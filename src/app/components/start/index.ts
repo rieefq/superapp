@@ -1,7 +1,8 @@
 /**
- * STUB — replaced by the shared-components track.
- * StartSheetHost renders the Start sheet bound to useShellStore().startSheet (mounted once by the shell).
+ * The Start sheet (§5.4.11, §3.10). The shell mounts StartSheetHost once; everything else opens it with
+ * `openStartSheet(kind, { source, prefill, background })` from '@/app/shell/store'.
  */
-export function StartSheetHost(): null {
-  return null
-}
+export { StartSheetHost } from './StartSheetHost'
+export { StartSheet, StartPanel, type StartSheetProps, type StartPanelProps } from './StartSheet'
+export { START_KINDS, START_KIND_META, STUDIO_KINDS, AUTONOMY_OPTIONS, type StartKindMeta, type StudioKind } from './kinds'
+export { startWork, validateStart, capRun, dueFromInput, startEvents, type StartForm, type StartResult } from './submit'

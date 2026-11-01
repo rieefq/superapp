@@ -1,10 +1,11 @@
 import { createContext, useContext, type DragEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { useInRouterContext, useNavigate, useSearchParams } from 'react-router'
 import { ArrowUpRight, Hand, PanelRight, X } from 'lucide-react'
-import { useRow } from '@/core/db'
+import { useDB, useRow, type Tables } from '@/core/db'
 import { getContext, useIsPinned } from '@/core/context'
 import { getIntegration } from '@/core/integrations/catalog'
 import { KIND_META, TASK_STATUS_LABEL, useEntity, type ResolvedEntity } from '@/core/services/entities'
+import { clipLine, plainText } from '@/core/services/serviceHelpers'
 import { HUES, refKey, type ApprovalStatus, type EntityKind, type EntityRef, type Hue, type RunStatus, type TaskStatus } from '@/core/types'
 import { cn } from '@/lib/cn'
 import { timeAgo } from '@/lib/format'
@@ -56,6 +57,52 @@ export function entityStatusWord(kind: EntityKind, status: string | undefined): 
   if (kind === 'approval' && status in APPROVAL_WORD) return APPROVAL_WORD[status as ApprovalStatus]
   const words = status.replace(/[_-]+/g, ' ').trim()
   return words ? words[0].toUpperCase() + words.slice(1) : undefined
+}
+
+// ------------------------------------------------------------------ excerpts
+
+/** The most useful short text an entity has (task description, document summary, source snippet…). */
+export function excerptIn(s: Tables, ref: EntityRef): string | undefined {
+  const { id } = ref
+  switch (ref.kind) {
+    case 'task':
+      return s.tasks[id]?.description
+    case 'knowledge': {
+      const k = s.knowledge[id]
+      return k?.summary || k?.content
+    }
+    case 'source':
+      return s.sources[id]?.snippet
+    case 'message':
+      return s.messages[id]?.content
+    case 'run': {
+      const r = s.runs[id]
+      return r?.summary ?? r?.error
+    }
+    case 'investigation':
+      return s.investigations[id]?.question
+    case 'project': {
+      const p = s.projects[id]
+      return p?.goal || p?.description
+    }
+    case 'agent':
+      return s.agents[id]?.description
+    case 'workflow':
+      return s.workflows[id]?.description
+    case 'approval':
+      return s.approvals[id]?.description ?? s.approvals[id]?.reason
+    default:
+      return undefined
+  }
+}
+
+/** A plain-text excerpt (≤ 240 characters) for hover cards and previews. */
+export function useEntityExcerpt(ref: EntityRef): string | undefined {
+  const { kind, id } = ref
+  return useDB((s) => {
+    const raw = excerptIn(s, { kind, id })
+    return raw ? clipLine(plainText(raw), 240) || undefined : undefined
+  })
 }
 
 // ------------------------------------------------------------------ marks
@@ -186,6 +233,8 @@ function HoverCardActions({ entity, route }: { entity: EntityRef; route: string 
 function HoverCardBody({ entity, className, routed }: EntityHoverCardProps & { routed?: boolean }) {
   const r = useEntity(entity)
   const project = useRow('projects', r.projectId && entity.kind !== 'project' ? r.projectId : null)
+  const own = useEntityExcerpt(entity)
+  const excerpt = own ?? (r.subtitle && r.subtitle !== project?.name ? r.subtitle : undefined)
   const lens = useContext(EntityCardContext)
   const custom = lens?.(entity)
   const status = entityStatusWord(entity.kind, r.status)
@@ -215,7 +264,7 @@ function HoverCardBody({ entity, className, routed }: EntityHoverCardProps & { r
             {r.updatedAt !== undefined && <span className="type-meta">Updated {timeAgo(r.updatedAt)}</span>}
           </div>
         )}
-        {custom ?? (r.subtitle && <p className="type-caption line-clamp-3 text-ink-2">{r.subtitle}</p>)}
+        {custom ?? (excerpt && <p className="type-caption line-clamp-3 text-ink-2 text-pretty">{excerpt}</p>)}
         {!r.exists && <p className="type-caption text-ink-3">This item was deleted or is no longer available.</p>}
       </div>
       {routed && r.exists && <HoverCardActions entity={entity} route={r.route} />}
@@ -290,6 +339,9 @@ function ChipFrame({
     if (e.key === ' ') {
       e.preventDefault()
       onInspect?.(entity)
+    } else if (onRemove && (e.key === 'Backspace' || e.key === 'Delete')) {
+      e.preventDefault()
+      onRemove()
     }
   }
   const onDragStart = (e: DragEvent<HTMLAnchorElement>) => {
@@ -303,7 +355,7 @@ function ChipFrame({
       <EntityMark entity={entity} resolved={r} size={sm ? 12 : 14} />
       {showKind && <span className="shrink-0 text-ink-3">{kindLabel} ·</span>}
       <span className={cn('min-w-0 truncate', !r.exists && 'text-ink-3 line-through decoration-ink-4')}>{title}</span>
-      {r.simulated && <SimBadge noTooltip className={sm ? 'h-3 px-0.5 text-[9px]' : undefined} />}
+      {r.simulated && <SimBadge noTooltip className={sm ? 'h-3.5 px-[3px] text-[9px] tracking-[0.04em]' : undefined} />}
     </>
   )
   const inner = cn('inline-flex min-w-0 items-center', sm ? 'gap-1' : 'gap-1.5')

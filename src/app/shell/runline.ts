@@ -4,6 +4,7 @@
  */
 import { startOfLocalDay, startOfLocalMonth } from '@/core/analytics'
 import type { ID, Run } from '@/core/types'
+import { formatCost } from '@/ui/signature/format'
 
 export interface RunLineInput {
   /** Queued, running, waiting and paused runs. */
@@ -46,6 +47,29 @@ export function splitPills(ordered: readonly Run[], visible: number): { shown: R
   return { shown: ordered.slice(0, n), overflow: Math.max(0, ordered.length - n) }
 }
 
+/** Width a pill needs to keep a readable title: waiting pills also carry "wants approval". */
+export function pillWidth(run: Pick<Run, 'status'>): number {
+  return run.status === 'waiting' ? 284 : run.status === 'failed' ? 250 : 236
+}
+
+/**
+ * How many pills fit in `width` px (leaving room for a +N pill when some don't), capped at the
+ * range's maximum (3 · 4 · 5 by breakpoint, §3.6). At least one pill always shows.
+ */
+export function fitPills(ordered: readonly Pick<Run, 'status'>[], width: number, max: number, gap = 6, overflowPill = 44): number {
+  let used = 0
+  let n = 0
+  for (const r of ordered) {
+    if (n >= max) break
+    const next = used + (n ? gap : 0) + pillWidth(r)
+    const remaining = ordered.length - (n + 1)
+    if (next + (remaining > 0 ? gap + overflowPill : 0) > width && n > 0) break
+    used = next
+    n++
+  }
+  return Math.max(Math.min(1, ordered.length), n)
+}
+
 export interface Spend {
   /** Live (non-simulated) spend of runs started today. */
   liveToday: number
@@ -85,13 +109,6 @@ export function budgetTone(monthCounted: number, monthlyBudgetUsd: number): Budg
   return 'normal'
 }
 
-/** $0.42 · $0.004 below a cent · $12.40 (§8.3). */
-export function formatCost(usd: number): string {
-  if (usd <= 0) return '$0.00'
-  if (usd < 0.01) return `$${usd.toFixed(3)}`
-  return `$${usd.toFixed(2)}`
-}
-
 export interface TotalsParts {
   running: number
   paused: number
@@ -110,16 +127,6 @@ export function totalsParts(active: readonly Run[], needsYou: number, spend: Spe
     else if (r.status === 'paused') paused++
   }
   const estimated = spend.liveToday <= 0
-  const spendLabel = estimated ? `est. ${formatCost(spend.simToday)} today` : `${formatCost(spend.liveToday)} today`
+  const spendLabel = estimated ? `${formatCost(spend.simToday, { est: true })} today` : `${formatCost(spend.liveToday)} today`
   return { running, paused, needsYou, spendLabel, estimated }
-}
-
-/** "01:24" / "1:02:09" elapsed since a timestamp (mono, §8.3). */
-export function formatElapsed(ms: number): string {
-  const total = Math.max(0, Math.floor(ms / 1000))
-  const h = Math.floor(total / 3600)
-  const m = Math.floor((total % 3600) / 60)
-  const s = total % 60
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`
 }

@@ -48,6 +48,12 @@ export interface CapabilityGrant {
   mode: GrantMode
   /** Which connected integration provides this capability (e.g. 'github', 'slack'). */
   integrationId?: string
+  /**
+   * Set by "Always allow" on an approval card: with mode 'allow', the agent may use this capability
+   * without asking regardless of its autonomy level (global always-ask settings still apply).
+   * Listed in Settings › Permissions with Revoke.
+   */
+  always?: boolean
 }
 
 export type PermissionDecision =

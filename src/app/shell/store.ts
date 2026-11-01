@@ -30,6 +30,8 @@ export interface ComposerContextSnapshot {
   likely?: EntityRef[]
   /** Refs switched off for this action (struck through). */
   off?: EntityRef[]
+  /** Project-memory parts switched off for this action. */
+  memoryOff?: ('goal' | 'instructions')[]
   /** Model the composer will use. */
   modelId?: string
 }
@@ -78,6 +80,8 @@ interface ShellState {
   stagePrimary: EntityRef | null
   /** The current selection inside the workspace (a list row, a node, a card). */
   selection: EntityRef | null
+  /** The workspace path segment the selection was made in (a selection never leaks across workspaces). */
+  selectionPath: string
   /** What the focused composer would send (Inspector › Context). */
   composerContext: ComposerContextSnapshot | null
 
@@ -114,6 +118,11 @@ interface ShellState {
 }
 
 const sameRef = (a: EntityRef, b: EntityRef) => a.kind === b.kind && a.id === b.id
+
+/** First path segment of the current location ('' for Home) — which workspace a selection belongs to. */
+export function currentSegment(pathname: string = typeof window === 'undefined' ? '/' : window.location.pathname): string {
+  return pathname.split('/')[1] ?? ''
+}
 const sameNullableRef = (a: EntityRef | null, b: EntityRef | null) => (a && b ? sameRef(a, b) : a === b)
 
 export const useShellStore = create<ShellState>()(
@@ -140,6 +149,7 @@ export const useShellStore = create<ShellState>()(
       listDrawerOpen: false,
       stagePrimary: null,
       selection: null,
+      selectionPath: '',
       composerContext: null,
 
       setInspector: (ws, patch) =>
@@ -189,7 +199,11 @@ export const useShellStore = create<ShellState>()(
       setMoreOpen: (open) => set({ moreOpen: open }),
       setListDrawerOpen: (open) => set({ listDrawerOpen: open }),
       setStagePrimary: (ref) => set((s) => (sameNullableRef(s.stagePrimary, ref) ? s : { stagePrimary: ref })),
-      setSelection: (ref) => set((s) => (sameNullableRef(s.selection, ref) ? s : { selection: ref })),
+      setSelection: (ref) =>
+        set((s) => {
+          const path = currentSegment()
+          return sameNullableRef(s.selection, ref) && s.selectionPath === path ? s : { selection: ref, selectionPath: path }
+        }),
       setComposerContext: (ctx) => set({ composerContext: ctx }),
       closeAllInspectors: () =>
         set((s) => {
@@ -246,4 +260,22 @@ export function setSelection(ref: EntityRef | null): void {
 /** Publish what the focused composer would send, for Inspector › Context (null when it unmounts). */
 export function setComposerContext(ctx: ComposerContextSnapshot | null): void {
   useShellStore.getState().setComposerContext(ctx)
+}
+
+/**
+ * Switch one context ref on or off for the next action (Inspector › Context toggles). Composers read
+ * `useShellStore((s) => s.composerContext?.off)` to honour toggles made in the Inspector.
+ */
+export function toggleContextRef(ref: EntityRef): void {
+  const cur = useShellStore.getState().composerContext ?? {}
+  const off = cur.off ?? []
+  const has = off.some((r) => sameRef(r, ref))
+  useShellStore.getState().setComposerContext({ ...cur, off: has ? off.filter((r) => !sameRef(r, ref)) : [...off, ref] })
+}
+
+/** Switch a project-memory part (goal or instructions) on or off for the next action. */
+export function toggleMemoryPart(part: 'goal' | 'instructions'): void {
+  const cur = useShellStore.getState().composerContext ?? {}
+  const off = cur.memoryOff ?? []
+  useShellStore.getState().setComposerContext({ ...cur, memoryOff: off.includes(part) ? off.filter((p) => p !== part) : [...off, part] })
 }

@@ -127,6 +127,12 @@ export function evaluatePermission(req: PermissionRequest, env?: Partial<Permiss
 
   if (asks.length) return ask(asks[0])
 
+  // An explicit "Always allow" grant skips the autonomy check (global always-ask was handled above).
+  if (agent) {
+    const grant = findGrant(agent.capabilities, capability, req.integrationId)
+    if (grant?.mode === 'allow' && grant.always) return allow(`You always allow ${agent.name} to ${verb}`)
+  }
+
   // (d) autonomy vs risk
   const autonomy = req.autonomy ?? agent?.autonomy ?? safety.defaultAutonomy
   const risk = req.risk ?? info.risk

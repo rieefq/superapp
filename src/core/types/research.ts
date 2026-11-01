@@ -20,6 +20,8 @@ export interface Investigation {
   depth: ResearchDepth
   /** Optional focus areas / sub-questions. */
   angles: string[]
+  /** Which source types the research run may use (default: both). Web search is simulated. */
+  sources?: { knowledge: boolean; web: boolean }
   sourceIds: ID[]
   findings: Finding[]
   /** Markdown report. */

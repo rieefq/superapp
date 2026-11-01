@@ -97,10 +97,10 @@ export function capabilityUses(s: Tables, input: PlanInput): CapabilityUse[] {
       for (const g of agent.capabilities) {
         if (seen.has(g.capability)) continue
         seen.add(g.capability)
-        // Same integration the agent script would use when the grant names none.
+        // Same integration the agent script would use when the grant names none (for the permission
+        // check). Agent runs are simulated scripts: only Atrium's own knowledge and tasks are touched for real.
         const integrationId = g.integrationId ?? AGENT_FALLBACK_INTEGRATION[g.capability]
-        const simulated = integrationId ? isSimIntegration(s, integrationId) : !LOCAL_CAPABILITIES.has(g.capability)
-        out.push({ capability: g.capability, integrationId, simulated })
+        out.push({ capability: g.capability, integrationId, simulated: !LOCAL_CAPABILITIES.has(g.capability) })
       }
       return out
     }
@@ -114,7 +114,8 @@ export function capabilityUses(s: Tables, input: PlanInput): CapabilityUse[] {
         const key = `${node.capability}:${node.integrationId ?? ''}`
         if (seen.has(key)) continue
         seen.add(key)
-        out.push({ capability: node.capability, integrationId: node.integrationId, simulated: node.integrationId ? isSimIntegration(s, node.integrationId) : !node.capability.startsWith('knowledge.') })
+        // Workflow steps run as simulated scripts; only Atrium's own knowledge and tasks are real.
+        out.push({ capability: node.capability, integrationId: node.integrationId, simulated: !LOCAL_CAPABILITIES.has(node.capability) })
       }
       return out
     }

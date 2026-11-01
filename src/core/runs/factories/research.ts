@@ -200,13 +200,17 @@ export function planInvestigation(params: Record<string, unknown>, rng: Rng): Ru
   const id = inv.id
   const budget = DEPTH_BUDGET[inv.depth]
   const angles = inv.angles.length ? inv.angles : deriveAngles(inv.question, inv.depth === 'quick' ? 3 : 4)
-  const hits = retrieve(inv, inv.question, budget.knowledgeLimit)
+  const useKnowledge = inv.sources?.knowledge !== false
+  const useWeb = inv.sources?.web !== false
+  const hits = useKnowledge ? retrieve(inv, inv.question, budget.knowledgeLimit) : []
 
   // Web searches: one per angle (quick: one combined search; deep: plus a skeptical one).
   const usedDomains = new Set<string>()
   const usedTitles = new Set<string>()
   const searches: SearchPlan[] = []
-  if (budget.combinedSearch) {
+  if (!useWeb) {
+    // Web search switched off for this investigation: knowledge-only research.
+  } else if (budget.combinedSearch) {
     const results = searchSimulatedWeb({ question: inv.question, angle: angles.join('; '), angleIndex: 0, count: budget.resultsPerSearch[1], rng, keyPrefix: 's0', usedDomains, usedTitles })
     results.forEach((r, i) => (r.angleIndex = i % Math.max(1, angles.length)))
     searches.push({ query: buildSearchQuery(inv.question, angles[0] ?? ''), angle: 'all angles', angleIndex: 0, contrarian: false, results })
@@ -217,7 +221,7 @@ export function planInvestigation(params: Record<string, unknown>, rng: Rng): Ru
       searches.push({ query: buildSearchQuery(inv.question, angle), angle, angleIndex: ai, contrarian: false, results })
     })
   }
-  if (budget.contrarian) {
+  if (useWeb && budget.contrarian) {
     const results = searchSimulatedWeb({ question: inv.question, angle: inv.question, angleIndex: angles.length, count: 2, rng, keyPrefix: 'c', contrarian: true, usedDomains, usedTitles })
     searches.push({ query: buildSearchQuery(inv.question, '', { contrarian: true }), angle: 'skeptical views', angleIndex: angles.length, contrarian: true, results })
   }
@@ -279,7 +283,7 @@ export function planInvestigation(params: Record<string, unknown>, rng: Rng): Ru
       durationMs: rng.int(1400, 2600),
       tokens: rng.int(450, 900),
     },
-    {
+    ...(useKnowledge ? [{
       kind: 'search',
       title: 'Search your knowledge base',
       detail: hits.length ? `${hits.length} relevant item${hits.length === 1 ? '' : 's'}` : 'Nothing relevant yet',
@@ -291,7 +295,7 @@ export function planInvestigation(params: Record<string, unknown>, rng: Rng): Ru
       durationMs: rng.int(900, 1700),
       tokens: rng.int(300, 700) + hits.reduce((a, h) => a + Math.ceil(h.passage.length / 4), 0),
       onComplete: () => ensureKnowledgeSources(id, hits),
-    },
+    } satisfies StepPlan] : []),
     ...searches.map(
       (s): StepPlan => ({
         kind: 'search',

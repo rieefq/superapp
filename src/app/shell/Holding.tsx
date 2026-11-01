@@ -78,8 +78,8 @@ function HoldingPanel({ pinned }: { pinned: ContextItem[] }) {
   return (
     <div className="flex min-h-0 flex-col">
       <header className="flex h-11 shrink-0 items-center gap-2 border-b border-line pr-2 pl-4">
-        <h2 className="type-title-3 flex-1 text-[15px]">Holding</h2>
-        {pinned.length > 0 && <span className="type-meta text-ink-3">{formatTokenEstimate(total)}</span>}
+        <h2 className="type-body flex-1 font-semibold text-ink">Holding</h2>
+        <span className="type-meta text-ink-3">{pinned.length}</span>
       </header>
       {pinned.length === 0 ? (
         <div className="flex flex-col items-start gap-1.5 px-4 py-5">

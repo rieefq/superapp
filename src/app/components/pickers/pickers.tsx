@@ -11,7 +11,8 @@ import { useSearch } from '@/core/search'
 import { computeAgentLiveStatus, KIND_META, resolveIn, useEntity, type AgentLiveStatus } from '@/core/services'
 import { isRunActive, type EntityKind, type EntityRef, type ID, type Run } from '@/core/types'
 import { cn } from '@/lib/cn'
-import { AgentMark, DynamicIcon, HUE_FILL, MonogramMark, SimBadge, type PopoverTriggerProps } from '@/ui'
+import { HUE_FILL, type PopoverTriggerProps } from '@/ui'
+import { AgentMark, EntityMark, MonogramMark, SimBadge } from '../sig'
 import { Picker, PickerTrigger, type PickerOption } from './Picker'
 
 /**
@@ -458,7 +459,7 @@ export function EntityPicker({ kinds, value, onChange, placeholder = 'Choose an 
       label: r.title,
       description: r.subtitle,
       group,
-      leading: <DynamicIcon name={r.icon} aria-hidden className="size-4 text-ink-3" strokeWidth={1.75} />,
+      leading: <EntityMark entity={r.ref} resolved={r} size={16} />,
       meta: r.simulated ? <SimBadge size="xs" label="SIM" /> : undefined,
     }))
   }, [resolved, query, suggestions])
@@ -478,7 +479,7 @@ export function EntityPicker({ kinds, value, onChange, placeholder = 'Choose an 
         base.trigger ??
         defaultTrigger(
           base,
-          current?.exists ? <DynamicIcon name={current.icon} aria-hidden className="size-3.5 shrink-0 text-ink-3" strokeWidth={1.75} /> : null,
+          current?.exists ? <EntityMark entity={current.ref} resolved={current} size={14} /> : null,
           current?.exists ? current.title : placeholder,
           !current?.exists,
         )

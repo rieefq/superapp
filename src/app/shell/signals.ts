@@ -76,19 +76,6 @@ export function useNeedsYou(): NeedsYou {
   return { approvals, sessions, tasks }
 }
 
-/** idle · working (a run is running) · waiting (an approval is pending; wins over working). §5.4.1 */
-export type ActivityState = 'idle' | 'working' | 'waiting'
-
-export function selectActivityState(s: Tables): ActivityState {
-  for (const a of Object.values(s.approvals)) if (a.status === 'pending') return 'waiting'
-  for (const r of Object.values(s.runs)) if (r.status === 'running') return 'working'
-  return 'idle'
-}
-
-export function useActivityState(): ActivityState {
-  return useDB(selectActivityState)
-}
-
 /** Which workspace's rail item reflects a run of this kind. */
 export const RUN_KIND_WORKSPACE: Record<RunKind, WorkspaceId> = {
   chat: 'chat',

@@ -2,7 +2,8 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { Layers, Paperclip, Plus, X } from 'lucide-react'
 import { useEntity } from '@/core/services/entities'
 import { cn } from '@/lib/cn'
-import { DynamicIcon, HUE_FILL, Sheet, Switch, Tooltip, toast } from '@/ui'
+import { HUE_FILL, Sheet, Switch, Tooltip, toast } from '@/ui'
+import { EntityMark } from '../sig'
 import type { ComposerContext, ContextEntry, ContextGroup } from './useComposerContext'
 import { useOpenContextInspector } from './ContextMeter'
 import { formatTokenCount } from './tokens'
@@ -15,6 +16,8 @@ export interface ContextLineProps {
   projectSlot?: ReactNode
   /** Opens Inspector › Context for "+n more" (default: the current workspace's Inspector). */
   onOpenInspector?: () => void
+  /** Wrap onto more lines instead of folding into "+n more" (sheets and dialogs, where the Inspector is out of reach). */
+  wrap?: boolean
   className?: string
 }
 
@@ -32,17 +35,17 @@ const GROUP_LABEL: Record<ContextGroup, string> = {
  * likely match). Likely chips are dimmed with a `+`; clicking one attaches it. Overflow folds into
  * "+n more", which opens Inspector › Context.
  */
-export function ContextLine({ context, collapsed, projectSlot, onOpenInspector, className }: ContextLineProps) {
+export function ContextLine({ context, collapsed, projectSlot, onOpenInspector, wrap, className }: ContextLineProps) {
   const openInspector = useOpenContextInspector()
   const entries = context.entries
   if (!entries.length && !projectSlot) return null
   if (collapsed) return <CollapsedContext context={context} className={className} />
-  return <ChipRow context={context} projectSlot={projectSlot} onMore={onOpenInspector ?? openInspector} className={className} />
+  return <ChipRow context={context} projectSlot={projectSlot} onMore={onOpenInspector ?? openInspector} wrap={wrap} className={className} />
 }
 
 // ------------------------------------------------------------------------------------------------ chip row
 
-function ChipRow({ context, projectSlot, onMore, className }: { context: ComposerContext; projectSlot?: ReactNode; onMore: () => void; className?: string }) {
+function ChipRow({ context, projectSlot, onMore, wrap, className }: { context: ComposerContext; projectSlot?: ReactNode; onMore: () => void; wrap?: boolean; className?: string }) {
   const rowRef = useRef<HTMLDivElement>(null)
   const [hidden, setHidden] = useState(0)
   const entries = context.entries
@@ -51,7 +54,7 @@ function ChipRow({ context, projectSlot, onMore, className }: { context: Compose
   // Fold chips that do not fit into "+n more" (measured; chips keep their natural width).
   useLayoutEffect(() => {
     const row = rowRef.current
-    if (!row) return
+    if (!row || wrap) return
     const measure = () => {
       const chips = Array.from(row.querySelectorAll<HTMLElement>('[data-context-chip]'))
       chips.forEach((c) => (c.style.display = ''))
@@ -72,7 +75,7 @@ function ChipRow({ context, projectSlot, onMore, className }: { context: Compose
     const ro = new ResizeObserver(measure)
     ro.observe(row)
     return () => ro.disconnect()
-  }, [signature])
+  }, [signature, wrap])
 
   let lastGroup: ContextGroup | 'slot' | null = projectSlot ? 'slot' : null
   return (
@@ -80,7 +83,7 @@ function ChipRow({ context, projectSlot, onMore, className }: { context: Compose
       ref={rowRef}
       role="group"
       aria-label="Context for this action"
-      className={cn('flex h-7 min-w-0 items-center gap-1.5 overflow-hidden', className)}
+      className={cn('flex min-w-0 items-center gap-1.5', wrap ? 'flex-wrap py-0.5' : 'h-7 overflow-hidden', className)}
     >
       {projectSlot}
       {entries.map((e) => {
@@ -236,13 +239,9 @@ function RefChip({ entry, context }: ContextChipProps) {
           onClick={() => context.toggle(entry.key)}
           className={CHIP_BUTTON}
         >
-          {held ? (
-            <Layers aria-hidden className={cn('size-3 shrink-0', on ? 'text-ink-3' : 'text-ink-4')} strokeWidth={2} />
-          ) : e.hue && (ref.kind === 'project' || ref.kind === 'collection' || ref.kind === 'workflow') ? (
-            <ProjectMark hue={e.hue} off={!on} />
-          ) : (
-            <DynamicIcon name={e.icon} aria-hidden className={cn('size-3 shrink-0', on ? 'text-ink-3' : 'text-ink-4')} strokeWidth={2} />
-          )}
+          <span className={cn('flex shrink-0', !on && 'opacity-40')}>
+            <EntityMark entity={ref} resolved={e} size={14} />
+          </span>
           <span className={cn('truncate', on ? 'text-ink' : 'text-ink-4 line-through decoration-ink-4')}>{name}</span>
           {e.simulated && <span className="type-meta-caps sim-hatch -my-px shrink-0 rounded-xs border border-dashed border-line-input px-1 text-[10px] leading-[14px] text-sim-ink">SIM</span>}
         </button>

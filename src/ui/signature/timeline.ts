@@ -1,5 +1,5 @@
 import { getIntegration } from '@/core/integrations/catalog'
-import type { EntityKind, Run, RunStep, StepKind, StepStatus } from '@/core/types'
+import type { Run, RunStep, StepKind, StepStatus } from '@/core/types'
 import { stepTitle } from './tense'
 
 /**
@@ -27,36 +27,63 @@ export type TimelineEntry = TimelineStepEntry | TimelineGroupEntry
 const READ_KINDS: readonly StepKind[] = ['read', 'browse']
 const GROUPABLE: readonly StepKind[] = ['read', 'browse', 'search']
 
-const NOUNS: Partial<Record<EntityKind, [string, string]>> = {
+const NOUNS: Record<string, [string, string]> = {
+  file: ['file', 'files'],
+  page: ['page', 'pages'],
+  item: ['item', 'items'],
   source: ['source', 'sources'],
   knowledge: ['document', 'documents'],
+  document: ['document', 'documents'],
+  note: ['note', 'notes'],
   repo: ['repository', 'repositories'],
   session: ['session', 'sessions'],
   task: ['task', 'tasks'],
   message: ['message', 'messages'],
   investigation: ['investigation', 'investigations'],
+  thread: ['conversation', 'conversations'],
 }
 
-function readNoun(steps: readonly RunStep[], runKind: Run['kind'] | undefined, n: number): string {
-  const kinds = new Set(steps.flatMap((s) => (s.refs ?? []).map((r) => r.kind)))
-  const pickNoun = (pair: [string, string]) => (n === 1 ? pair[0] : pair[1])
-  if (kinds.size === 1) {
-    const only = NOUNS[[...kinds][0]]
-    if (only) return pickNoun(only)
+const PATH_RE = /(?:^|[\s`'"(])((?:[\w.-]+\/)+[\w.-]+\.\w{1,8}|[\w-]+\.(?:tsx?|jsx?|json|md|css|py|go|rs|ya?ml|toml|sql|html|txt|csv))(?=$|[\s`'"),.:;])/g
+const COUNT_RE = /\b(\d+)\s+(?:more\s+|other\s+)?(pages?|sources?|files?|documents?|notes?|items?|articles?)\b/i
+
+/** What a finished read step read: file paths in its title, a counted noun ("Read 9 pages"), its refs, or one item. */
+export function readCounts(step: Pick<RunStep, 'title' | 'refs' | 'kind'>, runKind?: Run['kind']): Map<string, number> {
+  const out = new Map<string, number>()
+  const add = (noun: string, n: number) => out.set(noun, (out.get(noun) ?? 0) + n)
+  const paths = new Set([...step.title.matchAll(PATH_RE)].map((m) => m[1]))
+  if (paths.size) {
+    add('file', paths.size)
+    return out
   }
-  if (kinds.size === 0 && runKind === 'code') return pickNoun(['file', 'files'])
-  if (kinds.size === 0 && steps.every((s) => s.kind === 'browse')) return pickNoun(['page', 'pages'])
-  return pickNoun(['item', 'items'])
+  const counted = COUNT_RE.exec(step.title)
+  if (counted) {
+    const word = counted[2].toLowerCase().replace(/s$/, '')
+    add(word === 'article' ? 'page' : word, Number(counted[1]))
+    return out
+  }
+  if (step.refs?.length) {
+    for (const r of step.refs) add(NOUNS[r.kind] ? r.kind : 'item', 1)
+    return out
+  }
+  add(step.kind === 'browse' ? 'page' : runKind === 'code' ? 'file' : 'item', 1)
+  return out
 }
 
-/** Label for a collapsed group of finished read/search steps. */
+const phrase = (noun: string, n: number) => `${n} ${(NOUNS[noun] ?? NOUNS.item)[n === 1 ? 0 : 1]}`
+
+/** Label for a collapsed group of finished read/search steps: "Read 2 files and 1 document". */
 export function groupLabel(steps: readonly RunStep[], runKind?: Run['kind']): string {
   const reads = steps.filter((s) => READ_KINDS.includes(s.kind))
   const searches = steps.length - reads.length
-  const n = reads.reduce((sum, s) => sum + Math.max(1, s.refs?.length ?? 0), 0)
   if (!reads.length) return `Ran ${searches} searches`
-  const noun = readNoun(reads, runKind, n)
-  return searches ? `Searched and read ${n} ${noun}` : `Read ${n} ${noun}`
+  const totals = new Map<string, number>()
+  for (const s of reads) for (const [noun, n] of readCounts(s, runKind)) totals.set(noun === 'knowledge' ? 'document' : noun, (totals.get(noun === 'knowledge' ? 'document' : noun) ?? 0) + n)
+  const sorted = [...totals.entries()].sort((a, b) => b[1] - a[1])
+  const what =
+    sorted.length <= 2
+      ? sorted.map(([noun, n]) => phrase(noun, n)).join(' and ')
+      : phrase('item', sorted.reduce((sum, [, n]) => sum + n, 0))
+  return searches ? `Searched and read ${what}` : `Read ${what}`
 }
 
 /**

@@ -50,6 +50,8 @@ export interface CreateInvestigationInput {
   depth?: ResearchDepth
   angles?: string[]
   origin?: EntityRef
+  /** Source types the run may use (defaults: knowledge true, web true). */
+  sources?: { knowledge?: boolean; web?: boolean }
   /** Start the research run immediately (default true). */
   start?: boolean
 }
@@ -75,6 +77,12 @@ export function createInvestigation(input: CreateInvestigationInput): Investigat
     runIds: [],
     createdAt: now,
     updatedAt: now,
+  }
+  if (input.sources) {
+    const knowledge = input.sources.knowledge ?? true
+    const web = input.sources.web ?? true
+    if (!knowledge && !web) throw new Error('Choose at least one source for the investigation.')
+    inv.sources = { knowledge, web }
   }
   if (input.origin) inv.origin = { kind: input.origin.kind, id: input.origin.id }
   db.insert('investigations', inv)

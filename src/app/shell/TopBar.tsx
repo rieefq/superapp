@@ -1,9 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, type Ref } from 'react'
 import { useNavigate } from 'react-router'
 import { ChevronDown, ChevronRight, Search } from 'lucide-react'
 import { useDB } from '@/core/db'
 import { useScope } from '@/core/context'
-import { HUE_FILL, IconButton, KbdCombo, Menu, Tooltip, type MenuItem } from '@/ui'
+import { HUE_FILL, IconButton, KbdCombo, Menu, Tooltip, useActivityState, type MenuItem } from '@/ui'
 import { cn } from '@/lib/cn'
 import { MANIFESTS, NAV_GROUPS } from '../registry'
 import type { WorkspaceManifest } from '../types'
@@ -11,7 +11,7 @@ import { chordCombo } from '../shortcuts'
 import { useShellStore } from './store'
 import { useShellLayout } from './context'
 import { Mark, type MarkState } from './sig'
-import { useActivityState, useNeedsYouCount } from './signals'
+import { useNeedsYouCount } from './signals'
 import { ProjectSwitcher } from './ProjectSwitcher'
 import { HoldingChip } from './Holding'
 import { NeedsYouButton } from './NeedsYou'
@@ -76,6 +76,7 @@ function WorkspaceCrumb({ manifest }: { manifest: WorkspaceManifest }) {
         <button
           type="button"
           {...props}
+          ref={props.ref as Ref<HTMLButtonElement>}
           aria-label={`Workspace: ${manifest.label}. Switch workspace`}
           className={cn(
             'flex h-8 min-w-0 shrink-0 items-center gap-1.5 rounded-sm px-2 text-ink-2 transition-colors duration-(--dur-1) ease-standard',

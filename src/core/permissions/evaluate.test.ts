@@ -168,3 +168,27 @@ describe('helpers', () => {
     expect(findGrant(g, 'web.search')).toBeUndefined()
   })
 })
+
+describe('always-allow grants', () => {
+  it('lets an "Always allow" grant skip the autonomy check but not global always-ask', async () => {
+    const { db: database } = await import('@/core/db')
+    const { evaluatePermission: evaluate } = await import('./evaluate')
+    const base = database.get('agents', 'agt_always')
+    if (!base) {
+      database.insert('agents', {
+        id: 'agt_always', name: 'Ally', role: 'Coder', description: '', hue: 'sky', sigil: 1, modelId: 'sim-deep',
+        instructions: '', knowledgeScope: { all: true, collectionIds: [], projectIds: [] }, autonomy: 'balanced',
+        status: 'active', createdAt: 0, updatedAt: 0,
+        capabilities: [{ capability: 'repo.write', mode: 'allow' }],
+      })
+    }
+    // Plain allow: balanced autonomy still asks for a medium-risk capability.
+    expect(evaluate({ capability: 'repo.write', agentId: 'agt_always' }).outcome).toBe('ask')
+    database.update('agents', 'agt_always', (a) => ({ ...a, capabilities: [{ capability: 'repo.write', mode: 'allow', always: true }] }))
+    expect(evaluate({ capability: 'repo.write', agentId: 'agt_always' }).outcome).toBe('allow')
+    // Global always-ask still wins.
+    setSafety({ alwaysAsk: ['messages.send'] })
+    database.update('agents', 'agt_always', (a) => ({ ...a, capabilities: [{ capability: 'messages.send', mode: 'allow', always: true }] }))
+    expect(evaluate({ capability: 'messages.send', agentId: 'agt_always' }).outcome).toBe('ask')
+  })
+})

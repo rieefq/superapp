@@ -8,7 +8,7 @@ import { estimateTokens } from '@/core/ai'
 import { describeSource, resolveEntity } from '@/core/services'
 import type { EntityRef, ID } from '@/core/types'
 import { refKey } from '@/core/types'
-import { toast } from '@/ui'
+import { ENTITY_DRAG_TYPE, toast } from '@/ui'
 
 const tokenCache = new Map<string, { at: number; tokens: number }>()
 
@@ -122,7 +122,7 @@ export function toggleHold(ref: EntityRef): void {
 }
 
 /** The drag payload type used by EntityChip (JSON EntityRef). */
-export const ENTITY_DRAG_TYPE = 'application/x-atrium-entity'
+export { ENTITY_DRAG_TYPE }
 
 export function readDraggedEntity(data: DataTransfer | null): EntityRef | null {
   if (!data) return null

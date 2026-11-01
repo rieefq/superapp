@@ -1,3 +1,4 @@
+import type { Ref } from 'react'
 import { NavLink, useNavigate } from 'react-router'
 import { Settings2 } from 'lucide-react'
 import { Menu, Tooltip } from '@/ui'
@@ -59,7 +60,7 @@ function RailItem({ manifest, labeled, badge }: { manifest: WorkspaceManifest; l
                 <Icon aria-hidden className="size-5" strokeWidth={1.5} />
                 <Badges badge={badge} />
               </span>
-              {labeled && <span className="type-micro max-w-full truncate px-1">{manifest.label}</span>}
+              {labeled && <span className="type-micro max-w-full truncate tracking-[-0.01em]">{manifest.label}</span>}
             </>
           )}
         </NavLink>
@@ -108,6 +109,7 @@ function SystemMenu({ items }: { items: WorkspaceManifest[] }) {
         <button
           type="button"
           {...props}
+          ref={props.ref as Ref<HTMLButtonElement>}
           aria-label="System"
           className="grid size-10 place-items-center rounded-sm text-ink-3 transition-colors duration-(--dur-1) hover:bg-hover hover:text-ink-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--focus-ring)"
         >

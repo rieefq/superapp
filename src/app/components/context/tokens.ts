@@ -85,7 +85,7 @@ export function estimateAttachmentTokens(a: Attachment): number {
 
 /** "~840", "~3.2k", "~1.2M" — the ContextMeter's reading. */
 export function formatTokenCount(n: number, approx = true): string {
-  const prefix = approx ? '~' : ''
+  const prefix = approx && n > 0 ? '~' : ''
   if (n < 1000) return `${prefix}${Math.max(0, Math.round(n))}`
   if (n < 1_000_000) {
     const k = n / 1000

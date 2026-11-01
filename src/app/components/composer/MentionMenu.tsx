@@ -6,7 +6,7 @@ import { useSearch } from '@/core/search'
 import { resolveIn, type ResolvedEntity } from '@/core/services'
 import { isRunActive, refKey, type EntityRef, type ID } from '@/core/types'
 import { cn } from '@/lib/cn'
-import { AgentMark, DynamicIcon, SimBadge } from '@/ui'
+import { EntityMark, SimBadge } from '../sig'
 import type { SlashCommand } from '@/app/types'
 
 /**
@@ -162,11 +162,7 @@ export function MentionList({ id, options, active, onPick, onHover }: {
               className="flex min-h-8 cursor-pointer items-center gap-2.5 rounded-sm px-2 py-1 select-none data-active:bg-ink/8 pointer-coarse:min-h-11"
             >
               <span aria-hidden className="grid size-4 shrink-0 place-items-center">
-                {o.agent ? (
-                  <AgentMark seed={o.agent.sigil} hue={o.agent.hue as never} size={16} />
-                ) : (
-                  <DynamicIcon name={o.entity.icon} className="size-4 text-ink-3" strokeWidth={1.75} />
-                )}
+                <EntityMark entity={o.ref} resolved={o.entity} size={16} />
               </span>
               <span className="min-w-0 flex-1 truncate text-sm text-ink">{o.entity.title}</span>
               {o.entity.simulated && <SimBadge size="xs" label="SIM" />}

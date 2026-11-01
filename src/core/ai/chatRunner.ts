@@ -6,7 +6,17 @@ import type { EntityRef, ID, Message, ToolTrace, Usage } from '@/core/types'
 import { truncate } from '@/lib/format'
 import { hashString } from '@/lib/rng'
 import { newId } from '@/lib/id'
-import { buildTurns, citedIndexes, gatherKnowledge, LENGTH_NOTE, REFUSAL_NOTE, systemPromptFor, toCitations, toKnowledgeDocs } from './chatContext'
+import {
+  buildTurns,
+  citedIndexes,
+  gatherKnowledge,
+  LENGTH_NOTE,
+  REFUSAL_NOTE,
+  systemPromptFor,
+  toCitations,
+  toKnowledgeDocs,
+  type ContextSelection,
+} from './chatContext'
 import { estimateCost } from './models'
 import { checkModel, unavailableMessage } from './registry'
 import type { ModelProvider, StreamEvent } from './types'
@@ -92,6 +102,8 @@ export interface GenerationInput {
   messageId: ID
   modelId: string
   runId?: ID
+  /** The Context Line selection for this turn (exclusions + the exact retrieved set). */
+  selection?: ContextSelection
 }
 
 /**
@@ -149,7 +161,7 @@ async function generate(input: GenerationInput, gen: Generation): Promise<void> 
     .pop()
   const query = prevUser?.content.trim() ?? ''
   const searchStartedAt = Date.now()
-  const { docs, searched } = gatherKnowledge(thread, query, settings.ai.autoRetrieve)
+  const { docs, searched } = gatherKnowledge(thread, query, settings.ai.autoRetrieve, input.selection)
   const refs: EntityRef[] = docs.map((d) => ({ kind: 'knowledge', id: d.item.id }))
   const citations = toCitations(docs)
   const tools: ToolTrace[] = []
@@ -186,7 +198,7 @@ async function generate(input: GenerationInput, gen: Generation): Promise<void> 
   // --- Request --------------------------------------------------------------
   const request = {
     modelId,
-    system: systemPromptFor(thread, toKnowledgeDocs(docs), settings.profile.name),
+    system: systemPromptFor(thread, toKnowledgeDocs(docs), settings.profile.name, Date.now(), input.selection),
     messages: buildTurns(thread, messageId, model),
     effort: settings.ai.effort,
     reasoning: settings.ai.showReasoning,

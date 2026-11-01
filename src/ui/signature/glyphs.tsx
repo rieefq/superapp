@@ -163,7 +163,7 @@ export interface TaskGlyphProps extends GlyphA11y {
 /** Task squares (10px in a 12px box): backlog, to do, in progress, review, done, cancelled. */
 export function TaskGlyph({ status, live, attention, size = 12, label, decorative, className }: TaskGlyphProps) {
   const spec = taskGlyph(status, { live, attention })
-  const clip = useId()
+  const clip = `tg${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`
   const inset = spec.stroke / 2 + 1
   const side = 12 - inset * 2
   return (

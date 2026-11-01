@@ -1,6 +1,6 @@
 import { isRunActive, type ID, type Run, type RunStatus, type RunStep, type StepStatus } from '@/core/types'
 import { RUN_STATUS_META, STEP_STATUS_META } from './glyphMeta'
-import { stepTitle } from './tense'
+import { stepTitle, stripTicks } from './tense'
 
 /**
  * Step Tape model (docs/DESIGN.md §5.4.2): one cell per step, everywhere a run is referenced.
@@ -80,7 +80,7 @@ function tapeLabel(run: TapeRun, total: number, totalKnown: boolean, current: nu
     case 'failed': {
       if (current < 0) return 'Failed before the first step'
       const step = steps[current]
-      return `Failed at step ${current + 1} of ${total}: ${stepTitle(step.title, 'failed')}`
+      return `Failed at step ${current + 1} of ${total}: ${stripTicks(stepTitle(step.title, 'failed'))}`
     }
     case 'cancelled':
       return current < 0 ? 'Stopped before the first step' : `Stopped at step ${current + 1} of ${total}`
@@ -90,7 +90,7 @@ function tapeLabel(run: TapeRun, total: number, totalKnown: boolean, current: nu
       if (current < 0) return `${word}, no steps yet`
       const step = steps[current]
       const stepWord = run.status === 'paused' ? 'paused' : STEP_STATUS_META[step.status].word.toLowerCase()
-      return `${of(current + 1)}: ${stepTitle(step.title, step.status)}, ${stepWord}`
+      return `${of(current + 1)}: ${stripTicks(stepTitle(step.title, step.status))}, ${stepWord}`
     }
   }
 }

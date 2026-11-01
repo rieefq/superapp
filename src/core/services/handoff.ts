@@ -4,6 +4,7 @@ import {
   ME,
   type ActorRef,
   type AssetKind,
+  type Autonomy,
   type EntityRef,
   type ID,
   type KnowledgeKind,
@@ -174,6 +175,13 @@ export interface ToCodeSessionInput {
   prompt: string
   projectId?: ID | null
   title?: string
+  /** Approval policy for the session. */
+  autonomy?: Autonomy
+  agentId?: ID
+  /** Linked task (defaults to the source when it is a task). */
+  taskId?: ID
+  branch?: string
+  baseBranch?: string
 }
 
 export function toCodeSession(source: EntityRef, input: ToCodeSessionInput): HandoffResult {
@@ -184,7 +192,11 @@ export function toCodeSession(source: EntityRef, input: ToCodeSessionInput): Han
     prompt: input.prompt,
     title: input.title,
     projectId,
-    taskId: source.kind === 'task' ? source.id : undefined,
+    taskId: input.taskId ?? (source.kind === 'task' ? source.id : undefined),
+    agentId: input.agentId,
+    autonomy: input.autonomy,
+    branch: input.branch,
+    baseBranch: input.baseBranch,
     origin: source,
   })
   const ref: EntityRef = { kind: 'session', id: session.id }

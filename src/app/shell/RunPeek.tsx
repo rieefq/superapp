@@ -1,25 +1,21 @@
-import { useNavigate } from 'react-router'
 import { useDB } from '@/core/db'
-import { entityRoute, RUN_KIND_LABEL } from '@/core/services'
+import { RUN_KIND_LABEL } from '@/core/services'
 import { runEngine } from '@/core/runs'
 import type { Run } from '@/core/types'
-import { Button } from '@/ui'
-import { IdCode } from '@/ui/signature'
-import { shortCode } from '@/lib/id'
+import { Button, IdCode, formatClock, useRunElapsed } from '@/ui'
 import { cn } from '@/lib/cn'
 import { ConnectedApproval, RunGlyph, StepGlyph, Tape, runStatusWord } from './sig'
-import { formatElapsed } from './runline'
 
 /** The Run Line peek card (§3.6): current step and detail, last 3 steps, tape, and Attach · Open · Pause · Stop. */
-export function RunPeek({ run, now, onAttach, onOpen }: { run: Run; now: number; onAttach: () => void; onOpen: () => void }) {
-  const navigate = useNavigate()
+export function RunPeek({ run, onAttach, onOpen }: { run: Run; onAttach: () => void; onOpen: () => void }) {
+  const elapsedMs = useRunElapsed(run)
   const pending = useDB((s) => Object.values(s.approvals).find((a) => a.runId === run.id && a.status === 'pending')?.id)
   const project = useDB((s) => (run.projectId ? s.projects[run.projectId]?.name : undefined))
   const current = [...run.steps].reverse().find((s) => s.status === 'running' || s.status === 'waiting') ?? run.steps[run.steps.length - 1]
   const recent = run.steps.filter((s) => s !== current).slice(-3)
   const done = run.steps.filter((s) => s.status === 'done').length
   const total = Math.max(run.steps.length, run.plannedSteps ?? 0)
-  const elapsed = formatElapsed((run.endedAt ?? now) - (run.startedAt ?? run.createdAt))
+  const elapsed = formatClock(elapsedMs)
   const active = run.status === 'running' || run.status === 'queued' || run.status === 'waiting' || run.status === 'paused'
 
   return (
@@ -29,7 +25,7 @@ export function RunPeek({ run, now, onAttach, onOpen }: { run: Run; now: number;
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="type-body-sm line-clamp-2 font-medium text-ink">{run.title}</span>
           <span className="type-meta flex flex-wrap items-center gap-x-1.5 text-ink-3">
-            <IdCode id={run.id} label={shortCode(run.id)} />
+            <IdCode id={run.id} />
             <span aria-hidden>·</span>
             <span>{RUN_KIND_LABEL[run.kind]}</span>
             {project && (
@@ -86,10 +82,7 @@ export function RunPeek({ run, now, onAttach, onOpen }: { run: Run; now: number;
         <Button
           size="xs"
           variant="ghost"
-          onClick={() => {
-            onOpen()
-            navigate(entityRoute({ kind: 'run', id: run.id }))
-          }}
+          onClick={onOpen}
         >
           Open
         </Button>

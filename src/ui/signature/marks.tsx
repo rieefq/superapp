@@ -106,8 +106,9 @@ const monogramOf = (text: string) => {
 export function MonogramMark({ text, hue, size = 24, variant = 'square', simulated, icon, label, className }: MonogramMarkProps) {
   const letters = monogramOf(text)
   const Icon = typeof icon === 'string' ? getIcon(icon) : icon
-  const fontSize = Math.round(size * (letters.length > 2 ? 0.42 : 0.55) * 10) / 10
   const ring = variant === 'ring'
+  // Square: 55% of the size (§5.4.7). A ring has less room inside, so two letters step down.
+  const fontSize = Math.round(size * (letters.length > 2 || (ring && letters.length > 1) ? 0.42 : 0.55) * 10) / 10
   const c = size / 2
   return (
     <span

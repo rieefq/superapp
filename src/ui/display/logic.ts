@@ -11,7 +11,7 @@ import type { Hue } from '@/core/types'
 export type LogTone = 'done' | 'fail' | 'attn' | 'dim' | 'plain'
 
 const TS_RE = /^(\[?\d{4}-\d{2}-\d{2}[T ][\d:.]+(Z|[+-]\d{2}:?\d{2})?\]?|\[?\d{1,2}:\d{2}:\d{2}(\.\d{1,3})?\]?)\s+/
-const ZERO_RE = /\b(0|no|zero) (failed|failures?|errors?|warnings?|problems?)\b/gi
+const ZERO_RE = /\b(0|no|zero) (?:[a-z-]+ )?(failed|failures?|errors?|warnings?|problems?)\b/gi
 const FAIL_RE = /(✗|✕|✖|❌|(^|\s)×\s|\bFAIL(ED|URE|S)?\b|\bERR!|\bERROR\b|\b[A-Z]?\w*Error\b|\berror(s)?\b|\bfailed\b|\bfailures?\b|\bfatal\b|\bpanic(ked)?\b|Traceback|\bException\b|\bexit code [1-9]\d*)/i
 const ATTN_RE = /(⚠|\bWARN(ING)?S?\b|\bwarn(ing|ings)?\b|\bdeprecated\b)/i
 const DONE_RE = /(✓|✔|✅|\bPASS(ED)?\b|\bpassed\b|\bsucce(ss|eded|ssful|ssfully)\b|\bdone\b|\bcompleted?\b|\bready\b|\bbuilt\b|\bok\b)/i

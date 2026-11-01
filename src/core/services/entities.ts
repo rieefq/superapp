@@ -37,7 +37,7 @@ export const KIND_META: Record<EntityKind, EntityMeta> = {
   message: { label: 'Message', plural: 'Messages', icon: 'MessageSquareText', workspace: 'chat' },
   run: { label: 'Run', plural: 'Runs', icon: 'Activity', workspace: 'agents' },
   approval: { label: 'Approval', plural: 'Approvals', icon: 'ShieldCheck', workspace: 'agents' },
-  agent: { label: 'Agent', plural: 'Agents', icon: 'Bot', workspace: 'agents' },
+  agent: { label: 'Agent', plural: 'Agents', icon: 'Orbit', workspace: 'agents' },
   workflow: { label: 'Workflow', plural: 'Workflows', icon: 'Workflow', workspace: 'workflows' },
   knowledge: { label: 'Knowledge', plural: 'Knowledge', icon: 'BookOpen', workspace: 'knowledge' },
   collection: { label: 'Collection', plural: 'Collections', icon: 'Library', workspace: 'knowledge' },
@@ -82,10 +82,10 @@ export const KNOWLEDGE_KIND_META: Record<KnowledgeKind, { label: string; icon: s
 const RUN_KIND_ICON: Record<RunKind, string> = {
   chat: 'MessagesSquare',
   code: 'SquareTerminal',
-  agent: 'Bot',
+  agent: 'Orbit',
   research: 'Telescope',
   workflow: 'Workflow',
-  studio: 'Sparkles',
+  studio: 'Palette',
 }
 
 const ASSET_KIND_META: Record<AssetKind, { label: string; icon: string }> = {

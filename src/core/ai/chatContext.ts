@@ -46,10 +46,30 @@ function dedupeRefs(refs: readonly EntityRef[]): EntityRef[] {
   })
 }
 
-/** Thread context + globally pinned context + the project's pinned memory. */
-export function explicitContextRefs(thread: Thread): EntityRef[] {
-  const project = db.get('projects', thread.projectId)
-  return dedupeRefs([...thread.contextRefs, ...getContext().pinned.map((p) => p.ref), ...(project?.pinnedRefs ?? [])])
+/**
+ * What the user chose in the Context Line for this action. "No context reaches a model unless it
+ * appears in the Context Line": switched-off chips are excluded, and when the composer reports the
+ * exact "Likely" set it showed, automatic retrieval is limited to it.
+ */
+export interface ContextSelection {
+  /** Refs switched off for this action (never sent). Excluding the project drops project memory. */
+  exclude?: readonly EntityRef[]
+  /** The auto-retrieved knowledge the composer displayed; when set, retrieval is restricted to these. */
+  retrieved?: readonly EntityRef[]
+}
+
+function excludedKeys(sel: ContextSelection | undefined): Set<string> {
+  return new Set((sel?.exclude ?? []).map(refKey))
+}
+
+/** Thread context + globally pinned (held) context + the project's pinned memory, minus exclusions. */
+export function explicitContextRefs(thread: Thread, sel?: ContextSelection): EntityRef[] {
+  const excluded = excludedKeys(sel)
+  const projectExcluded = !!thread.projectId && excluded.has(refKey({ kind: 'project', id: thread.projectId }))
+  const project = projectExcluded ? undefined : db.get('projects', thread.projectId)
+  return dedupeRefs([...thread.contextRefs, ...getContext().pinned.map((p) => p.ref), ...(project?.pinnedRefs ?? [])]).filter(
+    (r) => !excluded.has(refKey(r)),
+  )
 }
 
 /** The opening of an item, cut at a sentence boundary, for items retrieval did not match. */
@@ -69,9 +89,15 @@ export function leadPassage(item: KnowledgeItem): string {
  * Knowledge for a turn: explicitly attached/pinned items first (always included), then
  * automatic retrieval when enabled. Deduped and capped at MAX_CONTEXT_DOCS.
  */
-export function gatherKnowledge(thread: Thread, query: string, autoRetrieve: boolean): { docs: ContextDoc[]; searched: boolean } {
+export function gatherKnowledge(
+  thread: Thread,
+  query: string,
+  autoRetrieve: boolean,
+  sel?: ContextSelection,
+): { docs: ContextDoc[]; searched: boolean } {
   const out = new Map<ID, ContextDoc>()
-  const explicitIds = explicitContextRefs(thread)
+  const excluded = excludedKeys(sel)
+  const explicitIds = explicitContextRefs(thread, sel)
     .filter((r) => r.kind === 'knowledge')
     .map((r) => r.id)
   if (explicitIds.length) {
@@ -82,9 +108,12 @@ export function gatherKnowledge(thread: Thread, query: string, autoRetrieve: boo
       if (item) out.set(id, { item, passage: hit?.passage?.trim() || leadPassage(item) })
     }
   }
-  const searched = autoRetrieve && query.trim().length > 0
+  const allowlist = sel?.retrieved?.filter((r) => r.kind === 'knowledge').map((r) => r.id)
+  const searched = autoRetrieve && query.trim().length > 0 && (allowlist === undefined || allowlist.length > 0)
   if (searched) {
-    for (const hit of safeRetrieve(query, { projectId: thread.projectId, limit: MAX_CONTEXT_DOCS })) {
+    const opts: RetrieveOptions = allowlist ? { ids: allowlist, limit: MAX_CONTEXT_DOCS } : { projectId: thread.projectId, limit: MAX_CONTEXT_DOCS }
+    for (const hit of safeRetrieve(query, opts)) {
+      if (excluded.has(refKey({ kind: 'knowledge', id: hit.item.id }))) continue
       if (!out.has(hit.item.id) && hit.passage.trim()) out.set(hit.item.id, { item: hit.item, passage: hit.passage.trim() })
     }
   }
@@ -190,21 +219,28 @@ export function describeRef(ref: EntityRef): string | undefined {
 }
 
 /** Summaries of pinned non-knowledge context (the project itself is described separately). */
-export function contextSummaries(thread: Thread): string[] {
-  return explicitContextRefs(thread)
+export function contextSummaries(thread: Thread, sel?: ContextSelection): string[] {
+  return explicitContextRefs(thread, sel)
     .filter((r) => r.kind !== 'knowledge' && !(r.kind === 'thread' && r.id === thread.id) && !(r.kind === 'project' && r.id === thread.projectId))
     .map(describeRef)
     .filter((s): s is string => !!s)
     .slice(0, MAX_CONTEXT_LINES)
 }
 
-export function systemPromptFor(thread: Thread, docs: readonly KnowledgeDoc[], userName: string, now = Date.now()): string {
-  const project = db.get('projects', thread.projectId)
+export function systemPromptFor(
+  thread: Thread,
+  docs: readonly KnowledgeDoc[],
+  userName: string,
+  now = Date.now(),
+  sel?: ContextSelection,
+): string {
+  const projectExcluded = !!thread.projectId && excludedKeys(sel).has(refKey({ kind: 'project', id: thread.projectId }))
+  const project = projectExcluded ? undefined : db.get('projects', thread.projectId)
   return buildSystemPrompt({
     now,
     userName,
     project: project ? { name: project.name, goal: project.goal, instructions: project.instructions } : null,
-    context: contextSummaries(thread),
+    context: contextSummaries(thread, sel),
     docs: [...docs],
   })
 }

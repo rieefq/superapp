@@ -9,6 +9,7 @@ import type { Attachment, EntityRef, ID, Message, Thread } from '@/core/types'
 import { truncate } from '@/lib/format'
 import { newId } from '@/lib/id'
 import { abortGeneration, activeGenerationIds, startGeneration } from './chatRunner'
+import type { ContextSelection } from './chatContext'
 import { getModelInfo } from './registry'
 
 /**
@@ -77,7 +78,7 @@ function newAssistantMessage(threadId: ID, modelId: string, createdAt: number): 
 }
 
 /** Create the turn's `chat` run, attach it to the message and start generating in the background. */
-function startTurn(threadId: ID, messageId: ID, modelId: string): void {
+function startTurn(threadId: ID, messageId: ID, modelId: string, selection?: ContextSelection): void {
   const thread = db.get('threads', threadId)
   const info = getModelInfo(modelId)
   let runId: ID | undefined
@@ -95,7 +96,7 @@ function startTurn(threadId: ID, messageId: ID, modelId: string): void {
   } catch (err) {
     console.warn('[chat] createRun failed', err)
   }
-  void startGeneration({ threadId, messageId, modelId, runId })
+  void startGeneration({ threadId, messageId, modelId, runId, selection })
 }
 
 function stopThreadGenerations(thread: Thread): void {
@@ -245,6 +246,13 @@ export interface SendMessageInput {
   projectId?: ID | null
   /** Added to the thread's context. */
   contextRefs?: EntityRef[]
+  /** Context Line chips the user switched off for this message — never sent to the model. */
+  excludeRefs?: EntityRef[]
+  /**
+   * The exact auto-retrieved ("Likely") knowledge the composer showed. When provided, automatic
+   * retrieval is restricted to these items so nothing unseen reaches the model.
+   */
+  retrievedRefs?: EntityRef[]
 }
 
 export interface SendMessageResult {
@@ -285,7 +293,9 @@ export async function sendMessage(input: SendMessageInput): Promise<SendMessageR
   const assistant = newAssistantMessage(thread.id, modelId, now + 1)
   db.insertMany('messages', [userMessage, assistant])
   db.update('threads', thread.id, (t) => ({ ...t, title, modelId, messageIds: [...t.messageIds, userMessage.id, assistant.id], updatedAt: now }))
-  startTurn(thread.id, assistant.id, modelId)
+  const selection: ContextSelection | undefined =
+    input.excludeRefs || input.retrievedRefs ? { exclude: input.excludeRefs, retrieved: input.retrievedRefs } : undefined
+  startTurn(thread.id, assistant.id, modelId, selection)
   return { threadId: thread.id, userMessageId: userMessage.id, assistantMessageId: assistant.id }
 }
 

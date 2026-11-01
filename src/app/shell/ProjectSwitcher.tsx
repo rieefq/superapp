@@ -64,7 +64,7 @@ export function ProjectMark({ project, size = 16 }: { project?: Pick<Project, 'n
   if (!project) {
     return <span aria-hidden className="inline-block shrink-0 rounded-xs border border-line-input" style={{ width: size, height: size }} />
   }
-  return <MonogramMark text={project.name.slice(0, 1).toUpperCase()} hue={project.hue} size={size} className="shrink-0" />
+  return <MonogramMark text={project.name} hue={project.hue} size={size} className="shrink-0" />
 }
 
 type Row = { type: 'all' } | { type: 'project'; project: Project } | { type: 'new'; name: string }
@@ -116,11 +116,14 @@ export function ProjectSwitcher({ compact = false }: { compact?: boolean }) {
 function SwitcherPanel({ projects, scope, close, phone }: { projects: Project[]; scope: ID | null; close: () => void; phone: boolean }) {
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
+  // "New project" with nothing typed asks for a name first (the field becomes the name field).
+  const [naming, setNaming] = useState(false)
   const signals = useProjectSignals(true)
   const listId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
 
   const rows = useMemo<Row[]>(() => {
+    if (naming) return [{ type: 'new', name: query.trim() }]
     const q = query.trim().toLowerCase()
     const match = (p: Project) => !q || p.name.toLowerCase().includes(q)
     const starred = projects.filter((p) => p.starred && match(p))
@@ -130,7 +133,7 @@ function SwitcherPanel({ projects, scope, close, phone }: { projects: Project[];
     for (const p of [...starred, ...rest]) out.push({ type: 'project', project: p })
     out.push({ type: 'new', name: query.trim() })
     return out
-  }, [projects, query])
+  }, [projects, query, naming])
 
   const initial = Math.max(0, rows.findIndex((r) => (r.type === 'all' ? scope === null : r.type === 'project' && r.project.id === scope)))
   const [active, setActive] = useState(initial)
@@ -138,7 +141,13 @@ function SwitcherPanel({ projects, scope, close, phone }: { projects: Project[];
 
   const choose = (row: Row, open: boolean) => {
     if (row.type === 'new') {
-      const project = createProject({ name: row.name || 'Untitled project' })
+      if (!row.name) {
+        setNaming(true)
+        setActive(0)
+        inputRef.current?.focus()
+        return
+      }
+      const project = createProject({ name: row.name })
       switchScope(project.id)
       close()
       navigate(`/projects/${encodeURIComponent(project.id)}`)
@@ -186,8 +195,8 @@ function SwitcherPanel({ projects, scope, close, phone }: { projects: Project[];
           aria-controls={listId}
           aria-activedescendant={rows[activeIndex] ? optionId(activeIndex) : undefined}
           aria-autocomplete="list"
-          aria-label="Switch project"
-          placeholder="Switch project…"
+          aria-label={naming ? 'New project name' : 'Switch project'}
+          placeholder={naming ? 'Name the new project…' : 'Switch project…'}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value)

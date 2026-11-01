@@ -186,6 +186,9 @@ function Row({ label, children, className }: { label: string; children: ReactNod
   )
 }
 
+/** "$50" for whole-dollar budgets, "$50.50" otherwise. */
+const formatBudget = (usd: number) => (Number.isInteger(usd) ? `$${usd}` : formatCost(usd))
+
 function CostText({ cost, budget, capUsd }: Pick<ReadBackData, 'cost' | 'budget' | 'capUsd'>) {
   return (
     <span className="flex flex-wrap items-baseline gap-x-1.5">
@@ -201,7 +204,7 @@ function CostText({ cost, budget, capUsd }: Pick<ReadBackData, 'cost' | 'budget'
       {capUsd ? <span className="text-ink-3">· stops at {formatCost(capUsd)}</span> : null}
       {budget && budget.monthlyUsd > 0 && (
         <span className={cn(budget.ratio !== null && budget.ratio >= 1 ? 'text-fail-ink' : budget.ratio !== null && budget.ratio >= 0.8 ? 'text-attn-ink' : 'text-ink-3')}>
-          · {formatCost(budget.leftUsd)} left of {formatCost(budget.monthlyUsd)} this month
+          · {formatCost(budget.leftUsd)} left of {formatBudget(budget.monthlyUsd)} this month
         </span>
       )}
     </span>
@@ -223,7 +226,7 @@ export function ReadBack({ data, className }: ReadBackProps) {
         <span className="flex flex-wrap items-baseline justify-between gap-x-3">
           <span className="min-w-0">
             <span className="text-ink">{data.verb}</span>
-            {data.title && <span className="text-ink-2"> · “{data.title}”</span>}
+            {data.title && <span className="text-ink-2"> · “{data.title.trim()}”</span>}
           </span>
           <span className="shrink-0 text-ink-3">{data.projectName ? `in ${data.projectName}` : 'no project'}</span>
         </span>

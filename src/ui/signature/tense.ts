@@ -137,3 +137,6 @@ export function lowerFirst(text: string): string {
   if (/[A-Z]/.test(word.slice(1))) return text
   return word[0].toLowerCase() + word.slice(1) + m[2]
 }
+
+/** `npm test` → npm test (plain-text contexts: truncated titles, labels, aria). */
+export const stripTicks = (text: string): string => text.replace(/`([^`]+)`/g, '$1')

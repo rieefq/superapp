@@ -18,92 +18,96 @@ const snap = (deg: number, step = 15) => (((Math.round(deg / step) * step) % 360
 const pick = <T,>(rng: Rng, items: readonly T[]): T => items[Math.floor(rng.next() * items.length)]
 const round = (n: number) => Math.round(n * 1000) / 1000
 
-/** Evenly spaced rays with one shortened beat; sometimes a center dot. */
-const rays: Family = (rng) => {
-  const n = pick(rng, [3, 3, 4, 4, 5] as const)
-  const base = snap(rng.int(0, 359))
-  const from = pick(rng, [0.14, 0.2, 0.28])
-  const short = rng.int(0, n - 1)
-  const out: SigilElement[] = []
-  for (let i = 0; i < n; i++) {
-    const to = i === short ? from + 0.2 : pick(rng, [0.56, 0.62, SIGIL_MAX_RADIUS])
-    out.push({ type: 'stroke', angle: snap(base + (360 / n) * i, 5), from, to })
-  }
-  if (n < 5 && from >= 0.2 && rng.chance(0.5)) out.push({ type: 'dot', angle: 0, r: 0 })
+/*
+ * Composition rules (so sigils read as instruments, never as faces or punctuation):
+ * dots sit only at the hub or at the end of a spoke or arc; spokes start at or near the hub;
+ * arcs are concentric orbits; nothing is mirrored around the vertical axis.
+ */
+
+/** Spokes from a hub, one reaching further; sometimes a terminal on the longest. */
+const spokes: Family = (rng) => {
+  const n = pick(rng, [3, 3, 4] as const)
+  const rot = snap(rng.int(0, 359), 15) + 7.5
+  const hub = pick(rng, [0, 0.16, 0.22])
+  const reach = rng.shuffle([SIGIL_MAX_RADIUS, 0.58, 0.48, 0.62]).slice(0, n)
+  const out: SigilElement[] = reach.map((to, i) => ({ type: 'stroke', angle: snap(rot + (360 / n) * i + (i === 1 ? 12 : 0), 2.5), from: hub, to }))
+  const longest = reach.indexOf(Math.max(...reach))
+  if (rng.chance(0.55)) out.push({ type: 'dot', angle: (out[longest] as { angle: number }).angle, r: reach[longest] })
+  else if (hub > 0 && n === 3) out.push({ type: 'dot', angle: 0, r: 0 })
   return out
 }
 
-/** One orbit arc, a radial stroke reaching toward it, and a satellite dot. */
-const orbit: Family = (rng) => {
-  const a = snap(rng.int(0, 359))
-  const r = pick(rng, [0.5, 0.56, 0.62])
-  const span = pick(rng, [90, 120, 150])
-  const out: SigilElement[] = [
-    { type: 'arc', angle: a, span, r },
-    { type: 'stroke', angle: snap(a + 180), from: 0, to: pick(rng, [0.32, 0.4]) },
-    { type: 'dot', angle: snap(a + 180), r: pick(rng, [0.56, 0.62]) },
-  ]
-  if (rng.chance(0.45)) out.push({ type: 'dot', angle: 0, r: 0 })
-  return out
-}
-
-/** Scattered stars joined by short radial ticks. */
-const constellation: Family = (rng) => {
-  const base = snap(rng.int(0, 359), 30)
-  const dots = pick(rng, [2, 3] as const)
-  const out: SigilElement[] = []
-  for (let i = 0; i < dots; i++) {
-    out.push({ type: 'dot', angle: snap(base + i * (360 / dots) + rng.int(-20, 20), 5), r: pick(rng, [0.3, 0.46, 0.58]) })
-  }
-  const strokes = dots === 3 ? pick(rng, [1, 2] as const) : 2
-  for (let i = 0; i < strokes; i++) {
-    const angle = snap(base + 180 / dots + i * (360 / dots), 5)
-    out.push({ type: 'stroke', angle, from: pick(rng, [0.12, 0.22]), to: pick(rng, [0.5, 0.6]) })
-  }
-  return out
-}
-
-/** A long axis, a short cross-beat and a marker dot. */
-const compass: Family = (rng) => {
-  const a = snap(rng.int(0, 359), 45)
-  const out: SigilElement[] = [
-    { type: 'stroke', angle: a, from: 0.1, to: SIGIL_MAX_RADIUS },
-    { type: 'stroke', angle: snap(a + 180), from: 0.1, to: pick(rng, [0.42, 0.5]) },
-    { type: 'stroke', angle: snap(a + pick(rng, [90, 270])), from: 0.24, to: 0.46 },
-    { type: 'dot', angle: snap(a + pick(rng, [135, 225])), r: 0.5 },
-  ]
-  if (rng.chance(0.35)) out.push({ type: 'dot', angle: 0, r: 0 })
-  return out
-}
-
-/** Two facing arcs (brackets) around a core. */
-const brackets: Family = (rng) => {
-  const a = snap(rng.int(0, 179), 45)
-  const r = pick(rng, [0.5, 0.58])
+/** A radar sector: two radii and the arc between them, sometimes with a sweep line inside. */
+const sector: Family = (rng) => {
+  const a = snap(rng.int(0, 359), 15)
   const span = pick(rng, [70, 90, 110])
+  const r = pick(rng, [0.58, SIGIL_MAX_RADIUS])
   const out: SigilElement[] = [
+    { type: 'stroke', angle: snap(a - span / 2, 2.5), from: 0.08, to: r },
+    { type: 'stroke', angle: snap(a + span / 2, 2.5), from: 0.08, to: r },
+    { type: 'arc', angle: a, span, r },
+  ]
+  if (rng.chance(0.5)) out.push({ type: 'stroke', angle: snap(a + span / 6, 2.5), from: 0.16, to: r - 0.16 })
+  else out.push({ type: 'dot', angle: snap(a + 180, 5), r: 0.36 })
+  return out
+}
+
+/** A dial: an open arc, a needle and its pivot. */
+const gauge: Family = (rng) => {
+  const open = snap(rng.int(0, 359), 45)
+  const span = pick(rng, [240, 270])
+  const needle = snap(open + 180 + rng.int(-70, 70), 15)
+  const out: SigilElement[] = [
+    { type: 'arc', angle: snap(open + 180), span, r: 0.58 },
+    { type: 'stroke', angle: needle, from: 0, to: 0.42 },
+    { type: 'dot', angle: 0, r: 0 },
+  ]
+  if (rng.chance(0.5)) out.push({ type: 'stroke', angle: open, from: 0.46, to: SIGIL_MAX_RADIUS })
+  return out
+}
+
+/** Ticks on a ring around a hub (a reticle), rotated off-axis; one tick reaches in further. */
+const reticle: Family = (rng) => {
+  const n = pick(rng, [3, 4] as const)
+  const rot = snap(rng.int(8, 82), 7.5)
+  const long = rng.int(0, n - 1)
+  const inner = pick(rng, [0.32, 0.38])
+  const out: SigilElement[] = []
+  for (let i = 0; i < n; i++) out.push({ type: 'stroke', angle: snap(rot + (360 / n) * i, 2.5), from: i === long ? 0.18 : inner, to: SIGIL_MAX_RADIUS })
+  if (n === 3 || rng.chance(0.6)) out.push({ type: 'dot', angle: 0, r: 0 })
+  return out
+}
+
+/** Two facing orbit segments joined by a line through the hub. */
+const brackets: Family = (rng) => {
+  const a = snap(rng.int(0, 179), 15) + 15
+  const span = pick(rng, [70, 90, 110])
+  const r = pick(rng, [0.52, 0.58])
+  return [
     { type: 'arc', angle: a, span, r },
     { type: 'arc', angle: snap(a + 180), span, r },
+    { type: 'stroke', angle: snap(a + 90), from: 0, to: 0.3 },
+    { type: 'stroke', angle: snap(a + 270), from: 0, to: 0.3 },
   ]
-  if (rng.chance(0.5)) out.push({ type: 'dot', angle: 0, r: 0 })
-  else out.push({ type: 'stroke', angle: snap(a + 90), from: 0, to: 0.3 })
-  if (rng.chance(0.5)) out.push({ type: 'dot', angle: snap(a + 90), r: r })
+}
+
+/** Uneven branches with terminals, like a small network. */
+const branches: Family = (rng) => {
+  const rot = snap(rng.int(0, 359), 15)
+  const gaps = rng.shuffle([105, 125, 130])
+  const reach = rng.shuffle([0.62, 0.5, 0.4])
+  const out: SigilElement[] = []
+  let angle = rot
+  for (let i = 0; i < 3; i++) {
+    out.push({ type: 'stroke', angle: snap(angle, 2.5), from: 0.1, to: reach[i] })
+    angle += gaps[i]
+  }
+  const ends = rng.shuffle([0, 1, 2]).slice(0, 2)
+  for (const i of ends) out.push({ type: 'dot', angle: (out[i] as { angle: number }).angle, r: reach[i] })
   return out
 }
 
-/** A spiral-ish pair: arc plus two rays of different reach. */
-const sweep: Family = (rng) => {
-  const a = snap(rng.int(0, 359))
-  const out: SigilElement[] = [
-    { type: 'arc', angle: a, span: pick(rng, [120, 160, 200]), r: pick(rng, [0.42, 0.5]) },
-    { type: 'stroke', angle: snap(a + 120), from: 0.18, to: SIGIL_MAX_RADIUS },
-    { type: 'stroke', angle: snap(a + 240), from: 0.18, to: 0.44 },
-  ]
-  if (rng.chance(0.55)) out.push({ type: 'dot', angle: snap(a + 120), r: 0.28 })
-  return out
-}
-
-const FAMILIES: readonly Family[] = [rays, orbit, constellation, compass, brackets, sweep]
+const FAMILIES: readonly Family[] = [spokes, sector, gauge, reticle, brackets, branches]
 
 /** The sigil for an agent's `sigil` seed: 3–5 elements, identical for the same seed. */
 export function sigilElements(seed: number): SigilElement[] {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode, type Ref } from 'react'
+import { useCallback, useRef, useSyncExternalStore, type ReactNode, type Ref } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { X } from 'lucide-react'
 import { IconButton, Popover, Portal, useLayer, useOverlayFocus, useReducedMotion, useScrollLock, type PopoverTriggerProps, type Placement } from '@/ui'
@@ -145,18 +145,4 @@ export function ShellPopover({ open, onOpenChange, trigger, title, width, placem
       {children({ close, phone: false })}
     </Popover>
   )
-}
-
-/** Delay a boolean turning true (hover intents) — false applies immediately. */
-export function useDelayedTrue(value: boolean, delay: number): boolean {
-  const [out, setOut] = useState(false)
-  useEffect(() => {
-    if (!value) {
-      setOut(false)
-      return
-    }
-    const t = setTimeout(() => setOut(true), delay)
-    return () => clearTimeout(t)
-  }, [value, delay])
-  return out
 }

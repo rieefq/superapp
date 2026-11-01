@@ -3,7 +3,7 @@ import {
   ArrowRightLeft, BookOpen, FileDiff, FlaskConical, Globe, Hand, Hourglass, Lightbulb, Package, Palette, PenLine, Route, Search,
   Send, SquareTerminal, Wrench, type LucideIcon,
 } from 'lucide-react'
-import type { ID, StepKind, StepStatus } from '@/core/types'
+import type { ID, RunStatus, StepKind, StepStatus } from '@/core/types'
 import { cn } from '@/lib/cn'
 import { RunStatusGlyph } from './glyphs'
 import { computeTape, type TapeCell, type TapeRun } from './tape'
@@ -171,7 +171,7 @@ export function StepTape({ run, size = 'sm', max, interactive, selectedStepId, o
       style={{ height: s.h + 4 + (model.simulated ? 3 : 0), paddingBottom: model.simulated ? 3 : 0, gap: s.gap }}
     >
       {model.leading > 0 && (
-        <span aria-hidden className={cn('mr-0.5 self-center text-ink-3 tabular', s.text)} style={{ marginBottom: model.simulated ? -3 : 0 }}>
+        <span aria-hidden className={cn('mr-0.5 shrink-0 text-ink-3 tabular', s.text)} style={{ height: s.h, lineHeight: `${s.h}px` }}>
           +{model.leading}
         </span>
       )}
@@ -195,7 +195,7 @@ export function StepTape({ run, size = 'sm', max, interactive, selectedStepId, o
         )
       })}
       {model.trailing > 0 && (
-        <span aria-hidden className={cn('ml-0.5 self-center text-ink-4 tabular', s.text)}>
+        <span aria-hidden className={cn('ml-0.5 shrink-0 text-ink-3 tabular', s.text)} style={{ height: s.h, lineHeight: `${s.h}px` }}>
           +{model.trailing}
         </span>
       )}
@@ -207,6 +207,56 @@ export function StepTape({ run, size = 'sm', max, interactive, selectedStepId, o
       {model.simulated && (
         <span aria-hidden className="sig-dash-baseline pointer-events-none absolute right-0 bottom-0 left-0 h-px" />
       )}
+    </div>
+  )
+}
+
+// ------------------------------------------------------------------ outcome strip
+
+const OUTCOME_CELL: Record<RunStatus, StepStatus> = {
+  queued: 'pending',
+  running: 'running',
+  waiting: 'waiting',
+  paused: 'pending',
+  succeeded: 'done',
+  failed: 'failed',
+  cancelled: 'skipped',
+}
+
+export interface OutcomeTapeProps {
+  /** Run statuses, oldest first (e.g. a workflow's last runs). */
+  outcomes: readonly RunStatus[]
+  size?: StepTapeSize
+  /** Most cells to draw (the newest are kept). Default 12. */
+  max?: number
+  /** Accessible label prefix, default "Last runs". */
+  label?: string
+  className?: string
+}
+
+/** One cell per run outcome (workflow list strips, §5.4.2): done ink-3, failed fail, stopped slashed, live while running. */
+export function OutcomeTape({ outcomes, size = 'sm', max = 12, label = 'Last runs', className }: OutcomeTapeProps) {
+  const s = SIZES[size]
+  const shown = outcomes.slice(-max)
+  const count = (st: RunStatus) => shown.filter((o) => o === st).length
+  const parts = [
+    [count('succeeded'), 'done'],
+    [count('failed'), 'failed'],
+    [count('cancelled'), 'stopped'],
+    [count('running') + count('waiting') + count('queued') + count('paused'), 'in progress'],
+  ].filter(([n]) => (n as number) > 0).map(([n, w]) => `${n} ${w}`)
+  return (
+    <div
+      role="img"
+      aria-label={shown.length ? `${label}: ${parts.join(', ')}` : `${label}: none yet`}
+      className={cn('inline-flex shrink-0 items-end', className)}
+      style={{ gap: s.gap, height: s.h + 4 }}
+    >
+      {shown.length === 0 && <span className={cn('text-ink-4', s.text)}>—</span>}
+      {shown.map((o, i) => {
+        const st = OUTCOME_CELL[o]
+        return <span key={i} aria-hidden className={cn('block shrink-0 rounded-cell', CELL[st])} style={{ width: s.w, height: st === 'waiting' ? s.h + 4 : s.h }} />
+      })}
     </div>
   )
 }

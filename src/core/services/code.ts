@@ -8,7 +8,7 @@ import { slugify, titleFromText } from '@/core/sim/text'
 import { createRng } from '@/lib/rng'
 import {
   ME, isRunActive,
-  type CodeSession, type CodeTurn, type EntityRef, type FileChange, type ID, type Repo, type RepoFile, type Run, type SessionStatus,
+  type Autonomy, type CodeSession, type CodeTurn, type EntityRef, type FileChange, type ID, type Repo, type RepoFile, type Run, type SessionStatus,
 } from '@/core/types'
 import { newId } from '@/lib/id'
 import { logActivity } from './activity'
@@ -271,6 +271,12 @@ export interface CreateSessionInput {
   taskId?: ID
   agentId?: ID
   origin?: EntityRef
+  /** Approval policy for this session (overrides the agent's autonomy for its runs). */
+  autonomy?: Autonomy
+  /** Working branch name (default: atrium/<slug-of-title>, made unique). */
+  branch?: string
+  /** Base branch (default: the repository's default branch). */
+  baseBranch?: string
 }
 
 function codingAgentId(explicit?: ID): ID | undefined {
@@ -279,8 +285,8 @@ function codingAgentId(explicit?: ID): ID | undefined {
   return forge && forge.status === 'active' ? forge.id : undefined
 }
 
-function uniqueBranch(repoId: ID, title: string): string {
-  const base = `atrium/${slugify(title, 40)}`
+function uniqueBranch(repoId: ID, title: string, exact = false): string {
+  const base = exact ? title.replace(/\s+/g, '-') : `atrium/${slugify(title, 40)}`
   const taken = new Set(db.filter('sessions', (s) => s.repoId === repoId).map((s) => s.branch))
   if (!taken.has(base)) return base
   for (let n = 2; ; n++) if (!taken.has(`${base}-${n}`)) return `${base}-${n}`
@@ -333,9 +339,10 @@ export function createSession(input: CreateSessionInput): CodeSession {
     repoId: repo.id,
     title,
     projectId: input.projectId !== undefined ? input.projectId : (task?.projectId ?? repo.projectId ?? null),
-    branch: uniqueBranch(repo.id, title),
-    baseBranch: repo.defaultBranch,
+    branch: input.branch?.trim() ? uniqueBranch(repo.id, input.branch.trim(), true) : uniqueBranch(repo.id, title),
+    baseBranch: input.baseBranch?.trim() || repo.defaultBranch,
     status: 'working',
+    ...(input.autonomy ? { autonomy: input.autonomy } : {}),
     turns: [turn],
     changes: [],
     checks: [],

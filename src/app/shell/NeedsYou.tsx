@@ -30,7 +30,7 @@ export function NeedsYouButton({ compact = false }: { compact?: boolean }) {
     <ShellPopover
       open={open}
       onOpenChange={setOpen}
-      title="Needs you"
+      title="Needs you and updates"
       width={420}
       trigger={(props, state) => (
         <button

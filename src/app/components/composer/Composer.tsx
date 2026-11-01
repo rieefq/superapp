@@ -13,7 +13,8 @@ import {
 } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { ArrowUp, AtSign, ChevronDown, Gauge, Paperclip, Square } from 'lucide-react'
-import { Link } from 'react-router'
+import { Link, useLocation } from 'react-router'
+import { workspaceForPath } from '@/app/registry'
 import type { SlashCommand } from '@/app/types'
 import { estimateTokens, getModelInfo, useModelAvailability } from '@/core/ai'
 import { updateSettings, useSettings } from '@/core/settings'
@@ -87,7 +88,7 @@ export interface ComposerProps {
   modelId?: string
   onModelChange?: (modelId: string) => void
   showModel?: boolean
-  /** Inside the composer, above the input (Home's verb chips). */
+  /** Inside the composer, at the top — above the Context Line and the input (Home's verb chips). */
   above?: ReactNode
   /** Inside the composer, under the input (Home's router reason). */
   below?: ReactNode
@@ -143,7 +144,8 @@ export function Composer(props: ComposerProps) {
     className,
   } = props
   const submitLabel = props.submitLabel ?? (backgroundable ? 'Run' : 'Send')
-  const owned = useComposerContext(props.contextOptions)
+  const { pathname } = useLocation()
+  const owned = useComposerContext({ label: workspaceForPath(pathname).label, ...props.contextOptions })
   const ctx = props.context ?? owned
   const phone = !useBreakpointUp('md')
   const reduced = useReducedMotion()
@@ -177,6 +179,7 @@ export function Composer(props: ComposerProps) {
   const availability = useModelAvailability(modelId)
   const effort = useSettings((s) => s.ai.effort)
   const reasoning = !!model?.capabilities.includes('reasoning')
+  useEffect(() => ctx.setModel(modelId), [ctx.setModel, modelId])
 
   // ---- tokens & limits
   const draftTokens = text.trim() ? estimateTokens(text) : 0
@@ -396,6 +399,7 @@ export function Composer(props: ComposerProps) {
   return (
     <div
       ref={rootRef}
+      data-composer=""
       data-size={size}
       className={cn(
         'relative flex w-full min-w-0 flex-col rounded-md border bg-raised p-3 transition-[border-color,outline-color] duration-(--dur-1) ease-standard',
@@ -404,8 +408,8 @@ export function Composer(props: ComposerProps) {
         className,
       )}
     >
-      {showLine && <ContextLine context={ctx} collapsed={collapsed} projectSlot={projectSlot} className="mb-1.5" />}
       {above}
+      {showLine && <ContextLine context={ctx} collapsed={collapsed} projectSlot={projectSlot} className="mb-1" />}
       <AnimatePresence initial={false}>
         {queued && (
           <motion.div
@@ -433,6 +437,7 @@ export function Composer(props: ComposerProps) {
       </AnimatePresence>
       <textarea
         ref={mergeRefs(inputRef, textareaRef)}
+        data-composer-input=""
         value={text}
         rows={1}
         disabled={disabled}
@@ -456,6 +461,7 @@ export function Composer(props: ComposerProps) {
         }}
         onKeyDown={onKeyDown}
         onPaste={onPaste}
+        onFocus={ctx.activate}
         style={{ minHeight: MIN_HEIGHT[size] }}
         className={cn(
           'type-body-lg block max-h-(--composer-max) w-full resize-none bg-transparent px-0.5 py-1 text-ink outline-none placeholder:text-ink-3 disabled:cursor-not-allowed pointer-coarse:text-[16px]',

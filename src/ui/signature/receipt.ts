@@ -79,6 +79,16 @@ export function modelInfoFor(modelId: string | undefined, simulated: boolean): R
 
 const READ_LIKE = new Set(['read', 'browse', 'search', 'tool'])
 
+const GITHUB_VERB: Partial<Record<Capability, string>> = { 'repo.read': 'read', 'repo.write': 'write', 'repo.pull_request': 'pull request' }
+
+/** Tool name as the Colophon and Receipt list it: "GitHub read", "Web search", "Terminal". */
+export function toolUseLabel(step: Pick<Run['steps'][number], 'tool' | 'integrationId' | 'capability'>): string | undefined {
+  const label = toolLabel(step)
+  if (!label) return undefined
+  const verb = label === 'GitHub' && step.capability ? GITHUB_VERB[step.capability] : undefined
+  return verb ? `${label} ${verb}` : label
+}
+
 export interface BuildReceiptOptions {
   approvals?: readonly Approval[]
   now?: number
@@ -109,7 +119,7 @@ export function buildReceipt(run: Run, opts: BuildReceiptOptions = {}): ReceiptM
   // Tools, in first-use order.
   const tools = new Map<string, ReceiptTool>()
   for (const step of run.steps) {
-    const label = toolLabel(step)
+    const label = toolUseLabel(step)
     if (!label || step.status === 'pending') continue
     const simulated = isStepSimulated(run, step)
     const key = `${label}|${simulated}`
@@ -125,7 +135,12 @@ export function buildReceipt(run: Run, opts: BuildReceiptOptions = {}): ReceiptM
     const approval = approvals.find((a) => a.stepId === step.id) ?? approvals.find((a) => a.capability === step.capability)
     const label = CAPABILITIES[step.capability]?.label ?? step.capability
     if (approval) capabilities.set(step.capability, { capability: step.capability, label, ...decisionFor(approval) })
-    else if (step.status === 'failed' && step.error && !step.startedAt)
+    else if (step.approvalId) {
+      // The approval row is not at hand: the step's status still tells the decision.
+      const outcome = step.status === 'waiting' ? 'pending' : step.status === 'skipped' ? 'denied' : 'approved'
+      const decision = outcome === 'pending' ? 'waiting for you' : outcome === 'denied' ? 'denied by you' : 'approved by you'
+      capabilities.set(step.capability, { capability: step.capability, label, decision, outcome })
+    } else if (step.status === 'failed' && step.error && !step.startedAt)
       capabilities.set(step.capability, { capability: step.capability, label, decision: 'blocked by policy', outcome: 'blocked' })
     else if (step.status !== 'pending') capabilities.set(step.capability, { capability: step.capability, label, decision: 'allowed by policy', outcome: 'allowed' })
   }

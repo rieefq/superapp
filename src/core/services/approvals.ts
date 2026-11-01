@@ -40,7 +40,23 @@ export function useApprovalsForRun(runId: ID | null | undefined): Approval[] {
 }
 
 /** Approve a pending request; the waiting run continues with the approved step. */
-export function approve(id: ID, note?: string): void {
+/**
+ * Approve a pending request. With `payload`, the human edited what will happen (the command,
+ * message or text) before approving: the approval preview and the waiting step's input are
+ * updated so the run proceeds with — and records — the edited version.
+ */
+export function approve(id: ID, note?: string, opts?: { payload?: string }): void {
+  const payload = opts?.payload
+  if (payload !== undefined) {
+    const approval = db.get('approvals', id)
+    if (approval?.status === 'pending') {
+      if (approval.preview) db.update('approvals', id, { preview: { ...approval.preview, content: payload } })
+      db.update('runs', approval.runId, (run) => ({
+        ...run,
+        steps: run.steps.map((s) => (s.id === approval.stepId ? { ...s, input: payload } : s)),
+      }))
+    }
+  }
   runEngine.resolveApproval(id, 'approved', note)
 }
 

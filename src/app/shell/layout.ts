@@ -95,6 +95,8 @@ export interface DockingInput {
   listOpen: boolean
   listWidth: number
   bezel: number
+  /** The user asked for the list while the rule had collapsed it: keep it docked, float the Inspector. */
+  listForced?: boolean
 }
 
 export interface DockingResult {
@@ -134,7 +136,7 @@ export function computeDocking(input: DockingInput): DockingResult {
   if (withList >= STAGE_MIN) {
     return { inspector: 'docked', list: userList, listAutoCollapsed: false, stageWidth: withList }
   }
-  if (userList === 'docked') {
+  if (userList === 'docked' && !input.listForced) {
     const withoutList = areaWidth - dockedSpace
     if (withoutList >= STAGE_MIN) {
       return { inspector: 'docked', list: 'collapsed', listAutoCollapsed: true, stageWidth: withoutList }
