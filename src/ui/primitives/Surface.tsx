@@ -142,8 +142,8 @@ export function Panel({ title, kicker, actions, footer, padding = 'md', variant 
       {hasHeader && (
         <header className="flex min-h-11 items-center justify-between gap-3 border-b border-line px-4 py-2">
           <div className="flex min-w-0 items-baseline gap-2.5">
-            {kicker && <span className="shrink-0 font-mono text-2xs tracking-[0.08em] text-ink-3 uppercase">{kicker}</span>}
-            {title && <h3 className="truncate text-sm font-medium text-ink">{title}</h3>}
+            {kicker && <span className="type-label shrink-0 text-ink-3">{kicker}</span>}
+            {title && <h3 className="truncate text-sm font-semibold text-ink">{title}</h3>}
           </div>
           {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
         </header>

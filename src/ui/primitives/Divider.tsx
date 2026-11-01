@@ -4,7 +4,7 @@ import { cn } from '@/lib/cn'
 export interface DividerProps extends HTMLAttributes<HTMLDivElement> {
   ref?: Ref<HTMLDivElement>
   orientation?: 'horizontal' | 'vertical'
-  /** Optional mono kicker set into the line. */
+  /** Optional `label`-role kicker set into the line. */
   label?: ReactNode
   /** Where the label sits. Default 'start'. */
   labelAlign?: 'start' | 'center'
@@ -29,7 +29,7 @@ export function Divider({ orientation = 'horizontal', label, labelAlign = 'start
     return (
       <div role="separator" className={cn('flex items-center gap-3', className)} {...props}>
         {labelAlign === 'center' && <span aria-hidden className={cn('h-px flex-1', line)} />}
-        <span className="shrink-0 font-mono text-2xs tracking-[0.08em] text-ink-3 uppercase">{label}</span>
+        <span className="type-label shrink-0 text-ink-3">{label}</span>
         <span aria-hidden className={cn('h-px flex-1', line)} />
       </div>
     )

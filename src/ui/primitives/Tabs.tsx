@@ -53,9 +53,10 @@ export interface TabsProps<T extends string = string> {
   children?: ReactNode
 }
 
+/** Underline bars are 32 / 40px (DESIGN §5.5); pills are 28 / 32px controls for dense filters. */
 const SIZE = {
-  underline: { sm: 'h-9 text-sm gap-1.5', md: 'h-10 text-sm gap-1.5' },
-  pill: { sm: 'h-6 px-2 text-xs gap-1', md: 'h-7 px-2.5 text-sm gap-1.5' },
+  underline: { sm: 'h-8 text-sm gap-1.5', md: 'h-10 text-sm gap-1.5' },
+  pill: { sm: 'h-7 px-2 text-xs gap-1', md: 'h-8 px-2.5 text-sm gap-1.5' },
 }
 
 /**
@@ -160,7 +161,7 @@ export function Tabs<T extends string = string>({
         {item.count !== undefined && (
           <span
             className={cn(
-              'rounded-xs px-1 font-mono text-2xs leading-4 tabular',
+              'type-meta rounded-xs px-1 leading-4',
               selected ? 'bg-press text-ink-2' : 'bg-hover text-ink-3',
               variant === 'pill' && selected && 'bg-hover',
             )}

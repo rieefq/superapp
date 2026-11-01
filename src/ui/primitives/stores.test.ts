@@ -70,26 +70,41 @@ describe('toast()', () => {
 
   const list = () => toastStore.getState().toasts
 
-  it('adds a toast from a string and auto-dismisses after its duration', () => {
+  it('adds a toast from a string and auto-dismisses after 6s (DESIGN §3.8 updates)', () => {
     const id = toast('Saved')
     expect(list()).toHaveLength(1)
-    expect(list()[0]).toMatchObject({ id, title: 'Saved', tone: 'neutral', duration: 4000 })
-    vi.advanceTimersByTime(3999)
+    expect(list()[0]).toMatchObject({ id, title: 'Saved', tone: 'neutral', duration: 6000 })
+    vi.advanceTimersByTime(5999)
     expect(list()).toHaveLength(1)
     vi.advanceTimersByTime(1)
     expect(list()).toHaveLength(0)
   })
 
-  it('tone helpers set tone and sensible durations', () => {
+  it('accepts toast(message, options)', () => {
+    toast('Copied', { description: 'run_4f2a', tone: 'success' })
+    expect(list()[0]).toMatchObject({ title: 'Copied', description: 'run_4f2a', tone: 'success' })
+  })
+
+  it('tone helpers set tone and spec durations', () => {
     toast.success('Done')
     toast.error('Failed')
     toast.loading('Working')
     const [s, e, l] = list()
-    expect(s).toMatchObject({ tone: 'success', duration: 4000 })
-    expect(e).toMatchObject({ tone: 'error', duration: 8000 })
+    expect(s).toMatchObject({ tone: 'success', duration: 6000 })
+    expect(e).toMatchObject({ tone: 'error', duration: 6000 })
     expect(l).toMatchObject({ tone: 'loading', duration: Infinity })
     vi.advanceTimersByTime(60_000)
     expect(list().map((t) => t.tone)).toEqual(['loading'])
+  })
+
+  it('toasts with an action last 8s; attention toasts with an action persist', () => {
+    toast.error('Couldn’t save', { action: { label: 'Retry', onClick: () => {} } })
+    toast.warning('Forge wants to run the test suite', { action: { label: 'Review', onClick: () => {} } })
+    const [retry, approval] = list()
+    expect(retry.duration).toBe(8000)
+    expect(approval.duration).toBe(Infinity)
+    vi.advanceTimersByTime(60_000)
+    expect(list().map((t) => t.tone)).toEqual(['warning'])
   })
 
   it('updates in place by id (loading → success) and restarts the timer', () => {
@@ -97,14 +112,14 @@ describe('toast()', () => {
     toast.update(id, { tone: 'success', title: 'Exported' })
     expect(list()).toHaveLength(1)
     expect(list()[0]).toMatchObject({ id, tone: 'success', title: 'Exported', version: 2 })
-    vi.advanceTimersByTime(4000)
+    vi.advanceTimersByTime(6000)
     expect(list()).toHaveLength(0)
   })
 
   it('dismisses by id and calls onDismiss', () => {
     const onDismiss = vi.fn()
     const id = toast({ title: 'Undo?', onDismiss, action: { label: 'Undo', onClick: () => {} } })
-    expect(list()[0].duration).toBe(6000)
+    expect(list()[0].duration).toBe(8000)
     dismissToast(id)
     expect(list()).toHaveLength(0)
     expect(onDismiss).toHaveBeenCalledOnce()

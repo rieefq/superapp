@@ -31,7 +31,8 @@ const SIZE = {
   sm: { box: 'size-5', text: 'text-[9px]', max: 2, status: 'size-1.5' },
   md: { box: 'size-6', text: 'text-[10px]', max: 2, status: 'size-2' },
   lg: { box: 'size-8', text: 'text-xs', max: 2, status: 'size-2.5' },
-  xl: { box: 'size-10', text: 'text-sm', max: 2, status: 'size-3' },
+  xl: { box: 'size-12', text: 'text-base', max: 2, status: 'size-3' },
+  '2xl': { box: 'size-16', text: 'text-xl', max: 2, status: 'size-3.5' },
 } as const
 
 const STATUS = {
@@ -91,7 +92,8 @@ export function Avatar({
           'inline-grid place-items-center overflow-hidden font-semibold leading-none tracking-[0.02em] select-none',
           s.box,
           s.text,
-          shape === 'circle' ? 'rounded-full' : size === 'lg' || size === 'xl' ? 'rounded-sm' : 'rounded-xs',
+          // Circles are actors; rounded squares are lasting things (DESIGN §5.2). Marks ≤20px use radius-xs.
+          shape === 'circle' ? 'rounded-full' : size === 'xs' || size === 'sm' ? 'rounded-xs' : 'rounded-sm',
           showImage ? 'bg-hover' : HUE_SUBTLE[h],
           'shadow-[inset_0_0_0_1px_color-mix(in_oklab,currentColor_14%,transparent)]',
         )}

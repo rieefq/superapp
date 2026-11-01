@@ -12,7 +12,8 @@ export type ButtonSize = 'xs' | 'sm' | 'md' | 'lg'
 /*
  * Hover/press styles are gated on `not-data-disabled` so disabled and loading buttons stay still.
  * Variants: primary = ink-inverted; secondary = 1px strong hairline on a raised key; outline = quieter hairline;
- * ghost = text with hover wash; danger = fail-colored text; danger-solid = solid fail (confirm steps only).
+ * ghost = text with hover wash; danger = fail-colored text; danger-solid = solid fail (confirm steps only);
+ * link = ink, underlined (accent is ink, so links are told apart by the underline, not by color).
  */
 const VARIANT: Record<ButtonVariant, string> = {
   primary:
@@ -24,8 +25,8 @@ const VARIANT: Record<ButtonVariant, string> = {
   ghost: 'text-ink-2 not-data-disabled:hover:bg-hover not-data-disabled:hover:text-ink not-data-disabled:active:bg-press',
   danger: 'text-fail-ink not-data-disabled:hover:bg-fail-tint not-data-disabled:active:bg-fail-tint/70',
   'danger-solid':
-    'bg-fail text-inverse-ink shadow-inset not-data-disabled:hover:bg-fail/88 not-data-disabled:active:bg-fail/78',
-  link: 'rounded-xs text-accent-ink decoration-accent-ink/40 underline-offset-[3px] not-data-disabled:hover:underline',
+    'bg-fail text-fail-on shadow-inset not-data-disabled:hover:bg-fail/88 not-data-disabled:active:bg-fail/78',
+  link: 'rounded-xs text-ink underline decoration-line-input underline-offset-[3px] not-data-disabled:hover:decoration-ink',
 }
 
 const SIZE: Record<ButtonSize, string> = {

@@ -110,6 +110,7 @@ function ConfirmDialog({ request }: { request: ConfirmRequest | undefined }) {
       onOpenChange={(o) => !o && settle(false)}
       role="alertdialog"
       size="sm"
+      className="max-w-[440px]"
       hideClose
       initialFocus={r.requireText ? inputRef : danger ? cancelRef : confirmRef}
       header={
@@ -123,14 +124,14 @@ function ConfirmDialog({ request }: { request: ConfirmRequest | undefined }) {
             </span>
           )}
           <div className="flex min-w-0 flex-col gap-1.5">
-            <DialogTitle className="text-base leading-6">{r.title}</DialogTitle>
+            <DialogTitle className="type-title-3">{r.title}</DialogTitle>
             {r.description && <DialogDescription>{r.description}</DialogDescription>}
           </div>
         </div>
       }
       footer={
         <>
-          <Button ref={cancelRef} variant="ghost" onClick={() => settle(false)}>
+          <Button ref={cancelRef} variant="secondary" onClick={() => settle(false)}>
             {r.cancelLabel ?? 'Cancel'}
           </Button>
           <Button ref={confirmRef} variant={danger ? 'danger-solid' : 'primary'} disabled={!matches} onClick={() => settle(true)}>

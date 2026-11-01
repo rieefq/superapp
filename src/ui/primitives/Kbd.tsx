@@ -60,7 +60,7 @@ export function KbdCombo({ combo, variant = 'keys', size = 'sm', tone = 'default
       <kbd
         className={cn(
           'inline-flex shrink-0 items-center gap-1.5 font-mono text-2xs leading-none tracking-wide',
-          tone === 'default' ? 'text-ink-4' : 'text-inverse-ink/60',
+          tone === 'default' ? 'text-ink-3' : 'text-inverse-ink/65',
           className,
         )}
         {...props}
@@ -85,7 +85,7 @@ export function KbdCombo({ combo, variant = 'keys', size = 'sm', tone = 'default
       <span className="sr-only">{label}</span>
       {steps.map((parts, i) => (
         <span key={i} aria-hidden className="inline-flex items-center gap-0.5">
-          {i > 0 && <span className={cn('px-0.5 text-2xs', tone === 'default' ? 'text-ink-4' : 'text-inverse-ink/50')}>then</span>}
+          {i > 0 && <span className={cn('px-0.5 text-2xs', tone === 'default' ? 'text-ink-3' : 'text-inverse-ink/65')}>then</span>}
           {parts.map((p, j) => (
             <Kbd key={j} size={size} tone={tone}>
               {p}

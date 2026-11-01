@@ -4,7 +4,7 @@
  */
 export {
   computeInsights, runTime, runDurationMs, INSIGHT_RANGES, RUN_KINDS, UNKNOWN_MODEL_ID,
-  type Insights, type InsightsInput, type InsightsTotals, type InsightsDay, type InsightsWindow, type RangeDays,
+  type Insights, type InsightsInput, type InsightsRun, type InsightsTotals, type InsightsDay, type InsightsWindow, type RangeDays,
   type ModelUsage, type AgentInsight, type WorkflowInsight, type FailureReason, type BudgetSummary,
 } from './insights'
 export { computeHomeSummary, isMyOpenTask, EMPTY_HOME_SUMMARY, type HomeSummary, type HomeSummaryInput } from './home'

@@ -1,5 +1,4 @@
 import { getModel } from '@/core/ai/models'
-import { runMatcher } from '@/core/runs/hooks'
 import { HUES, isRunActive, type Agent, type Approval, type Hue, type ID, type Run, type RunKind, type Task, type Usage, type Workflow } from '@/core/types'
 import { TIME } from '@/lib/format'
 import { hashString } from '@/lib/rng'
@@ -18,9 +17,9 @@ import { addLocalDays, dayIndex, localDaysBetween, localHour, localWeekday, star
  * - Durations: `endedAt − startedAt` of succeeded or failed runs (cancelled runs measure when
  *   someone stopped them, not how long the work takes).
  * - Costs: `usage.costUsd`. Simulated runs carry estimates, kept apart in `simulatedCostUsd`.
- * - Filters: `projectId` (null = all work) and `kinds` (empty = all kinds) apply to runs, to
- *   approvals through their run, and (project only) to tasks. The budget is account-wide and
- *   ignores filters.
+ * - Filters: `projectId` (null = all work) and `kinds` (empty or every kind = all) apply to runs,
+ *   to approvals through their run, and (project only) to tasks. Unfiltered views also list idle
+ *   agents and workflows. The budget is account-wide and ignores filters.
  */
 
 export const INSIGHT_RANGES = [7, 30, 90] as const
@@ -30,11 +29,18 @@ export type RangeDays = (typeof INSIGHT_RANGES)[number]
 const KIND_FLAGS: Record<RunKind, true> = { chat: true, code: true, agent: true, research: true, workflow: true, studio: true }
 export const RUN_KINDS: readonly RunKind[] = Object.keys(KIND_FLAGS) as RunKind[]
 
+/** The run fields analytics reads (any full `Run` qualifies). */
+export type InsightsRun = Pick<
+  Run,
+  | 'id' | 'kind' | 'status' | 'projectId' | 'agentId' | 'workflowId' | 'modelId' | 'simulated' | 'usage'
+  | 'createdAt' | 'startedAt' | 'endedAt' | 'error' | 'steps'
+>
+
 /** `modelId` used in `byModel` for runs that recorded no model. */
 export const UNKNOWN_MODEL_ID = 'unknown'
 
 export interface InsightsInput {
-  runs: readonly Run[]
+  runs: readonly InsightsRun[]
   approvals: readonly Approval[]
   tasks: readonly Task[]
   agents: readonly Agent[]
@@ -44,7 +50,7 @@ export interface InsightsInput {
   rangeDays: RangeDays
   /** Restrict to one project; null/undefined = all work. */
   projectId?: ID | null
-  /** Restrict to these run kinds; undefined or empty = all kinds. */
+  /** Restrict to these run kinds; undefined, empty or every kind = no kind filter. */
   kinds?: readonly RunKind[]
   /** `settings.safety.monthlyBudgetUsd`; 0/undefined = no budget set. */
   monthlyBudgetUsd?: number
@@ -238,7 +244,7 @@ const usd = (n: number): number => Math.round(n * 1e9) / 1e9
 /** Durations are reported in whole milliseconds. */
 const wholeMs = (n: number | null): number | null => (n === null ? null : Math.round(n))
 
-function usageOf(run: Run): Usage {
+function usageOf(run: InsightsRun): Usage {
   const u = run.usage as Usage | undefined
   return { inputTokens: finite(u?.inputTokens), outputTokens: finite(u?.outputTokens), costUsd: finite(u?.costUsd) }
 }
@@ -285,7 +291,7 @@ function newTotals(): TotalsAcc {
   }
 }
 
-function addRunToTotals(acc: TotalsAcc, run: Run, usage: Usage): void {
+function addRunToTotals(acc: TotalsAcc, run: InsightsRun, usage: Usage): void {
   acc.runs++
   if (run.status === 'succeeded') acc.succeeded++
   else if (run.status === 'failed') acc.failed++
@@ -350,7 +356,7 @@ function groupFor(groups: Map<ID, GroupAcc>, id: ID, dayCount: number): GroupAcc
   return acc
 }
 
-function addRunToGroup(acc: GroupAcc, run: Run, usage: Usage, day: number): void {
+function addRunToGroup(acc: GroupAcc, run: InsightsRun, usage: Usage, day: number): void {
   acc.runs++
   if (run.status === 'succeeded') acc.succeeded++
   else if (run.status === 'failed') acc.failed++
@@ -386,7 +392,7 @@ interface FailureAcc {
 /** Later failure wins; ties break on run id so results never depend on input order. */
 const isLater = (at: number, id: ID, thanAt: number, thanId: ID) => at > thanAt || (at === thanAt && id > thanId)
 
-function addFailure(failures: Map<string, FailureAcc>, run: Run, at: number): void {
+function addFailure(failures: Map<string, FailureAcc>, run: InsightsRun, at: number): void {
   const message = runFailureMessage(run)
   const key = failureFingerprint(message)
   const failedAt = run.endedAt ?? at
@@ -434,9 +440,10 @@ export function computeInsights(input: InsightsInput): Insights {
   const from = now - span
   const previousFrom = from - span
   const projectId = input.projectId || null
-  const kinds = input.kinds?.length ? input.kinds : undefined
+  // No kinds, or every kind, means no kind filter.
+  const kinds = input.kinds?.length && !RUN_KINDS.every((k) => input.kinds?.includes(k)) ? input.kinds : undefined
   const filtered = projectId !== null || kinds !== undefined
-  const matches = runMatcher({ projectId, kind: kinds })
+  const matches = (run: InsightsRun) => (projectId === null || run.projectId === projectId) && (!kinds || kinds.includes(run.kind))
   const inCurrent = (t: number) => t >= from && t <= now
   const inPrevious = (t: number) => t >= previousFrom && t < from
   const labelOf = input.modelLabel ?? ((id: string) => getModel(id)?.label)
@@ -461,7 +468,7 @@ export function computeInsights(input: InsightsInput): Insights {
   const agentLastRun = new Map<ID, number>()
   const workflowLastRun = new Map<ID, number>()
   const failures = new Map<string, FailureAcc>()
-  const runsById = new Map<ID, Run>()
+  const runsById = new Map<ID, InsightsRun>()
 
   const monthStart = startOfLocalMonth(now)
   const monthEnd = startOfNextLocalMonth(now)

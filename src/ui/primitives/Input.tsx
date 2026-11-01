@@ -18,7 +18,10 @@ import { mergeRefs } from './slot'
 
 export type ControlSize = 'sm' | 'md' | 'lg'
 
-/** Shared look for text-entry wells: sunken surface, hairline, accent border + halo on focus. */
+/**
+ * Shared look for text-entry wells: sunken surface, a --line-input boundary (≥3:1), and the standard
+ * focus ring (2px ink, 2px offset). Invalid fields use the fail border plus a message.
+ */
 export const CONTROL_SURFACE = cn(
   'rounded-sm border bg-sunken text-ink',
   'transition-[border-color,box-shadow,background-color] duration-(--dur-1) ease-standard',
@@ -26,22 +29,19 @@ export const CONTROL_SURFACE = cn(
 
 export function controlStateClasses({ invalid, disabled, focusWithin = true }: { invalid?: boolean; disabled?: boolean; focusWithin?: boolean }) {
   return cn(
-    invalid ? 'border-fail/60' : 'border-line',
-    !disabled && !invalid && 'hover:border-line-strong',
+    invalid ? 'border-fail' : 'border-line-input',
+    !disabled && !invalid && 'hover:border-ink-3',
     focusWithin
-      ? invalid
-        ? 'focus-within:border-fail focus-within:ring-2 focus-within:ring-fail/25'
-        : 'focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/25'
-      : invalid
-        ? 'focus:border-fail focus:ring-2 focus:ring-fail/25'
-        : 'focus:border-accent focus:ring-2 focus:ring-accent/25',
+      ? 'focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-(--focus-ring)'
+      : 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--focus-ring)',
     disabled && 'cursor-not-allowed opacity-50',
   )
 }
 
+/** md follows --control-h (32px, 28px in compact density). */
 const CONTROL_SIZE: Record<ControlSize, { box: string; pad: string; icon: string; text: string }> = {
   sm: { box: 'h-7', pad: 'px-2', icon: 'size-3.5', text: 'text-sm' },
-  md: { box: 'h-8', pad: 'px-2.5', icon: 'size-4', text: 'text-sm' },
+  md: { box: 'h-(--control-h)', pad: 'px-2.5', icon: 'size-4', text: 'text-sm' },
   lg: { box: 'h-10', pad: 'px-3', icon: 'size-4', text: 'text-base' },
 }
 
@@ -114,7 +114,7 @@ export function Input({
         disabled={field.disabled}
         required={field.required}
         className={cn(
-          'h-full w-full min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-ink-4 disabled:cursor-not-allowed',
+          'h-full w-full min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-ink-3 disabled:cursor-not-allowed',
           s.text,
           TOUCH_TEXT,
         )}
@@ -205,7 +205,7 @@ export function Textarea({
       className={cn(
         CONTROL_SURFACE,
         controlStateClasses({ invalid: field.invalid, disabled: field.disabled, focusWithin: false }),
-        'block w-full min-w-0 px-2.5 py-1.5 text-sm leading-5 outline-none placeholder:text-ink-4',
+        'block w-full min-w-0 px-2.5 py-1.5 text-sm leading-5 placeholder:text-ink-3',
         TOUCH_TEXT,
         mono && 'font-mono text-xs leading-5',
         autosize ? 'resize-none' : 'resize-y',

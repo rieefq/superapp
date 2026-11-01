@@ -120,7 +120,7 @@ export function Field({
           *
         </span>
       )}
-      {optional && !required && <span className="ml-1.5 text-xs font-normal text-ink-4">Optional</span>}
+      {optional && !required && <span className="ml-1.5 text-xs font-normal text-ink-3">Optional</span>}
     </label>
   )
 

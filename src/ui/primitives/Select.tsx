@@ -66,7 +66,7 @@ export interface SelectProps<T extends string = string> {
 
 const TRIGGER_SIZE: Record<ControlSize, string> = {
   sm: 'h-7 gap-1.5 pl-2 pr-1.5 text-sm',
-  md: 'h-8 gap-2 pl-2.5 pr-2 text-sm',
+  md: 'h-(--control-h) gap-2 pl-2.5 pr-2 text-sm',
   lg: 'h-10 gap-2 pl-3 pr-2.5 text-base',
 }
 
@@ -298,19 +298,19 @@ export function Select<T extends string = string>({
         className={cn(
           'flex min-w-0 items-center text-left',
           variant === 'field'
-            ? cn(CONTROL_SURFACE, controlStateClasses({ invalid: field.invalid, disabled: field.disabled, focusWithin: false }), 'w-full outline-none')
+            ? cn(CONTROL_SURFACE, controlStateClasses({ invalid: field.invalid, disabled: field.disabled, focusWithin: false }), 'w-full')
             : cn(
                 'rounded-sm text-ink-2 transition-colors duration-(--dur-1) hover:bg-hover hover:text-ink',
                 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
                 field.disabled && 'cursor-not-allowed opacity-50',
               ),
-          variant === 'field' && open && 'border-accent ring-2 ring-accent/25',
+          variant === 'field' && open && !field.invalid && 'border-ink-3',
           variant === 'ghost' && open && 'bg-hover text-ink',
           TRIGGER_SIZE[size],
           className,
         )}
       >
-        <span id={valueId} className={cn('flex min-w-0 flex-1 items-center gap-2 truncate', !selected && 'text-ink-4')}>
+        <span id={valueId} className={cn('flex min-w-0 flex-1 items-center gap-2 truncate', !selected && 'text-ink-3')}>
           {selected ? (
             renderValue ? (
               renderValue(selected)
@@ -357,7 +357,7 @@ export function Select<T extends string = string>({
                     {showGroup && (
                       <div
                         role="presentation"
-                        className={cn('px-2 pt-2 pb-1 font-mono text-2xs tracking-[0.08em] text-ink-4 uppercase', i > 0 && 'mt-1 border-t border-line pt-2.5')}
+                        className={cn('type-label px-2 pt-2 pb-1 text-ink-3', i > 0 && 'mt-1 border-t border-line pt-2.5')}
                       >
                         {opt.group}
                       </div>
@@ -372,7 +372,7 @@ export function Select<T extends string = string>({
                       onClick={() => commit(i)}
                       className={cn(
                         'flex shrink-0 cursor-pointer items-center gap-2 rounded-sm px-2 text-sm text-ink-2 select-none',
-                        opt.description ? 'py-1.5' : 'h-8 [[data-density=compact]_&]:h-7 pointer-coarse:h-11',
+                        opt.description ? 'py-1.5' : 'h-8 pointer-coarse:h-11',
                         isActive && 'bg-ink/8 text-ink',
                         isSelected && 'text-ink',
                         opt.disabled && 'cursor-not-allowed opacity-45',
@@ -389,7 +389,7 @@ export function Select<T extends string = string>({
                         <span className={cn('truncate', isSelected && 'font-medium')}>{opt.label}</span>
                         {opt.description && <span className="text-xs text-ink-3 text-pretty">{opt.description}</span>}
                       </span>
-                      {hasMeta && <span className="shrink-0 font-mono text-2xs text-ink-4 tabular">{opt.meta}</span>}
+                      {hasMeta && <span className="type-meta shrink-0 text-ink-3">{opt.meta}</span>}
                       <Check
                         aria-hidden
                         className={cn('size-3.5 shrink-0 text-ink', opt.description && 'self-start mt-0.5', !isSelected && 'invisible')}

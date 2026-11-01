@@ -303,7 +303,7 @@ function MenuPanel({
         <div key={section.key} role="group" aria-label={section.label} className="flex flex-col">
           {section.separatorBefore && <div role="separator" className="-mx-1 my-1 h-px bg-line" />}
           {section.label && (
-            <div aria-hidden className="px-2 pt-1.5 pb-1 font-mono text-2xs tracking-[0.08em] text-ink-4 uppercase select-none">
+            <div aria-hidden className="type-label px-2 pt-1.5 pb-1 text-ink-3 select-none">
               {section.label}
             </div>
           )}
@@ -329,7 +329,7 @@ function MenuPanel({
                 onClick={() => activate(index)}
                 className={cn(
                   'group/item flex shrink-0 cursor-pointer items-center gap-2 rounded-sm px-2 text-sm outline-none select-none',
-                  item.description ? 'py-1.5' : 'h-8 [[data-density=compact]_&]:h-7 pointer-coarse:h-11',
+                  item.description ? 'py-1.5' : 'h-8 pointer-coarse:h-11',
                   danger ? 'text-fail-ink focus:bg-fail-tint' : 'text-ink-2 focus:bg-ink/8 focus:text-ink',
                   item.disabled && 'cursor-not-allowed opacity-45',
                 )}

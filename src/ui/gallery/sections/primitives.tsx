@@ -2,13 +2,13 @@
  * Gallery — track A1 primitives: every component, variant, size and state, with live interactive demos.
  * Rendered at /dev/ui.
  */
-import { useRef, useState, type ReactNode } from 'react'
+import { useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import {
   Activity, Archive, ArrowRight, ArrowUpRight, AtSign, Bell, Bold, BookOpen, Bot, Calendar, Check, Clock, Code, Columns2,
   Copy, Download, Ellipsis, ExternalLink, Eye, File, FileText, Filter, Folder, FolderKanban, GitBranch, Globe, Hash,
   Heading2, Image, Inbox, Italic, Keyboard, Layers, LayoutGrid, Link, List, ListOrdered, Lock, Mail, MessagesSquare, Monitor,
   Moon, PanelLeft, PanelRight, Pause, Pencil, Pin, Play, Plus, Quote, RotateCcw, Rows3, Search, Send, Settings2, Share2,
-  Sparkles, SquareTerminal, Star, Sun, Telescope, Trash2, Users, WandSparkles, Workflow, Zap,
+  Palette, SquareTerminal, Star, Sun, Telescope, Trash2, Users, Workflow, Zap,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import {
@@ -44,6 +44,11 @@ const TOC = [
   ['hooks', 'Hooks & theme'],
 ] as const
 
+/** Local density preview: the spec's density variables, scoped to a subtree. */
+function densityVars(density: 'comfortable' | 'compact'): CSSProperties | undefined {
+  return density === 'compact' ? ({ '--row-h': '28px', '--row-h-2': '48px', '--control-h': '28px' } as CSSProperties) : undefined
+}
+
 function Block({ id, kicker, title, description, children }: { id: string; kicker: string; title: string; description?: string; children: ReactNode }) {
   return (
     <section id={`a1-${id}`} aria-labelledby={`a1-${id}-title`} className="flex scroll-mt-20 flex-col gap-6">
@@ -68,7 +73,7 @@ function Grid({ children, cols = 2 }: { children: ReactNode; cols?: 1 | 2 | 3 })
 function Specimen({ label, children, className, wide, stack }: { label: string; children: ReactNode; className?: string; wide?: boolean; stack?: boolean }) {
   return (
     <div className={cn('flex min-w-0 flex-col gap-3', wide && 'md:col-span-2 lg:col-span-full', className)}>
-      <span className="font-mono text-2xs tracking-[0.08em] text-ink-4 uppercase">{label}</span>
+      <span className="type-label text-ink-3">{label}</span>
       <div className={cn(stack ? 'flex flex-col gap-3' : 'flex flex-wrap items-center gap-2')}>{children}</div>
     </div>
   )
@@ -93,9 +98,9 @@ function ActionsBlock() {
         <table className="w-full min-w-[640px] border-collapse text-left">
           <thead>
             <tr>
-              <th className="pb-3 font-mono text-2xs font-normal tracking-[0.08em] text-ink-4 uppercase">Variant</th>
+              <th className="type-label pb-3 text-left text-ink-3">Variant</th>
               {SIZES.map((s) => (
-                <th key={s} className="pb-3 font-mono text-2xs font-normal tracking-[0.08em] text-ink-4 uppercase">
+                <th key={s} className="type-label pb-3 text-left text-ink-3">
                   {s} · {{ xs: 24, sm: 28, md: 32, lg: 40 }[s]}px
                 </th>
               ))}
@@ -192,7 +197,7 @@ const WORKSPACES: SelectOption[] = [
   { value: 'chat', label: 'Chat', icon: MessagesSquare, group: 'Think' },
   { value: 'research', label: 'Research', icon: Telescope, group: 'Think' },
   { value: 'code', label: 'Code', icon: SquareTerminal, group: 'Make' },
-  { value: 'studio', label: 'Studio', icon: WandSparkles, group: 'Make' },
+  { value: 'studio', label: 'Studio', icon: Palette, group: 'Make' },
   { value: 'agents', label: 'Agents', icon: Bot, group: 'Delegate' },
   { value: 'workflows', label: 'Workflows', icon: Workflow, group: 'Delegate' },
   { value: 'knowledge', label: 'Knowledge', icon: BookOpen, group: 'Organize', disabled: true },
@@ -862,7 +867,7 @@ function FeedbackBlock() {
     toast(ok ? 'Confirmed' : 'Cancelled', { tone: ok ? 'success' : 'neutral', duration: 2200 })
   }
   return (
-    <Block id="feedback" kicker="Feedback" title="confirm() & toast()" description="Imperative and promise-based. Toasts stack bottom-right on desktop and at the top on mobile, pause while hovered or focused, swipe right to dismiss, and F8 jumps to the newest one.">
+    <Block id="feedback" kicker="Feedback" title="confirm() & toast()" description="Imperative and promise-based. Toasts sit 16px above the Run Line (at the top on phones), at most three, newest at the bottom. Updates leave after 6s, Undo/Retry after 8s; decisions persist. Hover or focus pauses; swipe or Esc dismisses; F8 jumps to the newest.">
       <Grid>
         <Specimen label="confirm(opts) → Promise<boolean>">
           <Button variant="secondary" size="sm" onClick={() => ask({ title: 'Archive this conversation?', description: 'You can restore it from Archive at any time.', confirmLabel: 'Archive' })}>
@@ -901,8 +906,17 @@ function FeedbackBlock() {
           <Button size="sm" variant="ghost" onClick={() => toast.info('3 new sources found', { description: 'Added to “Q4 Competitive Landscape”.' })}>
             Info
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => toast.warning('80% of monthly budget used', { description: 'Estimated $40.12 of $50.00.' })}>
-            Warning
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() =>
+              toast.warning('Forge wants to run the test suite in atlas-portal', {
+                description: 'Medium risk · shell.execute',
+                action: { label: 'Review', onClick: () => toast('Opened the approval') },
+              })
+            }
+          >
+            Needs you (persists)
           </Button>
           <Button
             size="sm"
@@ -976,13 +990,13 @@ function MarksBlock() {
         <table className="w-full min-w-[620px] border-collapse text-left">
           <thead>
             <tr>
-              <th className="pb-3 font-mono text-2xs font-normal tracking-[0.08em] text-ink-4 uppercase">Tone</th>
+              <th className="type-label pb-3 text-left text-ink-3">Tone</th>
               {(['subtle', 'solid', 'outline'] as const).map((v) => (
-                <th key={v} className="pb-3 font-mono text-2xs font-normal tracking-[0.08em] text-ink-4 uppercase">
+                <th key={v} className="type-label pb-3 text-left text-ink-3">
                   {v}
                 </th>
               ))}
-              <th className="pb-3 font-mono text-2xs font-normal tracking-[0.08em] text-ink-4 uppercase">dot · md</th>
+              <th className="type-label pb-3 text-left text-ink-3">dot · md</th>
             </tr>
           </thead>
           <tbody>
@@ -1070,7 +1084,7 @@ function MarksBlock() {
           <Kbd size="md">Esc</Kbd>
         </Specimen>
         <Specimen label="Avatars · sizes, shapes, status">
-          {(['xs', 'sm', 'md', 'lg', 'xl'] as const).map((s) => (
+          {(['xs', 'sm', 'md', 'lg', 'xl', '2xl'] as const).map((s) => (
             <Avatar key={s} name="Morgan Lee" size={s} />
           ))}
           <Avatar name="Scout" shape="square" size="lg" hue="volt" status="live" />
@@ -1091,13 +1105,13 @@ function MarksBlock() {
 function LoadingBlock() {
   const [progress, setProgress] = useState(64)
   return (
-    <Block id="loading" kicker="Feedback" title="Spinners, skeletons & progress" description="Skeleton shimmer stops under reduced motion; spinners slow down instead of freezing; the indeterminate bar becomes a soft pulse.">
+    <Block id="loading" kicker="Feedback" title="Spinners, skeletons & progress" description="Local, non-AI loading only — AI work is shown with the Step Tape and status glyphs. Shimmer stops under reduced motion; spinners slow down; the indeterminate bar becomes a soft pulse.">
       <Grid cols={3}>
         <Specimen label="Spinner sizes">
           {(['xs', 'sm', 'md', 'lg', 'xl'] as const).map((s) => (
             <Spinner key={s} size={s} className="text-ink-3" />
           ))}
-          <Spinner size="md" className="text-live" label="Loading runs" />
+          <Spinner size="md" className="text-ink-2" label="Loading" />
         </Specimen>
         <Specimen label="Skeleton" stack>
           <div className="flex items-center gap-3">
@@ -1111,7 +1125,7 @@ function LoadingBlock() {
           <Skeleton height={64} />
         </Specimen>
         <Specimen label="Progress" stack>
-          <ProgressBar value={progress} label="Indexing knowledge" showValue />
+          <ProgressBar value={progress} label="Uploading 3 files" showValue />
           <div className="flex gap-2">
             <Button size="xs" variant="outline" onClick={() => setProgress((p) => Math.max(0, p - 16))}>
               −16
@@ -1120,10 +1134,10 @@ function LoadingBlock() {
               +16
             </Button>
           </div>
-          <ProgressBar value={100} tone="done" label="Run complete" showValue />
-          <ProgressBar value={82} tone="attn" size="thin" aria-label="Budget used" />
-          <ProgressBar value={30} tone="fail" size="md" aria-label="Error budget" />
-          <ProgressBar label="Waiting for model…" tone="live" />
+          <ProgressBar value={100} tone="done" label="Import complete" showValue />
+          <ProgressBar value={82} tone="attn" size="thin" label="Storage 82% used" />
+          <ProgressBar value={30} tone="fail" size="md" label="Upload failed at 30%" />
+          <ProgressBar label="Reading archive…" />
         </Specimen>
       </Grid>
     </Block>
@@ -1339,8 +1353,8 @@ function StatesBlock() {
           </Surface>
         </Specimen>
         <Specimen label="Empty · bordered drop zone, compact" stack>
-          <EmptyState bordered icon={Download} title="Drop files to add knowledge" description="PDF, Markdown, CSV or plain text — indexed locally, never uploaded." actions={<Button size="sm" variant="secondary">Choose files</Button>} />
-          <EmptyState compact bordered icon={Sparkles} title="No assets yet" description="Generated images and slides appear here." />
+          <EmptyState bordered icon={Download} title="Add files to knowledge" description="PDF, Markdown, CSV or plain text — indexed locally, never uploaded." actions={<Button size="sm" variant="secondary">Choose files</Button>} />
+          <EmptyState compact bordered icon={Image} title="No assets yet" description="Images and slides you create appear here." />
         </Specimen>
         <Specimen label="Error · details + retry" stack>
           <Surface variant="flat" radius="lg">
@@ -1373,7 +1387,7 @@ function ListsBlock() {
   const [iconQuery, setIconQuery] = useState('')
   const names = Object.keys(ICONS).filter((n) => n.toLowerCase().includes(iconQuery.toLowerCase()))
   return (
-    <Block id="lists" kicker="Layout" title="List items, nav items & dynamic icons" description="Rows are 32px (28px when html[data-density=compact], 44px on touch). DynamicIcon resolves the string icon names stored in data — unknown names fall back to a circle.">
+    <Block id="lists" kicker="Layout" title="List items, nav items & dynamic icons" description="Rows follow --row-h: 36px, 28px when html[data-density=compact], at least 44px on touch. DynamicIcon resolves the string icon names stored in data (and legacy aliases); unknown names fall back to a circle.">
       <Grid>
         <Specimen label="NavItem (router-aware) · density" stack>
           <SegmentedControl
@@ -1386,7 +1400,7 @@ function ListsBlock() {
               { value: 'compact', label: 'Compact' },
             ]}
           />
-          <nav aria-label="Demo navigation" data-density={density} className="flex w-full max-w-xs flex-col gap-px">
+          <nav aria-label="Demo navigation" style={densityVars(density)} className="flex w-full max-w-xs flex-col gap-px">
             <NavItem to="/dev/ui" end icon={LayoutGrid} label="Gallery" count={3} />
             <NavItem to="/" end icon={Inbox} label="Home" />
             <NavItem to="/chat" icon={MessagesSquare} label="Chat" count={12} />
@@ -1395,7 +1409,7 @@ function ListsBlock() {
           </nav>
         </Specimen>
         <Specimen label="ListItem · clickable rows (aria-current), row actions on hover" stack>
-          <div role="group" aria-label="Conversations" data-density={density} className="flex w-full flex-col gap-px">
+          <div role="group" aria-label="Conversations" style={densityVars(density)} className="flex w-full flex-col gap-px">
             {[
               { id: 'c1', label: 'Pricing objections from interviews', meta: '2m', icon: MessagesSquare },
               { id: 'c2', label: 'SSO edge cases for SAML IdPs', meta: '1h', icon: MessagesSquare, description: 'Atlas Portal v2 · 14 messages' },
@@ -1553,7 +1567,7 @@ function HooksBlock() {
             <Row k="(pointer: coarse)" v={String(coarse)} />
             <Row k="useClickOutside — clicks outside the box below" v={outside} />
           </div>
-          <div ref={boxRef} className="rounded-sm border border-dashed border-line-strong px-3 py-2 text-xs text-ink-3">
+          <div ref={boxRef} className="rounded-sm border border-line-strong bg-sunken px-3 py-2 text-xs text-ink-3">
             Clicks in here don’t count.
           </div>
         </Specimen>

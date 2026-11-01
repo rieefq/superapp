@@ -12,11 +12,11 @@ export interface EmptyStateProps extends Omit<HTMLAttributes<HTMLDivElement>, 't
   actions?: ReactNode
   /** Inline row layout for small containers (panels, lists). */
   compact?: boolean
-  /** Dashed hairline frame (drop zones, empty canvases). */
+  /** Solid hairline frame (empty canvases). Dashed edges are reserved for simulated content. */
   bordered?: boolean
 }
 
-/** Nothing here yet — explains what goes here and offers the next step. Serif title, quiet copy. */
+/** Nothing here yet — one sentence about what goes here, plus one next step (DESIGN §8.3). */
 export function EmptyState({ icon: Icon, illustration, title, description, actions, compact, bordered, className, ...props }: EmptyStateProps) {
   const mark =
     illustration ??
@@ -33,10 +33,10 @@ export function EmptyState({ icon: Icon, illustration, title, description, actio
     ))
   if (compact) {
     return (
-      <div className={cn('flex items-start gap-3 p-4', bordered && 'rounded-md border border-dashed border-line-strong', className)} {...props}>
+      <div className={cn('flex items-start gap-3 p-4', bordered && 'rounded-md border border-line-strong', className)} {...props}>
         {mark}
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <h3 className="font-serif text-lg leading-6 text-ink">{title}</h3>
+          <h3 className="type-title-3 text-ink">{title}</h3>
           {description && <p className="text-sm text-ink-3 text-pretty">{description}</p>}
           {actions && <div className="mt-2 flex flex-wrap gap-2">{actions}</div>}
         </div>
@@ -47,14 +47,14 @@ export function EmptyState({ icon: Icon, illustration, title, description, actio
     <div
       className={cn(
         'flex flex-col items-center justify-center gap-5 px-6 py-14 text-center',
-        bordered && 'rounded-lg border border-dashed border-line-strong',
+        bordered && 'rounded-md border border-line-strong',
         className,
       )}
       {...props}
     >
       {mark}
       <div className="flex max-w-sm flex-col items-center gap-1.5">
-        <h3 className="font-serif text-xl leading-7 text-ink text-balance">{title}</h3>
+        <h3 className="type-title-2 text-ink text-balance">{title}</h3>
         {description && <p className="text-sm text-ink-3 text-pretty">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center justify-center gap-2">{actions}</div>}
@@ -108,7 +108,7 @@ export function ErrorState({
         <TriangleAlert className={compact ? 'size-4' : 'size-5'} strokeWidth={1.75} />
       </div>
       <div className={cn('flex min-w-0 flex-col gap-1', compact ? 'flex-1' : 'max-w-md items-center')}>
-        <h3 className={cn('font-medium text-ink', compact ? 'text-sm' : 'text-base')}>{title}</h3>
+        <h3 className={cn('text-ink', compact ? 'text-sm font-semibold' : 'type-title-3')}>{title}</h3>
         {message && <p className="text-sm text-ink-3 text-pretty">{message}</p>}
         {(onRetry || actions || details) && (
           <div className={cn('mt-2.5 flex flex-wrap items-center gap-2', !compact && 'justify-center')}>

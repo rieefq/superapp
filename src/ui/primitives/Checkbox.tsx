@@ -74,10 +74,10 @@ export function Checkbox({
         aria-hidden
         className={cn(
           'pointer-events-none grid size-full place-items-center rounded-xs border transition-[background-color,border-color] duration-(--dur-1) ease-standard',
-          on ? 'border-inverse bg-inverse text-inverse-ink' : 'border-line-strong bg-sunken text-transparent',
-          !on && !field.disabled && 'peer-hover:border-ink-4',
-          field.invalid && !on && 'border-fail/70',
-          'peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent',
+          on ? 'border-inverse bg-inverse text-inverse-ink' : 'border-line-input bg-sunken text-transparent',
+          !on && !field.disabled && 'peer-hover:border-ink-3',
+          field.invalid && !on && 'border-fail',
+          'peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-(--focus-ring)',
           field.disabled && 'opacity-50',
         )}
       >

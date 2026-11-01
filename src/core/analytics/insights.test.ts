@@ -248,6 +248,8 @@ describe('breakdowns', () => {
     // Filtered views only list agents that ran in scope.
     expect(insights({ runs, agents, kinds: ['agent'] }).byAgent.map((a) => a.name)).toEqual(['Scout', 'Deleted agent', 'Muse'])
     expect(insights({ runs, agents, kinds: ['chat'] }).byAgent).toEqual([])
+    // Selecting every kind is the same as no kind filter.
+    expect(insights({ runs, agents, kinds: [...RUN_KINDS] }).byAgent).toEqual(r.byAgent)
   })
 
   it('summarizes workflows with failure rates', () => {

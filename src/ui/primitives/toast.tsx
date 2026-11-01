@@ -2,14 +2,14 @@ import { useRef, type ReactNode } from 'react'
 import { useStore } from 'zustand'
 import { createStore } from 'zustand/vanilla'
 import { AnimatePresence, motion, type PanInfo } from 'motion/react'
-import { CircleCheck, Info, OctagonAlert, TriangleAlert, X } from 'lucide-react'
+import { Check, Info, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useHotkey } from '@/ui/hooks/useHotkey'
 import { useBreakpointUp } from '@/ui/hooks/useMediaQuery'
 import { useReducedMotion } from '@/ui/hooks/useReducedMotion'
 import { Button } from './Button'
 import { IGNORE_OUTSIDE_ATTR } from './layers'
-import { DUR, EASE_SETTLE } from './motion'
+import { DUR, EASE_EXIT, EASE_SETTLE } from './motion'
 import { Portal } from './Portal'
 import { useSingletonHost } from './singleton'
 import { Spinner } from './Spinner'
@@ -54,14 +54,16 @@ export interface ToastState {
   paused: boolean
 }
 
-export const MAX_TOASTS = 4
+/** DESIGN §3.8: at most 3 on screen. */
+export const MAX_TOASTS = 3
 
+/** Updates dismiss after 6s; toasts with an action (Undo, Retry) after 8s; loading stays until updated. */
 const DEFAULT_DURATION: Record<ToastTone, number> = {
-  neutral: 4000,
-  success: 4000,
-  info: 5000,
-  warning: 6500,
-  error: 8000,
+  neutral: 6000,
+  success: 6000,
+  info: 6000,
+  warning: 8000,
+  error: 6000,
   loading: Infinity,
 }
 
@@ -92,7 +94,10 @@ function startTimer(id: string, duration: number) {
 
 function resolveDuration(opts: ToastOptions, tone: ToastTone): number {
   if (opts.duration !== undefined) return opts.duration
-  return DEFAULT_DURATION[tone] + (opts.action ? 2000 : 0)
+  // An attention toast with an action is a decision (e.g. [Review] an approval): it persists until handled.
+  if (tone === 'warning' && opts.action) return Infinity
+  if (tone === 'loading') return Infinity
+  return opts.action ? 8000 : DEFAULT_DURATION[tone]
 }
 
 function upsert(opts: ToastOptions): string {
@@ -240,11 +245,34 @@ export const toast: ToastFn = Object.assign(
 
 // ------------------------------------------------------------------------------------------------ host
 
-const TONE_ICON: Record<Exclude<ToastTone, 'neutral' | 'loading'>, { Icon: typeof Info; className: string; label: string }> = {
-  success: { Icon: CircleCheck, className: 'text-done', label: 'Success' },
-  error: { Icon: OctagonAlert, className: 'text-fail', label: 'Error' },
-  warning: { Icon: TriangleAlert, className: 'text-attn', label: 'Warning' },
-  info: { Icon: Info, className: 'text-accent', label: 'Info' },
+/** Status glyph alphabet (DESIGN §5.3): ✓ done, ✕ fail, ◆ attention; info is neutral by design. */
+function ToneGlyph({ tone }: { tone: ToastTone }) {
+  const box = 'mt-1 grid size-3 shrink-0 place-items-center'
+  if (tone === 'success')
+    return (
+      <span role="img" aria-label="Done" className={box}>
+        <Check className="size-3 text-done" strokeWidth={3} />
+      </span>
+    )
+  if (tone === 'error')
+    return (
+      <span role="img" aria-label="Failed" className={box}>
+        <X className="size-3 text-fail" strokeWidth={3} />
+      </span>
+    )
+  if (tone === 'warning')
+    return (
+      <span role="img" aria-label="Needs you" className={box}>
+        <span className="size-2 rotate-45 rounded-[1px] bg-attn" />
+      </span>
+    )
+  if (tone === 'info')
+    return (
+      <span role="img" aria-label="Info" className={box}>
+        <Info className="size-3 text-info" strokeWidth={2.25} />
+      </span>
+    )
+  return null
 }
 
 export interface ToastHostProps {
@@ -285,7 +313,8 @@ export function ToastHost({ hotkey = 'f8' }: ToastHostProps) {
         }}
         className={cn(
           'pointer-events-none fixed z-(--z-toast) flex flex-col',
-          desktop ? 'right-4 bottom-4 w-[380px] max-w-[calc(100vw-32px)]' : 'inset-x-2 top-[max(8px,env(safe-area-inset-top))]',
+          // 16px above the Run Line and from the right edge, 360px wide (DESIGN §3.8); top of the screen on phones.
+          desktop ? 'right-4 bottom-[calc(var(--runline-h,0px)+16px)] w-[360px] max-w-[calc(100vw-32px)]' : 'inset-x-2 top-[max(8px,env(safe-area-inset-top))]',
         )}
       >
         <ol aria-live="polite" aria-relevant="additions text" className="flex flex-col gap-2">
@@ -301,7 +330,6 @@ export function ToastHost({ hotkey = 'f8' }: ToastHostProps) {
 }
 
 function ToastItem({ toast: t, desktop, reduced }: { toast: ToastRecord; desktop: boolean; reduced: boolean }) {
-  const tone = t.tone !== 'neutral' && t.tone !== 'loading' ? TONE_ICON[t.tone] : null
   const enterY = desktop ? 12 : -12
   const onDragEnd = (_: unknown, info: PanInfo) => {
     if (info.offset.x > 90 || info.velocity.x > 500) dismissToast(t.id)
@@ -315,8 +343,12 @@ function ToastItem({ toast: t, desktop, reduced }: { toast: ToastRecord; desktop
       tabIndex={0}
       initial={reduced ? { opacity: 0 } : { opacity: 0, y: enterY, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1, x: 0 }}
-      exit={reduced ? { opacity: 0, transition: { duration: DUR[1] } } : { opacity: 0, x: 24, scale: 0.98, transition: { duration: DUR[2] } }}
-      transition={{ duration: DUR[3], ease: EASE_SETTLE }}
+      exit={
+        reduced
+          ? { opacity: 0, transition: { duration: DUR[1], ease: EASE_EXIT } }
+          : { opacity: 0, x: 24, scale: 0.98, transition: { duration: DUR[2], ease: EASE_EXIT } }
+      }
+      transition={reduced ? { duration: DUR[1] } : { duration: DUR[3], ease: EASE_SETTLE }}
       drag={reduced || !t.dismissible ? false : 'x'}
       dragConstraints={{ left: 0, right: 0 }}
       dragElastic={{ left: 0.05, right: 0.7 }}
@@ -328,16 +360,14 @@ function ToastItem({ toast: t, desktop, reduced }: { toast: ToastRecord; desktop
         }
       }}
       className={cn(
-        'pointer-events-auto relative flex w-full items-start gap-3 rounded-md border border-line bg-overlay py-3 pr-10 pl-3.5 text-ink shadow-e2',
-        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+        'pointer-events-auto relative flex w-full items-start gap-3 rounded-md border border-line bg-overlay py-3 pr-10 pl-3.5 text-ink',
+        // Attention toasts carry a 2px attn left edge (DESIGN §3.8); everything sits at e1.
+        t.tone === 'warning' ? 'shadow-[inset_2px_0_0_var(--attn),var(--shadow-e1)]' : 'shadow-e1',
+        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--focus-ring)',
         t.tone === 'loading' && 'pr-4',
       )}
     >
-      {t.tone === 'loading' ? (
-        <Spinner size={16} className="mt-0.5 text-live" label="In progress" />
-      ) : tone ? (
-        <tone.Icon role="img" aria-label={tone.label} className={cn('mt-0.5 size-4 shrink-0', tone.className)} strokeWidth={2} />
-      ) : null}
+      {t.tone === 'loading' ? <Spinner size={14} className="mt-[3px] text-ink-2" label="In progress" /> : <ToneGlyph tone={t.tone} />}
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         {t.title && <p className="text-sm leading-5 font-medium text-pretty">{t.title}</p>}
         {t.description && <p className="text-xs leading-[18px] text-ink-2 text-pretty">{t.description}</p>}

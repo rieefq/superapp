@@ -77,6 +77,38 @@ describe('useInsights', () => {
     expect(result.current.totals.runs).toBe(3)
   })
 
+  it('ignores step and progress churn but recomputes when analytics fields change', () => {
+    db.insertMany('runs', [mkRun({ id: 'live', status: 'running', createdAt: NOW - HOUR, startedAt: NOW - HOUR, progress: 0 })])
+    const { result } = renderHook(() => useInsights({ rangeDays: 7 }))
+    const first = result.current
+    expect(first.totals.active).toBe(1)
+    act(() => {
+      db.update('runs', 'live', (r) => ({
+        ...r,
+        progress: 0.5,
+        steps: [{ id: 'stp_1', kind: 'command', title: 'npm test', status: 'running', output: 'line 1' }],
+      }))
+    })
+    expect(result.current).toBe(first)
+    act(() => {
+      db.update('runs', 'live', (r) => ({ ...r, usage: { inputTokens: 70, outputTokens: 30, costUsd: 0.001 } }))
+    })
+    expect(result.current).not.toBe(first)
+    expect(result.current.totals.tokens).toBe(100)
+    const second = result.current
+    act(() => {
+      db.update('runs', 'live', (r) => ({
+        ...r,
+        status: 'failed',
+        endedAt: NOW,
+        steps: [{ id: 'stp_1', kind: 'command', title: 'npm test', status: 'failed', error: 'Tests failed (simulated).' }],
+      }))
+    })
+    expect(result.current).not.toBe(second)
+    expect(result.current.totals).toMatchObject({ active: 0, failed: 1 })
+    expect(result.current.failureReasons[0]).toMatchObject({ reason: 'Tests failed (simulated)', exampleRunId: 'live' })
+  })
+
   it('counts runs started this minute and slides the window as minutes pass', () => {
     db.insertMany('runs', [
       mkRun({ id: 'just-now', createdAt: NOW + 30 * SEC }), // later this minute

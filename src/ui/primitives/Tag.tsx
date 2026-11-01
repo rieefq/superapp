@@ -21,9 +21,10 @@ export interface TagProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 
   children: ReactNode
 }
 
+/** 18 / 22px (DESIGN §5.5); coarse pointers get a 44px hit area. */
 const SIZE = {
-  sm: { root: 'h-6 text-xs', pad: 'px-2', gap: 'gap-1.5', icon: 'size-3' },
-  md: { root: 'h-7 text-sm', pad: 'px-2.5', gap: 'gap-1.5', icon: 'size-3.5' },
+  sm: { root: 'h-[18px] text-2xs', pad: 'px-1.5', gap: 'gap-1', icon: 'size-3' },
+  md: { root: 'h-[22px] text-xs', pad: 'px-2', gap: 'gap-1.5', icon: 'size-3.5' },
 }
 
 /**
@@ -83,12 +84,12 @@ export function Tag({
         onRemove()
       }}
       className={cn(
-        '-mr-1 ml-0.5 grid size-4 shrink-0 place-items-center rounded-xs text-ink-3',
+        'relative -mr-1 ml-0.5 grid size-3.5 shrink-0 place-items-center rounded-xs text-ink-3',
         'hover:bg-press hover:text-ink focus-visible:outline-offset-0',
-        'pointer-coarse:size-6',
+        "pointer-coarse:after:absolute pointer-coarse:after:-inset-3 pointer-coarse:after:content-['']",
       )}
     >
-      <X aria-hidden className="size-3" strokeWidth={2.25} />
+      <X aria-hidden className="size-2.5" strokeWidth={2.5} />
     </button>
   )
 
@@ -120,7 +121,7 @@ export function Tag({
           }
         }}
         className={cn(
-          'inline-flex h-full min-w-0 items-center rounded-xs focus-visible:outline-offset-1',
+          "relative inline-flex h-full min-w-0 items-center rounded-xs focus-visible:outline-offset-1 pointer-coarse:after:absolute pointer-coarse:after:-inset-y-3 pointer-coarse:after:inset-x-0 pointer-coarse:after:content-['']",
           s.gap,
           s.pad,
           onRemove && 'pr-1',

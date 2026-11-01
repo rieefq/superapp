@@ -31,8 +31,8 @@ export interface SegmentedControlProps<T extends string = string> {
 }
 
 const SEG = {
-  sm: { root: 'h-7', item: 'h-6 px-2 text-xs gap-1', icon: 'size-3.5', iconOnly: 'w-6 px-0' },
-  md: { root: 'h-8', item: 'h-7 px-2.5 text-sm gap-1.5', icon: 'size-4', iconOnly: 'w-7 px-0' },
+  sm: { root: 'h-7', item: 'px-2 text-xs gap-1', icon: 'size-3.5', iconOnly: 'aspect-square px-0' },
+  md: { root: 'h-(--control-h)', item: 'px-2.5 text-sm gap-1.5', icon: 'size-4', iconOnly: 'aspect-square px-0' },
 }
 
 /**
@@ -126,7 +126,7 @@ export function SegmentedControl<T extends string = string>({
             onClick={() => select(i)}
             onKeyDown={(e) => onKeyDown(e, i)}
             className={cn(
-              'relative z-0 inline-flex min-w-0 cursor-pointer items-center justify-center rounded-[4px] font-medium whitespace-nowrap select-none',
+              'relative z-0 inline-flex h-full min-w-0 cursor-pointer items-center justify-center rounded-[4px] font-medium whitespace-nowrap select-none',
               'transition-colors duration-(--dur-1) ease-standard focus-visible:outline-offset-1',
               'disabled:cursor-not-allowed',
               s.item,

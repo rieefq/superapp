@@ -44,7 +44,7 @@ export function Breadcrumbs({ items, maxItems = 4, className, trailing }: Breadc
 
   return (
     <nav aria-label="Breadcrumb" className={cn('min-w-0', className)}>
-      <ol className="flex min-w-0 items-center gap-1.5 text-sm">
+      <ol className="type-body-sm flex min-w-0 items-center gap-1.5">
         {visible.map((c, i) => {
           const last = i === visible.length - 1
           return (

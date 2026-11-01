@@ -3,10 +3,11 @@ import { useShallow } from 'zustand/react/shallow'
 import { getModelInfo } from '@/core/ai/registry'
 import { db, useDB, useTable, type Tables } from '@/core/db'
 import { getSettings, useSettings } from '@/core/settings'
-import type { ID, RunKind } from '@/core/types'
+import type { ID, Run, RunKind, RunStep } from '@/core/types'
 import { TIME } from '@/lib/format'
+import { runFailureMessage } from './failures'
 import { computeHomeSummary, type HomeSummary } from './home'
-import { computeInsights, type Insights, type RangeDays } from './insights'
+import { computeInsights, type Insights, type InsightsRun, type RangeDays } from './insights'
 import { minuteCeil, minuteFloor } from './time'
 
 /**
@@ -48,6 +49,78 @@ export function useMinuteNow(): number {
   return useSyncExternalStore(subscribeMinute, currentMinute, currentMinute)
 }
 
+// ---------------------------------------------------------------- run facts
+
+/*
+ * Active simulated runs rewrite their row several times a second (step output, progress).
+ * Analytics only reads a few fields, so hooks subscribe to "facts": per-run objects holding
+ * just those fields, reused while they are unchanged. Step churn then neither recomputes
+ * insights nor re-renders the page.
+ */
+
+const NO_STEPS: RunStep[] = []
+
+function factsOf(run: Run): InsightsRun {
+  return {
+    id: run.id,
+    kind: run.kind,
+    status: run.status,
+    projectId: run.projectId,
+    agentId: run.agentId,
+    workflowId: run.workflowId,
+    modelId: run.modelId,
+    simulated: run.simulated,
+    usage: run.usage,
+    createdAt: run.createdAt,
+    startedAt: run.startedAt,
+    endedAt: run.endedAt,
+    // Steps only matter for a failed run's message: resolve it once, drop the steps.
+    error: run.status === 'failed' ? runFailureMessage(run) : undefined,
+    steps: NO_STEPS,
+  }
+}
+
+function sameFacts(a: InsightsRun, b: InsightsRun): boolean {
+  return (
+    a.kind === b.kind && a.status === b.status && a.projectId === b.projectId && a.agentId === b.agentId &&
+    a.workflowId === b.workflowId && a.modelId === b.modelId && a.simulated === b.simulated &&
+    a.createdAt === b.createdAt && a.startedAt === b.startedAt && a.endedAt === b.endedAt && a.error === b.error &&
+    a.usage?.inputTokens === b.usage?.inputTokens && a.usage?.outputTokens === b.usage?.outputTokens &&
+    a.usage?.costUsd === b.usage?.costUsd
+  )
+}
+
+const factsByRun = new WeakMap<Run, InsightsRun>()
+const factsByTable = new WeakMap<Tables['runs'], InsightsRun[]>()
+let latestFacts = new Map<ID, InsightsRun>()
+
+/** Facts for every run, reusing each run's previous facts object while its analytics fields are unchanged. */
+function selectRunFacts(runs: Tables['runs']): InsightsRun[] {
+  const cached = factsByTable.get(runs)
+  if (cached) return cached
+  const next = new Map<ID, InsightsRun>()
+  const list: InsightsRun[] = []
+  for (const run of Object.values(runs)) {
+    let facts = factsByRun.get(run)
+    if (!facts) {
+      const fresh = factsOf(run)
+      const previous = latestFacts.get(run.id)
+      facts = previous && sameFacts(previous, fresh) ? previous : fresh
+      factsByRun.set(run, facts)
+    }
+    next.set(run.id, facts)
+    list.push(facts)
+  }
+  latestFacts = next
+  factsByTable.set(runs, list)
+  return list
+}
+
+/** Analytics fields of every run; a new array only when one of those fields changes. */
+function useRunFacts(): InsightsRun[] {
+  return useDB(useShallow((s: Tables) => selectRunFacts(s.runs)))
+}
+
 // ---------------------------------------------------------------- insights
 
 export interface UseInsightsOptions {
@@ -66,11 +139,12 @@ const kindsFromKey = (key: string) => (key ? (key.split(',') as RunKind[]) : und
 
 /**
  * Insights for the current minute (the window ends at the last millisecond of this minute, so
- * runs that start now count immediately). Memoized on the runs, approvals, tasks, agents and
- * workflows tables, the minute, the options and the monthly budget setting.
+ * runs that start now count immediately). Recomputes when run analytics fields (status, times,
+ * usage, model, owner…), approvals, tasks, agents or workflows change, when the minute turns
+ * over, or when the options or the monthly budget setting change — not on step/progress churn.
  */
 export function useInsights({ rangeDays, projectId, kinds }: UseInsightsOptions): Insights {
-  const runs = useTable('runs')
+  const runs = useRunFacts()
   const approvals = useTable('approvals')
   const tasks = useTable('tasks')
   const agents = useTable('agents')
@@ -82,7 +156,7 @@ export function useInsights({ rangeDays, projectId, kinds }: UseInsightsOptions)
   return useMemo(
     () =>
       computeInsights({
-        runs: Object.values(runs),
+        runs,
         approvals: Object.values(approvals),
         tasks: Object.values(tasks),
         agents: Object.values(agents),

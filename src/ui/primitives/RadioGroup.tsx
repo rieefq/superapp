@@ -71,8 +71,8 @@ export function RadioGroup<T extends string = string>({
               variant === 'cards' &&
                 cn(
                   'rounded-sm border px-3 py-2.5 transition-[border-color,background-color] duration-(--dur-1) ease-standard',
-                  checked ? 'border-accent/60 bg-accent-tint/50' : 'border-line hover:border-line-strong',
-                  'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent',
+                  checked ? 'border-ink bg-accent-tint/60' : 'border-line-strong hover:border-ink-3',
+                  'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-(--focus-ring)',
                 ),
             )}
           >
@@ -91,8 +91,8 @@ export function RadioGroup<T extends string = string>({
                 aria-hidden
                 className={cn(
                   'pointer-events-none grid size-full place-items-center rounded-full border transition-[border-color,background-color] duration-(--dur-1) ease-standard',
-                  checked ? 'border-inverse bg-inverse' : 'border-line-strong bg-sunken peer-hover:border-ink-4',
-                  variant !== 'cards' && 'peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent',
+                  checked ? 'border-inverse bg-inverse' : 'border-line-input bg-sunken peer-hover:border-ink-3',
+                  variant !== 'cards' && 'peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-(--focus-ring)',
                 )}
               >
                 <span className={cn('size-1.5 rounded-full bg-inverse-ink transition-transform duration-(--dur-2) ease-settle', checked ? 'scale-100' : 'scale-0')} />

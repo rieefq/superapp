@@ -151,9 +151,9 @@ export interface HoverCardProps {
   children: ReactElement
   content: ReactNode
   placement?: Placement
-  /** ms before opening. Default 500. */
+  /** ms before opening. Default 400. */
   openDelay?: number
-  /** Grace period (ms) to move the pointer into the card. Default 200. */
+  /** Grace period (ms) to move the pointer into the card. Default 120. */
   closeDelay?: number
   className?: string
   disabled?: boolean
@@ -163,7 +163,7 @@ export interface HoverCardProps {
  * Delayed preview on hover or keyboard focus, with a grace period so the pointer can travel into the card.
  * Supplementary only: never put the sole path to an action inside a hover card. Escape closes it.
  */
-export function HoverCard({ children, content, placement = 'bottom-start', openDelay = 500, closeDelay = 200, className, disabled }: HoverCardProps) {
+export function HoverCard({ children, content, placement = 'bottom-start', openDelay = 400, closeDelay = 120, className, disabled }: HoverCardProps) {
   const [open, setOpen] = useState(false)
   const [anchor, setAnchor] = useState<HTMLElement | null>(null)
   const openTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)

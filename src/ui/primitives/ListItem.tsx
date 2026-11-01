@@ -35,7 +35,9 @@ export interface ListItemProps {
   'aria-current'?: 'page' | 'true' | 'location' | boolean
 }
 
-const ROW = 'h-8 [[data-density=compact]_&]:h-7 pointer-coarse:h-11'
+/** --row-h: 36px (28px compact); two-line rows use --row-h-2; ≥44px on touch. */
+const ROW = 'h-(--row-h) pointer-coarse:min-h-11'
+const ROW_2 = 'min-h-(--row-h-2) py-1.5'
 
 function renderIcon(icon: ListItemProps['icon'], className: string) {
   if (!icon) return null
@@ -49,9 +51,9 @@ function renderIcon(icon: ListItemProps['icon'], className: string) {
 
 function rowClasses({ selected, disabled, interactive, twoLine }: { selected?: boolean; disabled?: boolean; interactive: boolean; twoLine: boolean }) {
   return cn(
-    'group/row relative flex w-full min-w-0 items-center gap-2.5 rounded-sm px-2 text-left text-sm',
+    'group/row type-body-sm relative flex w-full min-w-0 items-center gap-2.5 rounded-sm px-2 text-left',
     'transition-colors duration-(--dur-1) ease-standard focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
-    twoLine ? 'py-1.5' : ROW,
+    twoLine ? ROW_2 : ROW,
     selected ? 'bg-press text-ink' : 'text-ink-2',
     interactive && !disabled && !selected && 'cursor-pointer hover:bg-hover hover:text-ink',
     interactive && !disabled && 'cursor-pointer',
@@ -78,12 +80,12 @@ function RowContent({
           {label}
         </span>
         {description && (
-          <span id={descriptionId} className="truncate text-xs text-ink-3">
+          <span id={descriptionId} className="type-caption truncate text-ink-3">
             {description}
           </span>
         )}
       </span>
-      {meta != null && <span className="shrink-0 font-mono text-2xs text-ink-4 tabular">{meta}</span>}
+      {meta != null && <span className="type-meta shrink-0 text-ink-3">{meta}</span>}
       {trailing && (
         <span
           className={cn(

@@ -17,10 +17,13 @@ export interface SwitchProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement
   name?: string
 }
 
-const TRACK = { sm: 'h-3.5 w-6', md: 'h-[18px] w-8' }
-const THUMB = { sm: 'size-2.5 data-[on]:translate-x-2.5', md: 'size-3.5 data-[on]:translate-x-3.5' }
+const TRACK = { sm: 'h-3.5 w-6 rounded-xs', md: 'h-[18px] w-8 rounded-sm' }
+const THUMB = { sm: 'size-2.5 rounded-[2px] data-[on]:translate-x-2.5', md: 'size-3.5 rounded-xs data-[on]:translate-x-3.5' }
 
-/** On/off toggle (role="switch"). Ink-inverted track when on; the thumb settles with ease-settle. */
+/**
+ * On/off toggle (role="switch"). Square track (DESIGN §4.8 — rounded-full is reserved for capsules, actors
+ * and dots); ink-inverted when on; the thumb settles with ease-settle.
+ */
 export function Switch({
   checked: checkedProp,
   defaultChecked = false,
@@ -52,11 +55,11 @@ export function Switch({
         if (!e.defaultPrevented) setChecked(!checked)
       }}
       className={cn(
-        'group relative inline-flex shrink-0 cursor-pointer items-center rounded-full p-0.5',
+        'group relative inline-flex shrink-0 cursor-pointer items-center p-0.5',
         'transition-[background-color,box-shadow] duration-(--dur-2) ease-standard',
         "pointer-coarse:after:absolute pointer-coarse:after:-inset-3 pointer-coarse:after:content-['']",
         TRACK[size],
-        checked ? 'bg-inverse' : 'bg-press shadow-[inset_0_0_0_1px_var(--line-strong)] hover:shadow-[inset_0_0_0_1px_var(--ink-4)]',
+        checked ? 'bg-inverse' : 'bg-press shadow-[inset_0_0_0_1px_var(--line-input)] hover:shadow-[inset_0_0_0_1px_var(--ink-3)]',
         'disabled:cursor-not-allowed disabled:opacity-45',
         label ? undefined : className,
       )}
@@ -67,7 +70,7 @@ export function Switch({
         aria-hidden
         data-on={checked ? '' : undefined}
         className={cn(
-          'block rounded-full transition-[transform,background-color] duration-(--dur-2) ease-settle',
+          'block transition-[transform,background-color] duration-(--dur-2) ease-settle',
           THUMB[size],
           checked ? 'bg-canvas' : 'bg-ink-3',
         )}

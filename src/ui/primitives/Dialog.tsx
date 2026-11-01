@@ -26,7 +26,7 @@ const DialogContext = createContext<DialogIds | null>(null)
 /** Title for custom dialog/sheet headers (wired to aria-labelledby). */
 export function DialogTitle({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) {
   const ctx = useContext(DialogContext)
-  return <h2 id={ctx?.titleId} className={cn('text-lg leading-6 font-semibold tracking-[-0.01em] text-ink text-balance', className)} {...props} />
+  return <h2 id={ctx?.titleId} className={cn('type-title-2 text-ink text-balance', className)} {...props} />
 }
 
 /** Description for custom headers (wired to aria-describedby). */
@@ -185,7 +185,8 @@ export function Dialog({
 
 // ------------------------------------------------------------------------------------------------ Sheet
 
-const SHEET_WIDTH = { sm: 'sm:w-[360px]', md: 'sm:w-[440px]', lg: 'sm:w-[560px]', xl: 'sm:w-[720px]' } as const
+/** xs 300 (list drawer) · sm 380 (tablet Inspector) · md 480 (Start sheet) · lg 560 · xl 720. */
+const SHEET_WIDTH = { xs: 'sm:w-[300px]', sm: 'sm:w-[380px]', md: 'sm:w-[480px]', lg: 'sm:w-[560px]', xl: 'sm:w-[720px]' } as const
 
 export interface SheetProps extends ModalBaseProps {
   /** 'auto' = bottom sheet on small screens, right panel from md up. Default 'right'. */

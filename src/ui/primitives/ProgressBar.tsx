@@ -28,11 +28,14 @@ export interface ProgressBarProps extends Omit<HTMLAttributes<HTMLDivElement>, '
   'aria-label'?: string
 }
 
-/** Thin determinate/indeterminate progress. The indeterminate bar becomes a soft pulse under reduced motion. */
+/**
+ * Thin determinate/indeterminate progress — for file uploads and imports only (DESIGN §5.5); AI runs use
+ * the Step Tape. The indeterminate bar becomes a soft pulse under reduced motion.
+ */
 export function ProgressBar({
   value,
   max = 100,
-  tone = 'live',
+  tone = 'neutral',
   size = 'sm',
   label,
   showValue,
