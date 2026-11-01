@@ -1,11 +1,12 @@
 import type { Hue } from '@/core/types'
 
 /**
- * Categorical series order (dataviz six-checks). Validated with
- * `validate_palette.js` against the identity-hue tokens on both chart surfaces
- * (dark #181817, light #fdfdfb): the mandated order (sky, coral, mint, …) failed the
- * adjacent CVD and normal-vision gates; this order is the best of all 40,320
- * permutations — worst adjacent CVD ΔE 11.2 dark / 8.7 light, normal-vision 15.1 / 15.3.
+ * Categorical series order (dataviz six-checks). Series are drawn with the `--series-*`
+ * tokens: the identity hue families stepped to mid lightness and higher chroma for data
+ * marks (identity hues themselves are tuned for text and fail the lightness/chroma gates
+ * as fills). Validated with `validate_palette.js` in this order on both chart surfaces —
+ * ALL CHECKS PASS: dark (#181817) worst adjacent CVD ΔE 12.9, normal-vision 21.0;
+ * light (#fdfdfb) worst adjacent CVD ΔE 11.3, normal-vision 20.6; contrast ≥ 3:1.
  * Mint (≈ done) and coral (≈ fail) are kept out of the leading slots so single- and
  * two-series charts never read as status. Never cycle: a 9th series folds into "Other".
  */
@@ -19,8 +20,9 @@ export const OTHER_COLOR = 'var(--ink-4)'
 /** Surface the chart sits on (for 2px rings and ramp mixing). Set by the chart frame. */
 export const CHART_SURFACE = 'var(--chart-surface, var(--surface-canvas))'
 
+/** Data-mark fill for a hue family (series token, not the identity text hue). */
 export function hueColor(hue: Hue): string {
-  return `var(--hue-${hue})`
+  return `var(--series-${hue})`
 }
 
 /** Color for categorical slot `index` (0-based). Out-of-range slots get the "Other" gray. */

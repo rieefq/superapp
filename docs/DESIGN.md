@@ -657,7 +657,7 @@ Rules:
 
 ### 4.5 Data-visualization colors
 
-- **Categorical series:** `SERIES_HUES` in `src/ui/charts/palette.ts`, in its validated order (rose, volt, sky, coral, cyan, amber, violet, mint), with at most 8 series. A 9th series folds into "Other" (`--ink-4`). Series never cycle.
+- **Categorical series:** `SERIES_HUES` in `src/ui/charts/palette.ts`, in its validated order (rose, volt, sky, coral, cyan, amber, violet, mint), with at most 8 series. Marks are filled with the `--series-<hue>` tokens (same hue families as identity, stepped to mid lightness/higher chroma; validated in both themes — identity `--hue-*` values are for text and marks, not chart fills). A 9th series folds into "Other" (`--ink-4`). Series never cycle.
 - **Single series:** `--ink-2`, `--ink` on hover.
 - **Outcomes:** succeeded `--ink-3`, failed `--fail`, cancelled `--ink-4`. The legend always shows the glyphs. Never mix categorical hues with state colors in one chart.
 - **Simulated data:** the `.sim-hatch` fill and a `SIM` entry in the legend.

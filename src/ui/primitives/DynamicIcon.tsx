@@ -97,10 +97,10 @@ export const ICON_ALIASES: Record<string, IconName> = {
   Gitlab: 'FolderGit2',
 }
 
-/** Names offered in icon pickers (project/collection identity). */
+/** Names offered in icon pickers (project/collection identity). No sparkle/wand/brain imagery (DESIGN §5.1). */
 export const PICKABLE_ICONS: IconName[] = [
   'Folder', 'FolderKanban', 'Boxes', 'Box', 'Package', 'Rocket', 'Megaphone', 'Feather', 'Telescope', 'Compass',
-  'Target', 'Flag', 'Lightbulb', 'Brain', 'Sparkles', 'Palette', 'PenTool', 'Code', 'Terminal', 'Bug', 'Database',
+  'Target', 'Flag', 'Lightbulb', 'Palette', 'PenTool', 'Code', 'Terminal', 'Bug', 'Database',
   'Server', 'Cloud', 'Globe', 'Map', 'Workflow', 'Waypoints', 'Network', 'Layers', 'Blocks', 'Shapes', 'Puzzle',
   'BookOpen', 'Library', 'Notebook', 'GraduationCap', 'Microscope', 'FlaskConical', 'ChartLine', 'ChartPie', 'Gauge',
   'Briefcase', 'Building2', 'Users', 'Heart', 'Star', 'Leaf', 'Zap',

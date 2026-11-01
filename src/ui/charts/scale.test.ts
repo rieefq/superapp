@@ -154,12 +154,12 @@ describe('nearestIndex', () => {
 describe('palette', () => {
   it('assigns slots in the validated fixed order and never cycles', () => {
     expect(SERIES_HUES).toEqual(['rose', 'volt', 'sky', 'coral', 'cyan', 'amber', 'violet', 'mint'])
-    expect(seriesColor(0)).toBe('var(--hue-rose)')
+    expect(seriesColor(0)).toBe('var(--series-rose)')
     expect(seriesColor(8)).toBe('var(--ink-4)')
   })
   it('lets an entity hue override the slot', () => {
-    expect(resolveSeriesColor({ hue: 'sky', colorIndex: 4 }, 0)).toBe('var(--hue-sky)')
-    expect(resolveSeriesColor({}, 2)).toBe('var(--hue-sky)')
+    expect(resolveSeriesColor({ hue: 'sky', colorIndex: 4 }, 0)).toBe('var(--series-sky)')
+    expect(resolveSeriesColor({}, 2)).toBe('var(--series-sky)')
   })
   it('folds the tail into Other', () => {
     const items = [5, 9, 1, 7, 3, 2, 8, 4].map((v, i) => ({ label: `s${i}`, value: v }))

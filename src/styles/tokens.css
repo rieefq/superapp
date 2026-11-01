@@ -68,6 +68,18 @@
   --hue-rose: #eba2c0;
   --hue-cyan: #7fcbdb;
 
+  /* Chart series fills (same hue families as identity, stepped for data marks).
+     Validated with the dataviz six-checks on #181817 in order rose,volt,sky,coral,cyan,amber,violet,mint:
+     lightness band, chroma floor, adjacent CVD ΔE ≥ 12.9 (deutan), normal-vision ΔE ≥ 21.0, contrast ≥ 3:1. */
+  --series-rose: #c85b8e;
+  --series-volt: #7f9100;
+  --series-sky: #3e87de;
+  --series-coral: #d05f43;
+  --series-cyan: #1396ab;
+  --series-amber: #ac7d0c;
+  --series-violet: #8c71d7;
+  --series-mint: #079e77;
+
   /* Diff */
   --diff-add-bg: #13261a;
   --diff-add-ink: #9fe8b2;
@@ -152,6 +164,16 @@
   --hue-mint: #1c6e52;
   --hue-rose: #973a62;
   --hue-cyan: #1a6a7c;
+
+  /* Chart series fills — validated on #fdfdfb: adjacent CVD ΔE ≥ 11.3, normal-vision ΔE ≥ 20.6, contrast ≥ 3:1. */
+  --series-rose: #bc4e7d;
+  --series-volt: #748400;
+  --series-sky: #377ad1;
+  --series-coral: #c35239;
+  --series-cyan: #1288a1;
+  --series-amber: #a07002;
+  --series-violet: #7868cd;
+  --series-mint: #059069;
 
   --diff-add-bg: #e3f4e8;
   --diff-add-ink: #1b6b3a;

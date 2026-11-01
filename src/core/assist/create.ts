@@ -44,6 +44,9 @@ const LEADS: readonly RegExp[] = [
 const CONTAINER =
   /^(?:images?|pictures?|photos?|illustrations?|videos?|clips?|slides?|slide ?decks?|decks?|presentations?|slideshows?|voice[- ]?overs?|narrations?|podcasts?|audio(?: clips?)?|recordings?|renders?)\s+(?:of|about|on|showing|depicting|explaining|covering|featuring|with|that shows|that explains)\s+/i
 
+const BARE_KIND =
+  /^(?:images?|pictures?|photos?|illustrations?|videos?|clips?|slides?|slide ?decks?|decks?|presentations?|voice[- ]?overs?|narrations?|podcasts?|audio(?: clips?)?|recordings?|copy|documents?|docs?|logos?|something|one|it)$/i
+
 /** Phrases that contain a kind word without asking for that kind ("in our brand voice"). */
 const NOT_A_KIND = /\b(?:brand voice|tone of voice|voice and tone|voice guide)\b/gi
 
@@ -67,7 +70,8 @@ export function cleanCreatePrompt(text: string): string {
     if (s === before) break
   }
   s = s.replace(CONTAINER, '').trim().replace(/[\s.!]+$/u, '')
-  if (s.replace(/[^\p{L}\p{N}]/gu, '').length < 2) s = original.replace(/[\s.!]+$/u, '')
+  // Nothing but the kind itself is left ("Make an image"): keep the request as written.
+  if (s.replace(/[^\p{L}\p{N}]/gu, '').length < 2 || BARE_KIND.test(s)) s = original.replace(/[\s.!]+$/u, '')
   return capitalize(s)
 }
 

@@ -30,6 +30,8 @@ interface NodeSpec {
   integrationId?: string
   agentId?: ID
   capability?: Capability
+  /** Explanations shown with the draft, emitted only when the step makes it into the graph. */
+  notes?: string[]
   /** Internal: added by "ask me before sending"; an explicit step of the same kind replaces it. */
   implied?: boolean
   /** Internal: an approval written after its step ("…, but ask me first") moves in front of it. */
@@ -51,7 +53,21 @@ interface CondStep {
   falseTerminal?: boolean
 }
 
-type Step = { type: 'node'; spec: NodeSpec } | CondStep
+interface NodeStep {
+  type: 'node'
+  spec: NodeSpec
+}
+
+type Step = NodeStep | CondStep
+
+type Branch = 'true' | 'false'
+
+interface OpenCondition {
+  step: CondStep
+  primary: Branch
+  branch: Branch
+  sentence: number
+}
 
 type Sep = 'start' | 'comma' | 'and' | 'then' | 'finally' | 'or'
 
@@ -67,8 +83,21 @@ interface Env {
   /** Pronoun replacement for the trigger's object: "summarize it" → "summarize the email". */
   object?: string
   triggerIntegration?: string
+  /** Draft-level notes (clauses that were skipped). */
   notes: string[]
   connected: (id: string) => boolean
+}
+
+const withNotes = (spec: NodeSpec, ...notes: Array<string | undefined>): NodeSpec => {
+  const list = notes.filter((n): n is string => !!n)
+  return list.length ? { ...spec, notes: [...(spec.notes ?? []), ...list] } : spec
+}
+
+function connectionNote(env: Env, id: string | undefined): string | undefined {
+  if (!id) return undefined
+  const def = getIntegration(id)
+  if (!def || env.connected(id)) return undefined
+  return `${def.name} is not connected yet; connect it in Integrations before this can run.`
 }
 
 // ---------------------------------------------------------------- trigger detection
@@ -145,33 +174,28 @@ function findEvent(text: string): FoundEvent | undefined {
 
 const TIME_RE = /\s*\b(?:at|by|around|@)\s+(\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)|\d{1,2}:\d{2}|noon|midnight)/i
 
-function connectionsNote(env: Env, id: string | undefined): void {
-  if (!id) return
-  const def = getIntegration(id)
-  if (!def || env.connected(id)) return
-  const note = `${def.name} is not connected yet; connect it in Integrations before this can run.`
-  if (!env.notes.includes(note)) env.notes.push(note)
-}
-
 // ---------------------------------------------------------------- clause splitting
 
-const STEP_VERBS = [
+const AGENT_VERBS = [
   'summari[sz]e', 'analy[sz]e', 'draft', 'write', 'research', 'review', 'classify', 'categori[sz]e', 'triage', 'prioriti[sz]e',
   'investigate', 'compare', 'translate', 'extract', 'score', 'rank', 'check', 'scan', 'monitor', 'collect', 'gather', 'compile',
   'find', 'look', 'identify', 'generate', 'create', 'make', 'produce', 'design', 'prepare', 'tag', 'label', 'evaluate', 'assess',
   'read', 'go through', 'dedupe', 'de-?duplicate', 'clean', 'update', 'pull', 'fetch', 'get', 'query', 'calculate', 'estimate',
   'draw', 'turn', 'convert', 'format', 'list', 'flag', 'route', 'enrich', 'answer', 'suggest', 'recommend', 'propose', 'outline',
   'plan', 'build', 'test', 'fix', 'run', 'organi[sz]e', 'sort', 'group', 'transcribe', 'proofread', 'edit', 'rewrite',
+]
+const OTHER_VERBS = [
   'post', 'send', 'notify', 'alert', 'e-?mail', 'message', 'announce', 'share', 'ping', 'dm', 'tell', 'forward', 'reply',
   'respond', 'publish', 'broadcast', 'remind', 'open', 'file', 'log', 'raise', 'submit', 'track', 'add', 'save', 'store', 'keep',
   'archive', 'record', 'put', 'append', 'jot', 'upload', 'export', 'wait', 'pause', 'hold', 'ask', 'approve', 'let', 'have',
-  'confirm', 'escalate', 'assign', 'move', 'close', 'mark', 'skip', 'ignore',
+  'confirm', 'escalate', 'assign', 'move', 'close', 'mark', 'skip', 'ignore', 'leave', 'comment',
 ]
 
 const STEP_START = new RegExp(
-  `^(?:(?:only\\s+)?(?:if|when|whenever|unless|in case|otherwise|else)\\b|(?:${STEP_VERBS.join('|')})\\b)`,
+  `^(?:(?:only\\s+)?(?:if|when|whenever|unless|in case|otherwise|else)\\b|(?:${[...AGENT_VERBS, ...OTHER_VERBS].join('|')})\\b)`,
   'i',
 )
+const AGENT_VERB = new RegExp(`^(?:${AGENT_VERBS.join('|')})\\b`, 'i')
 
 const LEAD =
   /^(?:and|also|then|so|please|just|automatically|always|immediately|finally|next|afterwards|after that|first|second|third|lastly|plus|to|it should|you should|we should|i want (?:you )?to|i'd like (?:you )?to|i would like (?:you )?to|can you|could you|have (?:it|them|the agent|an agent)|make sure (?:to|you)|go ahead and|try to)\b[\s,:]*/i
@@ -200,6 +224,7 @@ function sepKind(word: string, comma: boolean): Sep {
   return comma ? 'comma' : 'and'
 }
 
+/** Sentences → clauses; pieces that do not start a step ("…pricing and packaging") stay joined. */
 export function splitClauses(body: string): Clause[] {
   const sentences = body
     .split(/(?<=[.;!?])\s+|\n+/)
@@ -235,10 +260,8 @@ export function splitClauses(body: string): Clause[] {
 const COND_WORDS =
   /\b(?:urgent|critical|p0|p1|sev ?[12]|emergency|outage|high(?:[- ]priority)?|important|negative|angry|unhappy|upset|frustrated|complain\w*|positive|large|big|small|over|above|below|under|more than|less than|greater than|at least|at most|score|contains?|mentions?|includes?|is about|vip|enterprise|spam|fail(?:s|ed|ing)?|empty|missing|overdue|late|stale|blocked)\b|[<>]=?/i
 
-const EMBEDDED_STEP = new RegExp(
-  `(?:,\\s*|\\s+)(?:then\\s+)?(?=(?:post|send|notify|alert|e-?mail|message|create|open|file|save|store|add|log|ask|escalate|assign|share|ping|forward|reply|respond|summari[sz]e|draft|write|tag|label|flag|mark|move|close|archive|wait|research|review|analy[sz]e|update|upload|publish|skip|ignore|stop|let)\\b)`,
-  'gi',
-)
+const EMBEDDED_STEP =
+  /(?:,\s*|\s+)(?:then\s+)?(?=(?:post|send|notify|alert|e-?mail|message|create|open|file|save|store|add|log|ask|escalate|assign|share|ping|forward|reply|respond|summari[sz]e|draft|write|tag|label|flag|mark|move|close|archive|wait|research|review|analy[sz]e|update|upload|publish|skip|ignore|stop|let)\b)/gi
 
 function splitEmbeddedStep(body: string): { cond: string; rest: string } {
   for (const m of body.matchAll(EMBEDDED_STEP)) {
@@ -251,7 +274,7 @@ function splitEmbeddedStep(body: string): { cond: string; rest: string } {
 }
 
 const SUBJECT =
-  /^(?:it|this|that|they|one|any|the (?:email|e-mail|message|issue|ticket|pr|pull request|request|item|result|output|summary|customer|sender|payment|file|event|change|diff))\s+(?:is|are|was|were|has|have|looks?|seems?|gets?|comes?)?\s*/i
+  /^(?:it|this|that|they|one|any(?:thing|one)?|the (?:email|e-mail|message|issue|ticket|pr|pull request|request|item|result|output|summary|customer|sender|payment|file|event|change|diff))(?:['’]s|['’]re|\s+(?:is|are|was|were|has|have|looks?|seems?|gets?|comes?))?\s+/i
 
 interface ParsedCondition {
   expression: string
@@ -260,6 +283,8 @@ interface ParsedCondition {
   rest: string
 }
 
+const OPS: Record<string, string> = { above: '>', over: '>', 'greater than': '>', 'at least': '>=', below: '<', under: '<', 'less than': '<', 'at most': '<=' }
+
 function conditionFrom(cond: string): { expression: string; label: string } {
   const c = cond.toLowerCase()
   if (/\b(?:urgent|critical|p0|sev ?1|emergency|outage)\b/.test(c)) return { expression: 'priority is urgent', label: 'Urgent?' }
@@ -267,13 +292,13 @@ function conditionFrom(cond: string): { expression: string; label: string } {
   if (/\b(?:negative|angry|unhappy|upset|frustrated|complain\w*)\b/.test(c)) return { expression: 'sentiment is negative', label: 'Negative tone?' }
   const score = /\bscore\b[^\d<>]*?(>=|<=|>|<|above|over|greater than|at least|below|under|less than|at most)\s*(\d+(?:\.\d+)?)/.exec(c)
   if (score) {
-    const op = ({ above: '>', over: '>', 'greater than': '>', 'at least': '>=', below: '<', under: '<', 'less than': '<', 'at most': '<=' } as Record<string, string>)[score[1]] ?? score[1]
+    const op = OPS[score[1]] ?? score[1]
     return { expression: `score ${op} ${score[2]}`, label: `Score ${op} ${score[2]}?` }
   }
   const mention = /\b(?:mentions?|contains?|includes?|is about|talks about|says|refers to)\s+["“']?([\p{L}\p{N}#@][\p{L}\p{N}-]*)/iu.exec(cond)
   if (mention) return { expression: `subject contains "${mention[1].toLowerCase()}"`, label: `Mentions “${mention[1]}”?` }
   const plain = trimTail(cond.replace(SUBJECT, '').trim()) || cond.trim()
-  return { expression: clip(cond.trim(), 80), label: `${labelize(plain, 4)}?` }
+  return { expression: clip(cond.trim(), 80), label: `${labelize(plain, 6)}?` }
 }
 
 /** "if it's urgent, post …" / "unless it is spam" / "check whether …". Returns null for non-conditions. */
@@ -285,7 +310,7 @@ function parseCondition(text: string): ParsedCondition | { sequence: true; rest:
   if ((cue === 'when' || cue === 'whenever') && !COND_WORDS.test(cond)) return { sequence: true, rest }
   let negate = cue === 'unless'
   let body = cond
-  const neg = /^(?:(?:it|this|that|they|one|the \w+)\s+)?(?:is not|isn't|is n't|are not|aren't|was not|wasn't|does not|doesn't|do not|don't|not)\s+/i.exec(body)
+  const neg = /^(?:(?:it|this|that|they|one|the \w+)\s+)?(?:is not|isn't|isn’t|are not|aren't|aren’t|was not|wasn't|does not|doesn't|doesn’t|do not|don't|don’t|not)\s+/i.exec(body)
   if (neg) {
     negate = !negate
     body = body.slice(neg[0].length)
@@ -296,7 +321,9 @@ function parseCondition(text: string): ParsedCondition | { sequence: true; rest:
 /** "<step> if <condition>" → the condition first, the step in its branch. */
 function splitTrailingCondition(text: string): { cond: ParsedCondition; step: string } | null {
   const m = /^(.+?)\s+(?:but\s+)?(?:only\s+)?(if|unless|when(?:ever)?)\s+(.+)$/i.exec(text)
-  if (!m || !isStepStart(m[1]) || /^(?:if|when|whenever|unless)\b/i.test(stripLead(m[1]))) return null
+  if (!m) return null
+  const lead = stripLead(m[1])
+  if (!isStepStart(lead) || /^(?:if|when|whenever|unless|otherwise|else)\b/i.test(lead) || /^(?:check|see|determine|decide|find out)$/i.test(lead)) return null
   const cue = m[2].toLowerCase()
   if (cue.startsWith('when') && !COND_WORDS.test(m[3])) return null
   const parsed = parseCondition(`${cue} ${m[3]}`)
@@ -315,13 +342,12 @@ const IRREGULAR: Record<string, string> = {
   notifying: 'notify', announcing: 'announce', updating: 'update', closing: 'close', opening: 'open', uploading: 'upload',
   uploaded: 'upload', submitting: 'submit', forwarding: 'forward', forwarded: 'forward', messaging: 'message', alerting: 'alert',
   logging: 'log', logged: 'log', storing: 'store', stored: 'store', adding: 'add', added: 'add', escalating: 'escalate',
-  assigning: 'assign', running: 'run', going: 'go',
+  assigning: 'assign', running: 'run', commenting: 'comment', leaving: 'leave',
 }
 
 function toImperative(word: string): string {
   const w = word.toLowerCase()
-  if (IRREGULAR[w]) return IRREGULAR[w]
-  return w.replace(/ing$/, '').replace(/([^aeiou])\1$/, '$1')
+  return IRREGULAR[w] ?? w.replace(/ing$/, '').replace(/([^aeiou])\1$/, '$1')
 }
 
 const APPROVAL_CLAUSE =
@@ -336,20 +362,20 @@ const SUMMARY_DELIVERY =
   /^(?:send|e-?mail|post|share|give|deliver|dm|message|slack)\s+(?:(me|us|the team|everyone|[#@][\w-]+)\s+)?(?:an?|the|my|our)?\s*(?:(daily|weekly|monthly|nightly|short|quick|brief)\s+)?(summary|digest|report|recap|update|overview|list|brief|roundup|round-up|briefing)\b(.*)$/i
 
 const KNOWLEDGE_VERB = /^(?:save|store|add|file|log|keep|archive|record|put|append|write|create|make|jot)\b/i
-const KNOWLEDGE_NOUN = /\b(?:knowledge(?: base)?|notes?|wiki|library|collection|kb|research collection)\b/i
-const SAVE_ONLY = /^(?:save|store|archive|record|keep)\b/i
+const KNOWLEDGE_NOUN = /\b(?:knowledge(?: base)?|notes?|wiki|library|collection|kb)\b/i
+const SAVE_ONLY = /^(?:save|store|archive|record)\b/i
 const FILES_DEST = /\b(?:google )?drive\b|\bs3\b|\bbucket\b/i
 const TRACKER_VERB = /^(?:create|open|file|make|add|log|raise|submit|track)\b/i
 const TRACKER_NOUN = /\b(?:tasks?|tickets?|issues?|to-?dos?|bugs?|cards?)\b/i
+const TRACKER_NAME = /\b(?:linear|jira)\b/i
 const NOTIFY_ME = /^(?:notify|alert|tell|ping|message|remind)\s+me\b|^let me know\b|^send me\b|^keep me (?:posted|updated|in the loop)\b/i
 const SEND_VERB = /^(?:post|send|notify|alert|e-?mail|message|announce|share|ping|dm|tell|forward|reply|respond|publish|broadcast|slack)\b/i
-const AGENT_VERB = new RegExp(`^(?:${STEP_VERBS.slice(0, STEP_VERBS.indexOf('post')).join('|')})\\b`, 'i')
+const REVIEW_POST = /^(?:post|leave|add|submit|publish|share)\b.*\b(?:review|comments?)\b/i
 const DELEGATE = /^(?:have|ask|get|tell|let)\s+@?([\p{L}][\p{L}\p{N}_-]*)\s+(?:to\s+)?/iu
 const WHEN_DONE = /\s+(?:when|once|after)\s+(?:it(?:'s| is)\s+|that(?:'s| is)\s+|everything is\s+|they(?:'re| are)\s+)?(?:done|finished|complete|ready)\b.*$/i
 
 function replacePronoun(text: string, object: string | undefined): string {
-  if (!object) return text
-  return text.replace(/\b(?:it|them)\b/i, object)
+  return object ? text.replace(/\b(?:it|them)\b/i, object) : text
 }
 
 function notifySpec(source?: string): NodeSpec {
@@ -357,18 +383,12 @@ function notifySpec(source?: string): NodeSpec {
 }
 
 function approvalSpec(source: string): NodeSpec {
-  return {
-    type: 'approval',
-    label: 'Ask me first',
-    config: { instructions: 'Review before the workflow continues.' },
-    autoLabel: true,
-    source,
-  }
+  return { type: 'approval', label: 'Ask me first', config: { instructions: 'Review before the workflow continues.' }, autoLabel: true, source }
 }
 
-function taskOutput(text: string): NodeSpec {
+function taskOutput(text: string, note?: string): NodeSpec {
   const priority: Priority | undefined = /\burgent\b/i.test(text) ? 'urgent' : /\bhigh[- ]priority\b/i.test(text) ? 'high' : undefined
-  return { type: 'output', label: 'Create a task', config: { kind: 'task', ...(priority ? { priority } : {}) }, source: text }
+  return withNotes({ type: 'output', label: 'Create a task', config: { kind: 'task', ...(priority ? { priority } : {}) }, source: text }, note)
 }
 
 function messageSpec(text: string, env: Env): NodeSpec {
@@ -376,16 +396,16 @@ function messageSpec(text: string, env: Env): NodeSpec {
   const email = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/.exec(text)?.[0]
   const reply = /\b(?:reply|respond)\b/i.test(text)
   let integrationId: 'slack' | 'gmail'
+  let note: string | undefined
   if (channel || /\bslack\b|\bchannel\b|\bdm\b/i.test(text)) integrationId = 'slack'
   else if (email || /\be-?mail|\bgmail\b|\binbox\b/i.test(text) || (reply && env.triggerIntegration === 'gmail')) integrationId = 'gmail'
   else if (env.connected('slack') || !env.connected('gmail')) {
     integrationId = 'slack'
-    env.notes.push(`${quoted(clip(text, 50))} doesn’t say where to send, so it posts to Slack — change it in the step settings.`)
+    note = `${quoted(clip(text, 50))} doesn’t say where to send, so it posts to Slack — change it in the step settings.`
   } else {
     integrationId = 'gmail'
-    env.notes.push(`${quoted(clip(text, 50))} doesn’t say where to send, so it uses Gmail — change it in the step settings.`)
+    note = `${quoted(clip(text, 50))} doesn’t say where to send, so it uses Gmail — change it in the step settings.`
   }
-  connectionsNote(env, integrationId)
   const defaultChannel = env.ctx.connections.find((c) => c.id === 'slack')?.config.defaultChannel
   const toMe = /\bme\b/i.test(text)
   const config: Record<string, unknown> =
@@ -396,7 +416,7 @@ function messageSpec(text: string, env: Env): NodeSpec {
     integrationId === 'slack'
       ? `Post to ${typeof config.channel === 'string' ? config.channel : 'Slack'}`
       : email ? `Email ${email}` : reply ? 'Reply to the sender' : toMe ? 'Email me' : 'Send email'
-  return { type: 'action', label, integrationId, capability: 'messages.send', config, source: text }
+  return withNotes({ type: 'action', label, integrationId, capability: 'messages.send', config, source: text }, note, connectionNote(env, integrationId))
 }
 
 function trackerSpec(text: string, env: Env): NodeSpec {
@@ -404,15 +424,14 @@ function trackerSpec(text: string, env: Env): NodeSpec {
   const taskWord = /\b(?:tasks?|to-?dos?)\b/i.test(text) && !/\b(?:tickets?|issues?|bugs?|cards?)\b/i.test(text)
   if (!named && taskWord) return taskOutput(text)
   const integrationId = named ?? (env.connected('linear') ? 'linear' : env.connected('jira') ? 'jira' : undefined)
-  if (!integrationId) {
-    env.notes.push('No issue tracker (Linear or Jira) is connected, so the ticket step creates an Atrium task instead.')
-    return taskOutput(text)
-  }
-  connectionsNote(env, integrationId)
+  if (!integrationId) return taskOutput(text, 'No issue tracker (Linear or Jira) is connected, so the ticket step creates an Atrium task instead.')
   const conn = env.ctx.connections.find((c) => c.id === integrationId)
   const team = conn?.config.team ?? conn?.config.project
   const name = getIntegration(integrationId)?.name ?? integrationId
-  return { type: 'action', label: `Create ${name} issue`, integrationId, capability: 'tasks.manage', config: team ? { team } : {}, source: text }
+  return withNotes(
+    { type: 'action', label: `Create ${name} issue`, integrationId, capability: 'tasks.manage', config: team ? { team } : {}, source: text },
+    connectionNote(env, integrationId),
+  )
 }
 
 function agentSpec(text: string, env: Env, forcedAgentId?: ID): NodeSpec {
@@ -420,27 +439,29 @@ function agentSpec(text: string, env: Env, forcedAgentId?: ID): NodeSpec {
   const label = labelize(instruction, 6)
   const pick = forcedAgentId ? null : pickAgentForInstruction(text, env.ctx.agents, { runs: env.ctx.runs, context: env.fullText })
   const agentId = forcedAgentId ?? pick?.agentId
-  if (forcedAgentId) {
-    const name = env.ctx.agents.find((a) => a.id === forcedAgentId)?.name
-    env.notes.push(`${quoted(label, 40)}: assigned to ${name ?? 'the agent you named'}, as written.`)
-  } else if (pick) env.notes.push(`${quoted(label, 40)}: ${pick.reason}`)
-  else env.notes.push(`${quoted(label, 40)}: no active agent clearly fits — choose one before running.`)
-  return {
-    type: 'agent',
-    label,
-    config: { prompt: /[.!?]$/.test(instruction) ? instruction : `${instruction}.` },
-    ...(agentId ? { agentId } : {}),
-    ...(pick?.capability ? { capability: pick.capability } : {}),
-    source: text,
-  }
+  const note = forcedAgentId
+    ? `${quoted(label, 40)}: assigned to ${env.ctx.agents.find((a) => a.id === forcedAgentId)?.name ?? 'the agent you named'}, as written.`
+    : pick
+      ? `${quoted(label, 40)}: ${pick.reason}`
+      : `${quoted(label, 40)}: no active agent clearly fits — choose one before running.`
+  return withNotes(
+    {
+      type: 'agent',
+      label,
+      config: { prompt: /[.!?]$/.test(instruction) ? instruction : `${instruction}.` },
+      ...(agentId ? { agentId } : {}),
+      ...(pick?.capability ? { capability: pick.capability } : {}),
+      source: text,
+    },
+    note,
+  )
 }
 
 function approvalNodes(text: string, env: Env): NodeSpec[] {
   const spec = approvalSpec(text)
-  const before = /\bbefore\s+(?:it(?:'s| is| gets)\s+|they(?:'re| are| get)\s+|anything (?:is |gets )?)?(\w+(?:ing|ed)|sent)\b(.*)$/i.exec(text)
-  if (before && !/^(?:anything|everything)$/i.test(before[1])) {
-    const verb = toImperative(before[1])
-    const implied = nodesFor(`${verb}${before[2] ?? ''}`, env).filter((s) => s.type === 'action' || s.type === 'output')
+  const before = /\bbefore\s+(?:it(?:'s|’s| is| gets)\s+|they(?:'re|’re| are| get)\s+)?(\w+(?:ing|ed)|sent)\b(.*)$/i.exec(text)
+  if (before) {
+    const implied = nodesFor(`${toImperative(before[1])}${before[2] ?? ''}`, env).filter((s) => s.type === 'action' || s.type === 'output')
     if (implied.length) return [spec, ...implied.map((s) => ({ ...s, implied: true }))]
   }
   if (/\b(?:first|beforehand)\b|\bbefore (?:it|anything|this|that) (?:goes out|is sent|gets sent|is posted|gets posted|is published)\b/i.test(text)) {
@@ -458,8 +479,7 @@ function nodesFor(raw: string, env: Env): NodeSpec[] {
   const inline = INLINE_APPROVAL.exec(text)
   if (inline && inline.index > 0) {
     const rest = `${text.slice(0, inline.index)} ${text.slice(inline.index + inline[0].length)}`.replace(/\s+/g, ' ').trim()
-    const specs = nodesFor(rest, env)
-    return [approvalSpec(text), ...specs]
+    return [approvalSpec(text), ...nodesFor(rest, env)]
   }
 
   const delay = DELAY.exec(text)
@@ -479,32 +499,31 @@ function nodesFor(raw: string, env: Env): NodeSpec[] {
 
   const summary = SUMMARY_DELIVERY.exec(text)
   if (summary) {
-    const [, who, cadence, noun, restRaw] = summary
-    const rest = (restRaw ?? '').replace(/\s+(?:to|in|on|via|by|into)\s+(?:#[\w-]+|slack|e-?mail|gmail|me|us|the team|everyone)\b.*$/i, '')
-    const writer = { ...agentSpec(`Write a ${cadence ? `${cadence.toLowerCase()} ` : ''}${noun.toLowerCase()}${rest}`, env), optionalAfterAgent: true }
+    const [, who, cadence, noun, restRaw = ''] = summary
+    const rest = restRaw.replace(/\s+(?:to|in|on|via|by|into)\s+(?:#[\w-]+|slack|e-?mail|gmail|me|us|the team|everyone)\b.*$/i, '')
+    const writer: NodeSpec = { ...agentSpec(`Write a ${cadence ? `${cadence.toLowerCase()} ` : ''}${noun.toLowerCase()}${rest}`, env), optionalAfterAgent: true }
     const toMe = !!who && /^(?:me|us)$/i.test(who)
-    const delivery =
-      toMe && !/^e-?mail/i.test(text) && !/\bslack\b|#[\w-]+|\be-?mail\b/i.test(restRaw ?? '')
-        ? notifySpec(text)
-        : messageSpec(text, env)
+    const delivery = toMe && !/^e-?mail/i.test(text) && !/\bslack\b|#[\w-]+|\be-?mail\b/i.test(restRaw) ? notifySpec(text) : messageSpec(text, env)
     return [writer, delivery]
   }
 
+  if (NOTIFY_ME.test(text) && !/\bslack\b|#[\w-]+|\be-?mail\b|\bgmail\b/i.test(text)) return [notifySpec(text)]
   if (KNOWLEDGE_VERB.test(text) && /\bnotion\b/i.test(text)) {
-    connectionsNote(env, 'notion')
-    return [{ type: 'action', label: 'Save to Notion', integrationId: 'notion', capability: 'knowledge.write', config: {}, source: text }]
+    return [withNotes({ type: 'action', label: 'Save to Notion', integrationId: 'notion', capability: 'knowledge.write', config: {}, source: text }, connectionNote(env, 'notion'))]
   }
   if (KNOWLEDGE_VERB.test(text) && FILES_DEST.test(text)) {
     const integrationId = /\bs3\b|\bbucket\b/i.test(text) ? 's3' : 'google-drive'
-    connectionsNote(env, integrationId)
     const name = getIntegration(integrationId)?.name ?? integrationId
-    return [{ type: 'action', label: `Upload to ${name}`, integrationId, capability: 'files.write', config: {}, source: text }]
+    return [withNotes({ type: 'action', label: `Upload to ${name}`, integrationId, capability: 'files.write', config: {}, source: text }, connectionNote(env, integrationId))]
   }
-  if ((KNOWLEDGE_VERB.test(text) && KNOWLEDGE_NOUN.test(text) && !TRACKER_NOUN.test(text)) || (SAVE_ONLY.test(text) && !TRACKER_NOUN.test(text))) {
+  const trackerWords = TRACKER_NOUN.test(text) || TRACKER_NAME.test(text)
+  if ((KNOWLEDGE_VERB.test(text) && KNOWLEDGE_NOUN.test(text) && !trackerWords) || (SAVE_ONLY.test(text) && !trackerWords)) {
     return [{ type: 'output', label: 'Save to Knowledge', config: { kind: 'knowledge' }, source: text }]
   }
-  if (TRACKER_VERB.test(text) && TRACKER_NOUN.test(text)) return [trackerSpec(text, env)]
-  if (NOTIFY_ME.test(text) && !/\bslack\b|#[\w-]+|\be-?mail\b|\bgmail\b/i.test(text)) return [notifySpec(text)]
+  if (TRACKER_VERB.test(text) && trackerWords) return [trackerSpec(text, env)]
+  if (REVIEW_POST.test(text) && env.triggerIntegration === 'github') {
+    return [withNotes({ type: 'action', label: 'Post review on GitHub', integrationId: 'github', capability: 'repo.pull_request', config: {}, source: text }, connectionNote(env, 'github'))]
+  }
   if (SEND_VERB.test(text)) return [messageSpec(text, env)]
   if (AGENT_VERB.test(text)) return [agentSpec(text, env)]
 
@@ -519,7 +538,7 @@ const sameFamily = (a: NodeSpec, b: NodeSpec) =>
 
 const isGuardable = (s: NodeSpec | undefined) => !!s && (s.type === 'action' || s.type === 'output' || s.type === 'agent')
 
-/** Insert respecting implied / guard / redundancy rules. */
+/** Insert respecting the implied / guard / redundancy rules. */
 function insertSpec(list: NodeSpec[], spec: NodeSpec): void {
   const last = list[list.length - 1]
   if (spec.optionalAfterAgent && last?.type === 'agent') return
@@ -529,34 +548,51 @@ function insertSpec(list: NodeSpec[], spec: NodeSpec): void {
   }
   if (!spec.implied) {
     const impliedAt = list.findIndex((s) => s.implied && sameFamily(s, spec))
-    if (impliedAt >= 0) {
-      list.splice(impliedAt, 1)
-      if (impliedAt === list.length) {
-        list.push(spec)
-        return
-      }
-    }
+    if (impliedAt >= 0) list.splice(impliedAt, 1)
   }
   list.push(spec)
 }
 
-const GERUND: Array<[(s: NodeSpec) => boolean, string]> = [
+/** Insert at the top level: rules apply to the trailing run of plain steps (after the last condition). */
+function insertTop(steps: Step[], spec: NodeSpec): void {
+  let i = steps.length
+  while (i > 0 && steps[i - 1].type === 'node') i--
+  const tail = (steps.slice(i) as NodeStep[]).map((s) => s.spec)
+  insertSpec(tail, spec)
+  steps.splice(i, steps.length - i, ...tail.map((s): NodeStep => ({ type: 'node', spec: s })))
+}
+
+function pushSpecs(steps: Step[], open: OpenCondition | null, specs: NodeSpec[]): void {
+  for (const spec of specs) {
+    if (open) insertSpec(open.branch === 'true' ? open.step.whenTrue : open.step.whenFalse, spec)
+    else insertTop(steps, spec)
+  }
+}
+
+const GERUND: ReadonlyArray<[(s: NodeSpec) => boolean, string]> = [
   [(s) => s.integrationId === 'slack', 'posting'],
+  [(s) => s.capability === 'repo.pull_request' || s.capability === 'repo.write', 'posting'],
   [(s) => s.capability === 'messages.send', 'sending'],
   [(s) => s.capability === 'tasks.manage' || s.config.kind === 'task', 'filing'],
   [(s) => s.config.kind === 'knowledge' || s.capability === 'knowledge.write' || s.capability === 'files.write', 'saving'],
-  [(s) => s.type === 'agent', 'continuing'],
   [(s) => s.config.kind === 'notify', 'notifying'],
 ]
 
-function relabelApprovals(list: NodeSpec[]): void {
-  list.forEach((spec, i) => {
-    if (spec.type !== 'approval' || !spec.autoLabel) return
-    const next = list[i + 1]
-    if (!next) return
-    const gerund = GERUND.find(([test]) => test(next))?.[1]
-    if (gerund && gerund !== 'continuing') spec.label = `Review before ${gerund}`
-    if (next.capability && !spec.capability) spec.capability = next.capability
+function relabelApproval(spec: NodeSpec, next: NodeSpec | undefined): void {
+  if (spec.type !== 'approval' || !spec.autoLabel || !next) return
+  const gerund = GERUND.find(([test]) => test(next))?.[1]
+  if (gerund) spec.label = `Review before ${gerund}`
+  if (next.capability && !spec.capability) spec.capability = next.capability
+}
+
+function relabelApprovals(steps: Step[]): void {
+  steps.forEach((step, i) => {
+    if (step.type === 'node') {
+      const next = steps[i + 1]
+      relabelApproval(step.spec, next?.type === 'node' ? next.spec : undefined)
+      return
+    }
+    for (const list of [step.whenTrue, step.whenFalse]) list.forEach((spec, j) => relabelApproval(spec, list[j + 1]))
   })
 }
 
@@ -564,7 +600,7 @@ function relabelApprovals(list: NodeSpec[]): void {
 
 interface End {
   id: string
-  handle?: 'true' | 'false'
+  handle?: Branch
 }
 
 function assemble(trigger: WorkflowTrigger, steps: Step[], prefix: string, notes: string[]): { nodes: WorkflowNode[]; edges: WorkflowEdge[] } {
@@ -584,6 +620,7 @@ function assemble(trigger: WorkflowTrigger, steps: Step[], prefix: string, notes
       ...(spec.capability ? { capability: spec.capability } : {}),
     }
     nodes.push(node)
+    for (const note of spec.notes ?? []) if (!notes.includes(note)) notes.push(note)
     return node
   }
   const link = (from: End, to: string) => {
@@ -595,15 +632,9 @@ function assemble(trigger: WorkflowTrigger, steps: Step[], prefix: string, notes
     })
   }
   const chain = (specs: NodeSpec[], startCol: number, lane: number): { first: string; last: string } | null => {
-    let first: string | undefined
-    let prev: string | undefined
-    specs.forEach((spec, i) => {
-      const node = place(spec, startCol + i, lane)
-      if (prev) link({ id: prev }, node.id)
-      first ??= node.id
-      prev = node.id
-    })
-    return first && prev ? { first, last: prev } : null
+    const ids = specs.map((spec, i) => place(spec, startCol + i, lane).id)
+    ids.slice(1).forEach((id, i) => link({ id: ids[i] }, id))
+    return ids.length ? { first: ids[0], last: ids[ids.length - 1] } : null
   }
 
   const triggerNode = place(
@@ -670,8 +701,7 @@ function draftName(text: string, steps: Step[], event: FoundEvent | undefined, s
   if (first?.source) {
     const base = stripLead(first.source).replace(INLINE_APPROVAL, '').replace(WHEN_DONE, '')
     const noun = event?.noun ? pluralNoun(/\bnew\b/i.test(event.noun) ? event.noun : `new ${event.noun}`) : undefined
-    const named = noun ? base.replace(/\b(?:it|them)\b/i, noun) : base
-    const label = labelize(named, 7)
+    const label = labelize(noun ? base.replace(/\b(?:it|them)\b/i, noun) : base, 7)
     if (label) return clip(label, 60)
   }
   return clip(suggestTitle(text, schedule, 7) ?? 'New workflow', 60)
@@ -696,12 +726,12 @@ export function draftWorkflowFromText(text: string, ctx: WorkflowDraftContext): 
   const notes: string[] = []
   const connected = (id: string) => ctx.connections.some((c) => c.id === id && c.status === 'connected')
   const prefix = ctx.idPrefix ?? `draft-${shortHash(input)}`
+  const env: Env = { ctx, fullText: input, notes, connected }
 
-  // Trigger: event › recurring schedule › webhook mention › manual.
+  // Trigger: event › recurring schedule › manual.
   const event = findEvent(input)
   const schedule = extractSchedule(input)
   let cron = schedule ? scheduleToCron(schedule) : undefined
-  let body = input
   let timePhrase: string | undefined
   if (schedule && cron && !/\d|noon|midnight/i.test(schedule)) {
     const t = TIME_RE.exec(input.replace(schedule, ' '))
@@ -713,35 +743,37 @@ export function draftWorkflowFromText(text: string, ctx: WorkflowDraftContext): 
   }
 
   let trigger: WorkflowTrigger
-  let filter: CondStep | undefined
-  const env: Env = { ctx, fullText: input, notes, connected }
+  let body = input
+  const steps: Step[] = []
   if (event) {
     const { rule } = event
+    let integrationId = rule.integrationId
+    let eventId = rule.event
+    // "ticket" / "issue" without a named tracker: prefer the connected one.
+    if (eventId === 'linear.issue.created' && !/\blinear\b/i.test(event.phrase) && !connected('linear') && connected('jira')) {
+      eventId = 'jira.issue.created'
+      integrationId = 'jira'
+    }
     trigger =
       rule.type === 'webhook'
         ? { type: 'webhook', label: describeTrigger({ type: 'webhook' }) }
-        : { type: 'event', label: '', event: rule.event, ...(rule.integrationId ? { integrationId: rule.integrationId } : {}) }
-    // Prefer the connected tracker when the text just says "ticket" / "issue".
-    if (rule.event === 'linear.issue.created' && !/\blinear\b/i.test(event.phrase) && !connected('linear') && connected('jira')) {
-      trigger = { ...trigger, event: 'jira.issue.created', integrationId: 'jira' }
-    }
-    trigger.label = describeTrigger(trigger)
+        : { type: 'event', label: describeTrigger({ type: 'event', event: eventId, integrationId }), event: eventId, ...(integrationId ? { integrationId } : {}) }
     env.object = rule.object
-    env.triggerIntegration = trigger.integrationId
-    connectionsNote(env, trigger.integrationId)
-    body = event.atStart
-      ? input.slice(event.end)
-      : `${input.slice(0, event.start)}${rule.object}${input.slice(event.end)}`
+    env.triggerIntegration = integrationId
+    notes.push(`Starts ${lowerFirst(trigger.label)} (from ${quoted(event.phrase, 50)}).`)
+    const triggerNote = connectionNote(env, integrationId)
+    if (triggerNote) notes.push(triggerNote)
+    body = event.atStart ? input.slice(event.end) : `${input.slice(0, event.start)}${rule.object}${input.slice(event.end)}`
     const filterWord = FILTER_WORDS.exec(event.phrase)
     if (filterWord) {
       const { expression, label } = conditionFrom(filterWord[0])
-      filter = {
+      steps.push({
         type: 'condition',
         spec: { type: 'condition', label, config: { expression } },
         whenTrue: [],
         whenFalse: [{ type: 'output', label: 'Skip', config: { kind: 'none' } }],
         falseTerminal: true,
-      }
+      })
     }
     if (schedule) {
       body = body.replace(schedule, ' ')
@@ -749,6 +781,7 @@ export function draftWorkflowFromText(text: string, ctx: WorkflowDraftContext): 
     }
   } else if (schedule && cron) {
     trigger = { type: 'schedule', label: describeTrigger({ type: 'schedule', cron }), cron }
+    notes.push(`Runs ${lowerFirst(trigger.label)} (from ${quoted(`${schedule}${timePhrase ?? ''}`.trim(), 50)}).`)
     body = body.replace(schedule, ' ')
     if (timePhrase) body = body.replace(timePhrase, ' ')
   } else {
@@ -758,8 +791,6 @@ export function draftWorkflowFromText(text: string, ctx: WorkflowDraftContext): 
       notes.push(`${quoted(schedule)} is a one-off time, so the draft starts manually — add a schedule if it should repeat.`)
     }
   }
-  if (event) notes.unshift(`Starts ${lowerFirst(trigger.label)} (from ${quoted(event.phrase, 50)}).`)
-  else if (trigger.type === 'schedule') notes.unshift(`Runs ${lowerFirst(trigger.label)} (from ${quoted(`${schedule}${timePhrase ?? ''}`.trim(), 50)}).`)
 
   body = body
     .replace(/\s+/g, ' ')
@@ -768,29 +799,13 @@ export function draftWorkflowFromText(text: string, ctx: WorkflowDraftContext): 
     .replace(/^[\s,;:.—–-]+/, '')
     .trim()
 
-  // Steps.
-  const steps: Step[] = filter ? [filter] : []
-  let open: { step: CondStep; primary: 'true' | 'false'; branch: 'true' | 'false'; sentence: number } | null = null
-  const flip = (b: 'true' | 'false'): 'true' | 'false' => (b === 'true' ? 'false' : 'true')
-  const pushSpecs = (specs: NodeSpec[]) => {
-    for (const spec of specs) {
-      if (open) insertSpec(open.branch === 'true' ? open.step.whenTrue : open.step.whenFalse, spec)
-      else insertTop(spec)
-    }
-  }
-  const insertTop = (spec: NodeSpec) => {
-    // Use a scratch list of the trailing run of plain node steps so guards / implied steps work at the top level too.
-    let i = steps.length
-    while (i > 0 && steps[i - 1].type === 'node') i--
-    const tail = steps.slice(i).map((s) => (s as { spec: NodeSpec }).spec)
-    insertSpec(tail, spec)
-    steps.splice(i, steps.length - i, ...tail.map((s): Step => ({ type: 'node', spec: s })))
-  }
-  const openCondition = (cond: ParsedCondition, sentence: number) => {
+  // Steps, in the order written; conditions open a branch that lasts until the sentence ends.
+  let open: OpenCondition | null = null
+  const openCondition = (cond: ParsedCondition, sentence: number): OpenCondition => {
     const step: CondStep = { type: 'condition', spec: { type: 'condition', label: cond.label, config: { expression: cond.expression } }, whenTrue: [], whenFalse: [] }
     steps.push(step)
-    const primary = cond.negate ? 'false' : 'true'
-    open = { step, primary, branch: primary, sentence }
+    const primary: Branch = cond.negate ? 'false' : 'true'
+    return { step, primary, branch: primary, sentence }
   }
 
   for (const clause of splitClauses(body)) {
@@ -798,60 +813,43 @@ export function draftWorkflowFromText(text: string, ctx: WorkflowDraftContext): 
     if (!text) continue
     if (open) {
       const continues = /^(?:otherwise|else)\b/i.test(text)
-      if (clause.sentence !== open.sentence && !continues) open = null
-      else if (clause.sep === 'finally') open = null
-      else if (open.branch !== open.primary && clause.sep === 'then') open = null
+      if ((clause.sentence !== open.sentence && !continues) || clause.sep === 'finally' || (open.branch !== open.primary && clause.sep === 'then')) {
+        open = null
+      }
     }
 
     const trailing = splitTrailingCondition(text)
     if (trailing) {
-      open = null
-      openCondition(trailing.cond, clause.sentence)
-      pushSpecs(nodesFor(trailing.step, env))
+      open = openCondition(trailing.cond, clause.sentence)
+      pushSpecs(steps, open, nodesFor(trailing.step, env))
       continue
     }
 
     const cond = parseCondition(text)
     if (cond && 'sequence' in cond) {
-      if (cond.rest) pushSpecs(nodesFor(cond.rest, env))
+      pushSpecs(steps, open, nodesFor(cond.rest, env))
       continue
     }
     if (cond) {
-      const current = open as { step: CondStep; primary: 'true' | 'false'; branch: 'true' | 'false'; sentence: number } | null
-      if (current && cond.negate && cond.expression === current.step.spec.config.expression && current.branch === current.primary) {
-        current.branch = flip(current.branch)
-        current.sentence = clause.sentence
+      if (open && cond.negate && cond.expression === open.step.spec.config.expression && open.branch === open.primary) {
+        open = { ...open, branch: open.primary === 'true' ? 'false' : 'true', sentence: clause.sentence }
       } else {
-        open = null
-        openCondition(cond, clause.sentence)
+        open = openCondition(cond, clause.sentence)
       }
-      if (cond.rest) pushSpecs(nodesFor(cond.rest, env))
+      pushSpecs(steps, open, nodesFor(cond.rest, env))
       continue
     }
 
     const otherwise = /^(?:otherwise|else|or else)\b[\s,:]*/i.exec(text)
     if (otherwise) {
-      const current = open as { step: CondStep; primary: 'true' | 'false'; branch: 'true' | 'false'; sentence: number } | null
-      if (current) {
-        current.branch = flip(current.primary)
-        current.sentence = clause.sentence
-      }
-      const rest = text.slice(otherwise[0].length)
-      if (rest) pushSpecs(nodesFor(rest, env))
+      if (open) open = { ...open, branch: open.primary === 'true' ? 'false' : 'true', sentence: clause.sentence }
+      pushSpecs(steps, open, nodesFor(text.slice(otherwise[0].length), env))
       continue
     }
-    pushSpecs(nodesFor(text, env))
+    pushSpecs(steps, open, nodesFor(text, env))
   }
 
-  // Tidy labels, drop empty top-level guards, then lay out.
-  const topSpecs = steps.filter((s): s is { type: 'node'; spec: NodeSpec } => s.type === 'node').map((s) => s.spec)
-  relabelApprovals(topSpecs)
-  for (const step of steps) {
-    if (step.type !== 'condition') continue
-    relabelApprovals(step.whenTrue)
-    relabelApprovals(step.whenFalse)
-  }
-
+  relabelApprovals(steps)
   const { nodes, edges } = assemble(trigger, steps, prefix, notes)
   return {
     name: draftName(input, steps, event, schedule),

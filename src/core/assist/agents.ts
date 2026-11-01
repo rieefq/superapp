@@ -31,7 +31,7 @@ export const AGENT_TOPICS: readonly Topic[] = [
     label: 'research',
     re: /\b(?:research\w*|investigat\w*|web|search(?:es|ing)?|brows\w*|look into|find out|look up|competitors?|competitive|market|news|sources?|trends?|landscape|benchmarks?)\b/i,
     caps: ['web.search', 'web.browse'],
-    role: /research|analyst|investigat|scout/i,
+    role: /research|investigat|scout/i,
   },
   {
     id: 'code',
@@ -169,6 +169,10 @@ function scoreAgent(agent: Agent, own: TopicHit[], context: TopicHit[], words: s
   const result: Scored = { agent, score: 0, named: false, caps: [] }
   let bestContribution = 0
 
+  /**
+   * Per topic: holding its capabilities is the main signal (3), a fitting role adds 2 (1 without the
+   * capabilities, 1 for weak topics), and the topic named first in the instruction gets +0.5.
+   */
   const apply = (hit: TopicHit, weight: number, primary: boolean) => {
     const { topic } = hit
     const matched = topic.caps.filter((c) => granted.has(c))
@@ -178,8 +182,9 @@ function scoreAgent(agent: Agent, own: TopicHit[], context: TopicHit[], words: s
       else if (topic.all) capScore = (3 * matched.length) / topic.caps.length
       else capScore = 3 + 0.25 * (matched.length - 1)
     }
-    const roleScore = topic.role.test(agent.role) ? (topic.weak ? 1 : 2) : 0
-    const contribution = weight * (capScore + roleScore + (primary && capScore + roleScore > 0 ? 0.5 : 0))
+    const roleScore = topic.role.test(agent.role) ? (topic.weak || capScore === 0 ? 1 : 2) : 0
+    const bonus = primary && !topic.weak && capScore > 0 ? 0.5 : 0
+    const contribution = weight * (capScore + roleScore + bonus)
     result.score += contribution
     if (!topic.weak) for (const c of matched) if (!result.caps.includes(c)) result.caps.push(c)
     if (contribution > bestContribution) {
@@ -189,7 +194,8 @@ function scoreAgent(agent: Agent, own: TopicHit[], context: TopicHit[], words: s
       result.roleCue = roleScore ? agent.role : undefined
     }
   }
-  for (const hit of own) apply(hit, 1, hit.index === primaryIndex)
+  // The first topic named carries full weight; later ones in the instruction 0.75; surrounding context 0.5.
+  for (const hit of own) apply(hit, hit.index === primaryIndex ? 1 : 0.75, hit.index === primaryIndex)
   for (const hit of context) apply(hit, 0.5, false)
 
   const about = `${agent.role} ${agent.description}`.toLowerCase()

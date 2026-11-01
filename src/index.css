@@ -132,6 +132,15 @@
   --color-hue-rose: var(--hue-rose);
   --color-hue-cyan: var(--hue-cyan);
 
+  --color-series-rose: var(--series-rose);
+  --color-series-volt: var(--series-volt);
+  --color-series-sky: var(--series-sky);
+  --color-series-coral: var(--series-coral);
+  --color-series-cyan: var(--series-cyan);
+  --color-series-amber: var(--series-amber);
+  --color-series-violet: var(--series-violet);
+  --color-series-mint: var(--series-mint);
+
   --color-diff-add-bg: var(--diff-add-bg);
   --color-diff-add-ink: var(--diff-add-ink);
   --color-diff-add-mark: var(--diff-add-mark);

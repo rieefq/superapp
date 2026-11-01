@@ -219,7 +219,7 @@ function FormsBlock() {
   const [effort, setEffort] = useState<'low' | 'medium' | 'high'>('medium')
   const slugError = /\s/.test(slug) ? 'Slugs cannot contain spaces — try “atlas-portal”.' : undefined
   return (
-    <Block id="forms" kicker="Forms" title="Fields, inputs & select" description="Sunken wells with a hairline; focus draws an accent edge and halo. Field wires label, hint, error, required and ids automatically — errors always carry an icon and text.">
+    <Block id="forms" kicker="Forms" title="Fields, inputs & select" description="Sunken wells bounded by --line-input (≥3:1); focus draws the 2px ink ring. Field wires label, hint, error, required and ids automatically — errors always carry an icon and text.">
       <Grid>
         <Specimen label="Field + Input" stack>
           <Field label="Project name" hint="Shown in the rail and on every linked item." required>
@@ -593,7 +593,7 @@ function MenusBlock() {
                 >
                   <f.icon aria-hidden className="size-4 text-ink-3" strokeWidth={1.75} />
                   <span className="flex-1 truncate font-mono text-xs">{f.name}</span>
-                  <span className="font-mono text-2xs text-ink-4">{f.meta}</span>
+                  <span className="type-meta text-ink-3">{f.meta}</span>
                 </div>
               ))}
             </div>
@@ -1444,8 +1444,8 @@ function ListsBlock() {
                 </div>
               ))}
               <div className="flex items-center gap-2 bg-canvas px-2.5 py-2">
-                <DynamicIcon name="NotARealIcon" className="size-4 shrink-0 text-ink-4" strokeWidth={1.75} />
-                <span className="truncate font-mono text-2xs text-ink-4">unknown → Circle</span>
+                <DynamicIcon name="NotARealIcon" className="size-4 shrink-0 text-ink-3" strokeWidth={1.75} />
+                <span className="truncate font-mono text-2xs text-ink-3">unknown → Circle</span>
               </div>
             </div>
           </ScrollArea>
@@ -1670,7 +1670,7 @@ export default function Section() {
       <ListsBlock />
       <PanesBlock />
       <HooksBlock />
-      <div className="flex items-center gap-2 text-xs text-ink-4">
+      <div className="flex items-center gap-2 text-xs text-ink-3">
         <Zap aria-hidden className="size-3.5" /> <Users aria-hidden className="size-3.5" /> <Calendar aria-hidden className="size-3.5" />
         <span>End of primitives.</span>
       </div>
