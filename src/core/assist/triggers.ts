@@ -22,6 +22,7 @@ export const TRIGGER_EVENTS: readonly TriggerEventInfo[] = [
   { event: 'google-drive.file.created', integrationId: 'google-drive', label: 'When a file is added to Google Drive' },
   { event: 'google-calendar.event.created', integrationId: 'google-calendar', label: 'When a calendar event is created' },
   { event: 'stripe.payment.succeeded', integrationId: 'stripe', label: 'When a Stripe payment succeeds' },
+  { event: 'stripe.payment.failed', integrationId: 'stripe', label: 'When a Stripe payment fails' },
   { event: 'knowledge.created', label: 'When knowledge is added' },
 ]
 

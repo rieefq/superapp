@@ -23,10 +23,12 @@ export function capitalize(text: string): string {
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : text
 }
 
-/** Lowercase the first letter unless the first word looks like a name or acronym ("Slack", "PR"). */
+const PROPER = /^(?:(?:Mon|Tues|Wednes|Thurs|Fri|Satur|Sun)days?|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/
+
+/** Lowercase the first letter unless the first word looks like a name, day or acronym ("Slack", "Mondays", "PR"). */
 export function lowerFirst(text: string): string {
   const first = text.split(/\s+/, 1)[0] ?? ''
-  if (/^[A-Z0-9]{2,}/.test(first) || /^[A-Z][a-z]+[A-Z]/.test(first)) return text
+  if (/^[A-Z0-9]{2,}/.test(first) || /^[A-Z][a-z]+[A-Z]/.test(first) || PROPER.test(first)) return text
   return text ? text.charAt(0).toLowerCase() + text.slice(1) : text
 }
 

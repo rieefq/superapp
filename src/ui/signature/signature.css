@@ -1,0 +1,158 @@
+/*
+ * Signature-kit motion (docs/DESIGN.md §8.2). Live things breathe (opacity 0.55 ↔ 1 at --dur-breathe),
+ * the timeline bead travels the active segment (1800ms), resolved approvals get a highlighter wipe.
+ * Reduced motion (OS setting or html[data-motion='reduce']): breathing becomes a static live glyph
+ * with a 1px ring, no bead, the wipe is instant.
+ */
+
+@keyframes sig-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.sig-breathe {
+  animation: sig-breathe var(--dur-breathe, 1600ms) ease-in-out infinite;
+}
+
+/* The ring that replaces breathing under reduced motion (SVG element or box). */
+.sig-rm-ring {
+  display: none;
+}
+
+@keyframes sig-bead {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(var(--sig-bead-travel, 24px));
+    opacity: 0;
+  }
+}
+
+.sig-bead {
+  animation: sig-bead 1800ms var(--ease-standard) infinite;
+}
+
+/* Highlighter wipe: the pending tint is removed left to right, then the stamp appears. */
+@keyframes sig-wipe {
+  from {
+    clip-path: inset(0 0 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 100%);
+  }
+}
+
+.sig-wipe {
+  animation: sig-wipe var(--dur-3, 240ms) var(--ease-standard) forwards;
+}
+
+@keyframes sig-stamp {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.sig-stamp {
+  animation: sig-stamp var(--dur-2, 180ms) var(--ease-settle) both;
+}
+
+.sig-stamp-delayed {
+  animation: sig-stamp var(--dur-2, 180ms) var(--ease-settle) var(--dur-3, 240ms) both;
+}
+
+/* A tape cell that is running: breathing fill; under reduced motion a static fill with a 1px ring. */
+.sig-cell-live {
+  animation: sig-breathe var(--dur-breathe, 1600ms) ease-in-out infinite;
+}
+
+/* Hatched tape baseline for simulated runs. */
+.sig-dash-baseline {
+  background-image: linear-gradient(to right, var(--line-input) 0 3px, transparent 3px 5px);
+  background-size: 5px 1px;
+  background-repeat: repeat-x;
+}
+
+/* Skipped tape cell: --line-strong outline with a diagonal slash. */
+.sig-cell-skipped {
+  background-image: linear-gradient(
+    to top right,
+    transparent calc(50% - 0.6px),
+    var(--line-strong) calc(50% - 0.6px),
+    var(--line-strong) calc(50% + 0.6px),
+    transparent calc(50% + 0.6px)
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-motion='full']) .sig-breathe,
+  html:not([data-motion='full']) .sig-cell-live {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+  html:not([data-motion='full']) .sig-halo {
+    display: none !important;
+  }
+  html:not([data-motion='full']) .sig-rm-ring {
+    display: inline !important;
+  }
+  html:not([data-motion='full']) .sig-cell-live {
+    outline: 1px solid var(--live);
+    outline-offset: 1px;
+  }
+  html:not([data-motion='full']) .sig-bead {
+    display: none !important;
+  }
+  html:not([data-motion='full']) .sig-wipe {
+    animation: none !important;
+    clip-path: inset(0 0 0 100%);
+  }
+  html:not([data-motion='full']) .sig-stamp,
+  html:not([data-motion='full']) .sig-stamp-delayed {
+    animation: none !important;
+    opacity: 1;
+  }
+}
+
+html[data-motion='reduce'] .sig-breathe,
+html[data-motion='reduce'] .sig-cell-live {
+  animation: none !important;
+  opacity: 1 !important;
+}
+html[data-motion='reduce'] .sig-halo {
+  display: none !important;
+}
+html[data-motion='reduce'] .sig-rm-ring {
+  display: inline !important;
+}
+html[data-motion='reduce'] .sig-cell-live {
+  outline: 1px solid var(--live);
+  outline-offset: 1px;
+}
+html[data-motion='reduce'] .sig-bead {
+  display: none !important;
+}
+html[data-motion='reduce'] .sig-wipe {
+  animation: none !important;
+  clip-path: inset(0 0 0 100%);
+}
+html[data-motion='reduce'] .sig-stamp,
+html[data-motion='reduce'] .sig-stamp-delayed {
+  animation: none !important;
+  opacity: 1;
+}

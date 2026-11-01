@@ -66,11 +66,15 @@ describe('pickAgentForInstruction', () => {
   })
 
   it('weighs surrounding context at half strength', () => {
-    // "Summarize it" alone only nudges toward the communications role…
-    expect(pick('Summarize it')).toBeNull()
+    // "Summarize it" alone falls to the communications role…
+    expect(pick('Summarize it')).toBe('agt_herald')
     // …but inside a support-email workflow the triage agent fits better.
     expect(pick('Summarize it', 'When a new support email arrives, summarize it and file a ticket')).toBe('agt_sentinel')
     expect(pick('Review it', 'When a PR is opened, review it')).toBe('agt_forge')
+    // Messaging cues in the context do not pull the work toward the messaging agent.
+    expect(pick('Summarize it', 'When a new support email arrives, summarize it and post it to #support')).toBe('agt_sentinel')
+    // A specific writing deliverable outweighs the input's domain.
+    expect(pick('Write the release notes', 'When a PR is merged, write the release notes')).toBe('agt_herald')
   })
 
   it('breaks ties by recent success rate, then by name', () => {

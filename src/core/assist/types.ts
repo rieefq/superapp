@@ -53,7 +53,7 @@ export interface NextActionKindMeta {
 
 export interface AgentPick {
   agentId: ID
-  /** Heuristic match score (higher is better; ≥ 2 to be returned). */
+  /** Heuristic match score (higher is better; ≥ 1.5 to be returned). */
   score: number
   /** Human-readable explanation, e.g. "Scout (Research analyst) can search the web — fits “research”." */
   reason: string
@@ -64,7 +64,7 @@ export interface AgentPick {
 export interface PickAgentOptions {
   /** Run history; ties are broken by each agent's success rate over its last 10 finished runs. */
   runs?: readonly Run[]
-  /** Surrounding text (e.g. the whole workflow description); its cues count at half weight. */
+  /** Surrounding text (e.g. the whole workflow description); its cues count at half weight (messaging cues are ignored). */
   context?: string
 }
 

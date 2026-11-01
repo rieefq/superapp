@@ -123,6 +123,7 @@ const EVENT_RULES: readonly EventRule[] = [
   { event: 'meetings.transcript.ready', integrationId: 'meetings', re: /\b(?:meeting|call) (?:transcripts?|recordings?|notes?|ends?)\b|\btranscripts?\b/i, object: 'the transcript' },
   { event: 'google-drive.file.created', integrationId: 'google-drive', re: /\b(?:files?|docs?|documents?) (?:is |are )?(?:added|uploaded|created) (?:to|in) (?:google )?drive\b|\bdrive files?\b/i, object: 'the file' },
   { event: 'google-calendar.event.created', integrationId: 'google-calendar', re: /\bcalendar events?\b|\bmeetings? (?:is |are |gets? )?(?:booked|scheduled)\b/i, object: 'the event' },
+  { event: 'stripe.payment.failed', integrationId: 'stripe', re: /\b(?:payments?|charges?|invoices?)\b(?=[^,.;]{0,24}\bfail)/i, object: 'the payment' },
   { event: 'stripe.payment.succeeded', integrationId: 'stripe', re: /\b(?:payments?|charges?|subscriptions?|refunds?|stripe)\b/i, object: 'the payment' },
   { event: 'knowledge.created', re: /\b(?:knowledge(?: items?)?|notes?|docs?) (?:is |are )?(?:added|created|saved)\b/i, object: 'the note' },
   { event: 'webhook', type: 'webhook', re: /\bwebhooks?\b|\b(?:http|post) requests?\b/i, object: 'the request' },
@@ -142,6 +143,8 @@ interface FoundEvent {
   start: number
   end: number
   atStart: boolean
+  /** "every new email" is a noun phrase (replaced by "the email"); "when an email arrives" is a clause (removed). */
+  nounCue: boolean
   /** "new support email" — for naming. */
   noun: string
   phrase: string
@@ -167,10 +170,15 @@ function findEvent(text: string): FoundEvent | undefined {
     // A sentence-initial trigger clause runs to its comma ("When a new email arrives in the inbox, …").
     if (atStart && boundary && /[,;]/.test(rest.charAt(boundary.index))) end = from + boundary.index + 1
     const noun = window.slice(0, eventEnd).replace(/^\s*(?:a|an|the|any|some)\s+/i, '').trim()
-    return { rule: best.rule, start: cueStart, end, atStart, noun, phrase: text.slice(cueStart, end).replace(/[,;]$/, '').trim() }
+    const nounCue = /^(?:(?:for |on )?(?:each|every|any) new|on new)$/i.test(cue[0])
+    return { rule: best.rule, start: cueStart, end, atStart, nounCue, noun, phrase: text.slice(cueStart, end).replace(/[,;]$/, '').trim() }
   }
   return undefined
 }
+
+const CADENCE_WORD = /^(?:daily|weekly|bi-?weekly|monthly|nightly|hourly|quarterly|annually|yearly)$/i
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 const TIME_RE = /\s*\b(?:at|by|around|@)\s+(\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)|\d{1,2}:\d{2}|noon|midnight)/i
 
@@ -188,7 +196,7 @@ const OTHER_VERBS = [
   'post', 'send', 'notify', 'alert', 'e-?mail', 'message', 'announce', 'share', 'ping', 'dm', 'tell', 'forward', 'reply',
   'respond', 'publish', 'broadcast', 'remind', 'open', 'file', 'log', 'raise', 'submit', 'track', 'add', 'save', 'store', 'keep',
   'archive', 'record', 'put', 'append', 'jot', 'upload', 'export', 'wait', 'pause', 'hold', 'ask', 'approve', 'let', 'have',
-  'confirm', 'escalate', 'assign', 'move', 'close', 'mark', 'skip', 'ignore', 'leave', 'comment',
+  'confirm', 'escalate', 'assign', 'move', 'close', 'mark', 'skip', 'ignore', 'leave', 'comment', 'page', 'text',
 ]
 
 const STEP_START = new RegExp(
@@ -301,6 +309,9 @@ function conditionFrom(cond: string): { expression: string; label: string } {
   return { expression: clip(cond.trim(), 80), label: `${labelize(plain, 6)}?` }
 }
 
+const NEGATION =
+  /^(?:(?:it|this|that|they|one|the \w+)(?:['’](?:s|re)|\s+(?:is|are|was|were|does|do|did))?\s+)?(?:not|isn['’]t|aren['’]t|wasn['’]t|weren['’]t|doesn['’]t|don['’]t|didn['’]t)\s+/i
+
 /** "if it's urgent, post …" / "unless it is spam" / "check whether …". Returns null for non-conditions. */
 function parseCondition(text: string): ParsedCondition | { sequence: true; rest: string } | null {
   const m = /^(?:only\s+)?(if|when|whenever|unless|in case)\s+|^(?:check|see|determine|decide|find out)\s+(?:if|whether)\s+/i.exec(text)
@@ -310,7 +321,7 @@ function parseCondition(text: string): ParsedCondition | { sequence: true; rest:
   if ((cue === 'when' || cue === 'whenever') && !COND_WORDS.test(cond)) return { sequence: true, rest }
   let negate = cue === 'unless'
   let body = cond
-  const neg = /^(?:(?:it|this|that|they|one|the \w+)\s+)?(?:is not|isn't|isn’t|are not|aren't|aren’t|was not|wasn't|does not|doesn't|doesn’t|do not|don't|don’t|not)\s+/i.exec(body)
+  const neg = NEGATION.exec(body)
   if (neg) {
     negate = !negate
     body = body.slice(neg[0].length)
@@ -359,7 +370,7 @@ const INLINE_APPROVAL =
 const DELAY = /^(?:wait|pause|sleep|hold)(?:\s+for)?\s+(\d+|an?|one|two|three|four|five|six|ten|a few)\s*(minutes?|mins?|hours?|hrs?|days?)\b/i
 
 const SUMMARY_DELIVERY =
-  /^(?:send|e-?mail|post|share|give|deliver|dm|message|slack)\s+(?:(me|us|the team|everyone|[#@][\w-]+)\s+)?(?:an?|the|my|our)?\s*(?:(daily|weekly|monthly|nightly|short|quick|brief)\s+)?(summary|digest|report|recap|update|overview|list|brief|roundup|round-up|briefing)\b(.*)$/i
+  /^(?:send|e-?mail|post|share|give|deliver|dm|message|slack)\s+(?:(me|us|the team|everyone|[#@][\w-]+)\s+)?(?:(an?|the|my|our)\s+)?(?:(daily|weekly|monthly|nightly|short|quick|brief)\s+)?(summary|digest|report|recap|update|overview|list|brief|roundup|round-up|briefing|release notes|changelog|announcement)\b(.*)$/i
 
 const KNOWLEDGE_VERB = /^(?:save|store|add|file|log|keep|archive|record|put|append|write|create|make|jot)\b/i
 const KNOWLEDGE_NOUN = /\b(?:knowledge(?: base)?|notes?|wiki|library|collection|kb)\b/i
@@ -369,7 +380,7 @@ const TRACKER_VERB = /^(?:create|open|file|make|add|log|raise|submit|track)\b/i
 const TRACKER_NOUN = /\b(?:tasks?|tickets?|issues?|to-?dos?|bugs?|cards?)\b/i
 const TRACKER_NAME = /\b(?:linear|jira)\b/i
 const NOTIFY_ME = /^(?:notify|alert|tell|ping|message|remind)\s+me\b|^let me know\b|^send me\b|^keep me (?:posted|updated|in the loop)\b/i
-const SEND_VERB = /^(?:post|send|notify|alert|e-?mail|message|announce|share|ping|dm|tell|forward|reply|respond|publish|broadcast|slack)\b/i
+const SEND_VERB = /^(?:post|send|notify|alert|e-?mail|message|announce|share|ping|dm|tell|forward|reply|respond|publish|broadcast|slack|page|text)\b/i
 const REVIEW_POST = /^(?:post|leave|add|submit|publish|share)\b.*\b(?:review|comments?)\b/i
 const DELEGATE = /^(?:have|ask|get|tell|let)\s+@?([\p{L}][\p{L}\p{N}_-]*)\s+(?:to\s+)?/iu
 const WHEN_DONE = /\s+(?:when|once|after)\s+(?:it(?:'s| is)\s+|that(?:'s| is)\s+|everything is\s+|they(?:'re| are)\s+)?(?:done|finished|complete|ready)\b.*$/i
@@ -399,7 +410,11 @@ function messageSpec(text: string, env: Env): NodeSpec {
   let note: string | undefined
   if (channel || /\bslack\b|\bchannel\b|\bdm\b/i.test(text)) integrationId = 'slack'
   else if (email || /\be-?mail|\bgmail\b|\binbox\b/i.test(text) || (reply && env.triggerIntegration === 'gmail')) integrationId = 'gmail'
-  else if (env.connected('slack') || !env.connected('gmail')) {
+  else if (/\bslack\b|(?:^|\s)#[\w-]+/i.test(env.fullText)) integrationId = 'slack'
+  else if (/\b(?:e-?mails?|repl(?:y|ies)|gmail|inbox)\b/i.test(env.fullText) || env.triggerIntegration === 'gmail') {
+    integrationId = 'gmail'
+    note = `${quoted(clip(text, 50))} sends by email because the request is about email — change it in the step settings.`
+  } else if (env.connected('slack') || !env.connected('gmail')) {
     integrationId = 'slack'
     note = `${quoted(clip(text, 50))} doesn’t say where to send, so it posts to Slack — change it in the step settings.`
   } else {
@@ -407,6 +422,9 @@ function messageSpec(text: string, env: Env): NodeSpec {
     note = `${quoted(clip(text, 50))} doesn’t say where to send, so it uses Gmail — change it in the step settings.`
   }
   const defaultChannel = env.ctx.connections.find((c) => c.id === 'slack')?.config.defaultChannel
+  if (integrationId === 'slack' && !channel && defaultChannel && !note) {
+    note = `${quoted(clip(text, 50))} names no channel, so it posts to ${defaultChannel} (your default Slack channel) — change it in the step settings.`
+  }
   const toMe = /\bme\b/i.test(text)
   const config: Record<string, unknown> =
     integrationId === 'slack'
@@ -436,14 +454,14 @@ function trackerSpec(text: string, env: Env): NodeSpec {
 
 function agentSpec(text: string, env: Env, forcedAgentId?: ID): NodeSpec {
   const instruction = capitalize(replacePronoun(text, env.object))
-  const label = labelize(instruction, 6)
+  const label = clip(labelize(instruction, 8), 56)
   const pick = forcedAgentId ? null : pickAgentForInstruction(text, env.ctx.agents, { runs: env.ctx.runs, context: env.fullText })
   const agentId = forcedAgentId ?? pick?.agentId
   const note = forcedAgentId
-    ? `${quoted(label, 40)}: assigned to ${env.ctx.agents.find((a) => a.id === forcedAgentId)?.name ?? 'the agent you named'}, as written.`
+    ? `${quoted(label, 56)}: assigned to ${env.ctx.agents.find((a) => a.id === forcedAgentId)?.name ?? 'the agent you named'}, as written.`
     : pick
-      ? `${quoted(label, 40)}: ${pick.reason}`
-      : `${quoted(label, 40)}: no active agent clearly fits — choose one before running.`
+      ? `${quoted(label, 56)}: ${pick.reason}`
+      : `${quoted(label, 56)}: no active agent clearly fits — choose one before running.`
   return withNotes(
     {
       type: 'agent',
@@ -499,9 +517,11 @@ function nodesFor(raw: string, env: Env): NodeSpec[] {
 
   const summary = SUMMARY_DELIVERY.exec(text)
   if (summary) {
-    const [, who, cadence, noun, restRaw = ''] = summary
+    const [, who, written, cadence, noun, restRaw = ''] = summary
     const rest = restRaw.replace(/\s+(?:to|in|on|via|by|into)\s+(?:#[\w-]+|slack|e-?mail|gmail|me|us|the team|everyone)\b.*$/i, '')
-    const writer: NodeSpec = { ...agentSpec(`Write a ${cadence ? `${cadence.toLowerCase()} ` : ''}${noun.toLowerCase()}${rest}`, env), optionalAfterAgent: true }
+    const what = `${cadence ? `${cadence.toLowerCase()} ` : ''}${noun.toLowerCase()}`
+    const article = written ? (/^(?:my|our)$/i.test(written) ? 'the' : written.toLowerCase()) : /s$/.test(noun) ? 'the' : /^[aeiou]/i.test(what) ? 'an' : 'a'
+    const writer: NodeSpec = { ...agentSpec(`Write ${article} ${what}${rest}`, env), optionalAfterAgent: true }
     const toMe = !!who && /^(?:me|us)$/i.test(who)
     const delivery = toMe && !/^e-?mail/i.test(text) && !/\bslack\b|#[\w-]+|\be-?mail\b/i.test(restRaw) ? notifySpec(text) : messageSpec(text, env)
     return [writer, delivery]
@@ -536,7 +556,8 @@ function nodesFor(raw: string, env: Env): NodeSpec[] {
 const sameFamily = (a: NodeSpec, b: NodeSpec) =>
   a.type === b.type && (a.capability ?? '') === (b.capability ?? '') && (a.type !== 'output' || a.config.kind === b.config.kind)
 
-const isGuardable = (s: NodeSpec | undefined) => !!s && (s.type === 'action' || s.type === 'output' || s.type === 'agent')
+/** Steps that have an effect outside the run; "…, but ask me first" moves the approval in front of these. */
+const isGuardable = (s: NodeSpec | undefined) => !!s && (s.type === 'action' || s.type === 'output')
 
 /** Insert respecting the implied / guard / redundancy rules. */
 function insertSpec(list: NodeSpec[], spec: NodeSpec): void {
@@ -603,7 +624,12 @@ interface End {
   handle?: Branch
 }
 
-function assemble(trigger: WorkflowTrigger, steps: Step[], prefix: string, notes: string[]): { nodes: WorkflowNode[]; edges: WorkflowEdge[] } {
+function assemble(
+  trigger: WorkflowTrigger,
+  steps: Step[],
+  prefix: string,
+  notes: string[],
+): { nodes: WorkflowNode[]; edges: WorkflowEdge[]; finalOutput?: string } {
   const nodes: WorkflowNode[] = []
   const edges: WorkflowEdge[] = []
   let n = 0
@@ -673,6 +699,7 @@ function assemble(trigger: WorkflowTrigger, steps: Step[], prefix: string, notes
     const out = place(notifySpec(), col, 0)
     for (const end of ends) link(end, out.id)
     if (!hasOutput) notes.push('Added a final “Notify me” step so you see each result.')
+    return { nodes, edges, finalOutput: out.label }
   }
   return { nodes, edges }
 }
@@ -701,19 +728,22 @@ function draftName(text: string, steps: Step[], event: FoundEvent | undefined, s
   if (first?.source) {
     const base = stripLead(first.source).replace(INLINE_APPROVAL, '').replace(WHEN_DONE, '')
     const noun = event?.noun ? pluralNoun(/\bnew\b/i.test(event.noun) ? event.noun : `new ${event.noun}`) : undefined
-    const label = labelize(noun ? base.replace(/\b(?:it|them)\b/i, noun) : base, 7)
+    // "summarize it" / "summarize the email" (from "summarize every new email") → "Summarize new support emails".
+    const object = event ? new RegExp(`\\b(?:it|them|${event.rule.object})\\b`, 'i') : undefined
+    const label = labelize(noun && object ? base.replace(object, noun) : base, 8)
     if (label) return clip(label, 60)
   }
-  return clip(suggestTitle(text, schedule, 7) ?? 'New workflow', 60)
+  return clip(suggestTitle(text, schedule, 8) ?? 'New workflow', 60)
 }
 
-function describeSteps(trigger: WorkflowTrigger, steps: Step[]): string {
+function describeSteps(trigger: WorkflowTrigger, steps: Step[], finalOutput: string | undefined): string {
   const lower = (specs: NodeSpec[]) => joinList(specs.map((s) => lowerFirst(s.label)))
   const phrases = steps.map((step) =>
     step.type === 'node'
       ? lowerFirst(step.spec.label)
       : `check “${step.spec.label}” (yes: ${lower(step.whenTrue) || 'continue'}; no: ${step.falseTerminal ? 'stop' : lower(step.whenFalse) || 'continue'})`,
   )
+  if (finalOutput) phrases.push(lowerFirst(finalOutput))
   const start = trigger.type === 'manual' ? 'When you run it' : describeTrigger(trigger)
   return phrases.length ? `${start}: ${phrases.join(', then ')}.` : `${start}.`
 }
@@ -742,6 +772,13 @@ export function draftWorkflowFromText(text: string, ctx: WorkflowDraftContext): 
     }
   }
 
+  // A cadence word used as an adjective ("the weekly update", "a daily summary") stays in the step text.
+  const attributive =
+    !!schedule &&
+    CADENCE_WORD.test(schedule) &&
+    new RegExp(`\\b${escapeRe(schedule)}\\s+(?!(?:and|or|then|at|on|in|to|for|from|with|by|but|so)\\b)\\p{L}`, 'iu').test(input)
+  const withoutSchedule = (s: string) => (schedule && !attributive ? s.replace(schedule, ' ') : s)
+
   let trigger: WorkflowTrigger
   let body = input
   const steps: Step[] = []
@@ -763,7 +800,11 @@ export function draftWorkflowFromText(text: string, ctx: WorkflowDraftContext): 
     notes.push(`Starts ${lowerFirst(trigger.label)} (from ${quoted(event.phrase, 50)}).`)
     const triggerNote = connectionNote(env, integrationId)
     if (triggerNote) notes.push(triggerNote)
-    body = event.atStart ? input.slice(event.end) : `${input.slice(0, event.start)}${rule.object}${input.slice(event.end)}`
+    body = event.atStart
+      ? input.slice(event.end)
+      : event.nounCue
+        ? `${input.slice(0, event.start)}${rule.object}${input.slice(event.end)}`
+        : `${input.slice(0, event.start).replace(/[\s,;]+$/, '')}${input.slice(event.end)}`
     const filterWord = FILTER_WORDS.exec(event.phrase)
     if (filterWord) {
       const { expression, label } = conditionFrom(filterWord[0])
@@ -776,18 +817,18 @@ export function draftWorkflowFromText(text: string, ctx: WorkflowDraftContext): 
       })
     }
     if (schedule) {
-      body = body.replace(schedule, ' ')
+      body = withoutSchedule(body)
       if (cron) notes.push(`Starts on the event, so ${quoted(schedule)} was not used as a schedule.`)
     }
   } else if (schedule && cron) {
     trigger = { type: 'schedule', label: describeTrigger({ type: 'schedule', cron }), cron }
     notes.push(`Runs ${lowerFirst(trigger.label)} (from ${quoted(`${schedule}${timePhrase ?? ''}`.trim(), 50)}).`)
-    body = body.replace(schedule, ' ')
+    body = withoutSchedule(body)
     if (timePhrase) body = body.replace(timePhrase, ' ')
   } else {
     trigger = { type: 'manual', label: describeTrigger({ type: 'manual' }) }
     if (schedule) {
-      body = body.replace(schedule, ' ')
+      body = withoutSchedule(body)
       notes.push(`${quoted(schedule)} is a one-off time, so the draft starts manually — add a schedule if it should repeat.`)
     }
   }
@@ -812,7 +853,9 @@ export function draftWorkflowFromText(text: string, ctx: WorkflowDraftContext): 
     const text = stripLead(clause.text)
     if (!text) continue
     if (open) {
-      const continues = /^(?:otherwise|else)\b/i.test(text)
+      const parsed = parseCondition(text)
+      const flipsOpen = !!parsed && !('sequence' in parsed) && parsed.negate && parsed.expression === open.step.spec.config.expression
+      const continues = /^(?:otherwise|else)\b/i.test(text) || flipsOpen
       if ((clause.sentence !== open.sentence && !continues) || clause.sep === 'finally' || (open.branch !== open.primary && clause.sep === 'then')) {
         open = null
       }
@@ -850,10 +893,10 @@ export function draftWorkflowFromText(text: string, ctx: WorkflowDraftContext): 
   }
 
   relabelApprovals(steps)
-  const { nodes, edges } = assemble(trigger, steps, prefix, notes)
+  const { nodes, edges, finalOutput } = assemble(trigger, steps, prefix, notes)
   return {
     name: draftName(input, steps, event, schedule),
-    description: describeSteps(trigger, steps),
+    description: describeSteps(trigger, steps, finalOutput),
     trigger,
     nodes,
     edges,

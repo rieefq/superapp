@@ -19,7 +19,7 @@ import type { NextAction, NextActionKind, NextActionKindMeta, NextActionsOptions
 /** Routes for aggregate suggestions that are not about one entity. */
 export const ASSIST_ROUTES = {
   /** Every pending approval (the Agents workspace approvals view). */
-  approvals: '/agents?tab=approvals',
+  approvals: '/agents?status=waiting',
 } as const
 
 export const NEXT_ACTION_KINDS: Record<NextActionKind, NextActionKindMeta> = {
@@ -154,11 +154,12 @@ const sessionsRule: Rule = ({ s, now, inScope }) =>
             : `${passed} of ${plural(ses.checks.length, 'check')} passed`
         : 'no checks ran'
       const who = ses.agentId ? s.agents[ses.agentId]?.name ?? 'The coding agent' : 'The coding agent'
-      const task = ses.taskId ? s.tasks[ses.taskId] : undefined
+      const linked = ses.taskId ? s.tasks[ses.taskId] : undefined
+      const task = linked && linked.title.trim().toLowerCase() !== ses.title.trim().toLowerCase() ? linked : undefined
       const reason =
         pending > 0
           ? `${who} finished ${agoText(now - ses.updatedAt)} · ${checks}${task ? ` · for ${quoted(task.title, 40)}` : ''}.`
-          : `All ${plural(ses.changes.length, 'file')} reviewed — apply them or open a pull request · ${checks}.`
+          : `${ses.changes.length === 1 ? 'The changed file is' : `All ${ses.changes.length} changed files are`} reviewed — apply or open a pull request · ${checks}.`
       return {
         id: `review:session:${ses.id}`,
         kind: 'review' as const,

@@ -64,7 +64,7 @@ export const AGENT_TOPICS: readonly Topic[] = [
   {
     id: 'triage',
     label: 'triage',
-    re: /\b(?:triag\w*|support|inbox|tickets?|customer (?:e-?mails?|requests?|issues?)|queue|escalat\w*|help ?desk)\b/i,
+    re: /\b(?:triag\w*|classif\w*|categori[sz]\w*|prioriti[sz]\w*|support|inbox|tickets?|customer (?:e-?mails?|requests?|issues?)|queue|escalat\w*|help ?desk)\b/i,
     caps: ['tasks.manage', 'files.read'],
     all: true,
     role: /triage|support|help ?desk/i,
@@ -84,6 +84,13 @@ export const AGENT_TOPICS: readonly Topic[] = [
     role: /assistant|scheduler|coordinat/i,
   },
   {
+    id: 'publishing',
+    label: 'publishing',
+    re: /\b(?:release notes|changelogs?|newsletters?|announcements?|press releases?|digests?)\b/i,
+    caps: ['messages.send'],
+    role: /communicat|writer|editor|content|comms/i,
+  },
+  {
     id: 'writing',
     label: 'writing',
     re: /\b(?:summar\w*|digest|recap|report|write|draft|brief(?:ing)?|outline|release notes|updates?)\b/i,
@@ -93,7 +100,7 @@ export const AGENT_TOPICS: readonly Topic[] = [
   },
 ]
 
-const MIN_SCORE = 2
+const MIN_SCORE = 1.5
 const RECENT_RUNS = 10
 const STOP = new Set([
   'the', 'and', 'for', 'with', 'that', 'this', 'from', 'into', 'about', 'what', 'when', 'have', 'has', 'our', 'your', 'their',
@@ -222,7 +229,7 @@ function describePick(best: Scored): string {
 }
 
 /**
- * The best active agent for `text`, or null when no agent clearly fits (score < 2).
+ * The best active agent for `text`, or null when no agent clearly fits (score < 1.5).
  * `opts.context` (e.g. the whole workflow description) contributes at half weight;
  * `opts.runs` breaks ties by recent success rate.
  */
@@ -233,7 +240,8 @@ export function pickAgentForInstruction(text: string, agents: readonly Agent[], 
   if (!active.length || (!instruction && !contextText)) return null
 
   const own = topicHits(instruction)
-  const context = topicHits(contextText).filter((h) => !own.some((o) => o.topic.id === h.topic.id))
+  // Sending is its own workflow step, so messaging cues elsewhere in the context say nothing about who does the work.
+  const context = topicHits(contextText).filter((h) => h.topic.id !== 'comms' && !own.some((o) => o.topic.id === h.topic.id))
   const words = terms(instruction)
   const scored = active.map((agent) => scoreAgent(agent, own, context, words, instruction, contextText))
 
