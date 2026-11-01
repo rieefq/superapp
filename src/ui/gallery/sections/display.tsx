@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { CircleCheck, CircleDashed, CircleX, Loader } from 'lucide-react'
+import { CircleCheck, CircleDashed, CircleX, Download, Loader } from 'lucide-react'
 import {
   ActivityFeed,
   CodeBlock,
@@ -30,6 +30,7 @@ import {
   type TimeSeries,
   type WeekdayHourCell,
 } from '@/ui/charts'
+import { ArtFrame, ProceduralArt, downloadArt, type ArtStyle, type ProceduralSpec } from '@/ui/art'
 import { cn } from '@/lib/cn'
 import { createRng } from '@/lib/rng'
 import { formatCompact, formatDuration, formatUsd } from '@/lib/format'
@@ -951,6 +952,146 @@ function ChartsDemo() {
 }
 
 /* ------------------------------------------------------------------------------------------ */
+/* Art                                                                                        */
+/* ------------------------------------------------------------------------------------------ */
+
+const PALETTES: Record<string, string[]> = {
+  dusk: ['#141a33', '#3b2f63', '#c0587e', '#f29e6d', '#ffd6a0'],
+  coast: ['#0b3954', '#087e8b', '#bfd7ea', '#ff5a5f', '#f4f1de'],
+  moss: ['#1b1f16', '#3a5a40', '#a3b18a', '#dad7cd', '#e9c46a'],
+  bauhaus: ['#1d1d1b', '#e63946', '#f4a261', '#2a9d8f', '#f1faee'],
+  studio: ['#2b2d42', '#8d99ae', '#edf2f4', '#ef6f6c', '#ffb703'],
+  ink: ['#111111', '#f2efe9', '#ff4f00', '#7a7a7a'],
+  glacier: ['#0d1b2a', '#1b263b', '#415a77', '#778da9', '#e0e1dd'],
+  orchard: ['#283618', '#606c38', '#fefae0', '#dda15e', '#bc6c25'],
+}
+
+const STYLE_SET: { style: ArtStyle; palette: string; seed: number; label: string }[] = [
+  { style: 'photographic', palette: 'dusk', seed: 1207, label: 'Photographic' },
+  { style: 'illustration', palette: 'moss', seed: 88, label: 'Illustration' },
+  { style: '3d', palette: 'studio', seed: 5150, label: '3D' },
+  { style: 'abstract', palette: 'bauhaus', seed: 31, label: 'Abstract' },
+  { style: 'editorial', palette: 'ink', seed: 777, label: 'Editorial' },
+]
+
+const ASPECTS: { aspect: string; style: ArtStyle; palette: string; seed: number; span: string }[] = [
+  { aspect: '16/9', style: 'photographic', palette: 'coast', seed: 4242, span: 'col-span-6 lg:col-span-4' },
+  { aspect: '4/5', style: 'editorial', palette: 'orchard', seed: 19, span: 'col-span-3 lg:col-span-2' },
+  { aspect: '9/16', style: 'illustration', palette: 'dusk', seed: 640, span: 'col-span-3 lg:col-span-2 lg:row-span-2' },
+  { aspect: '21/9', style: '3d', palette: 'glacier', seed: 2024, span: 'col-span-6 lg:col-span-4' },
+  { aspect: '3/2', style: 'abstract', palette: 'coast', seed: 903, span: 'col-span-3 lg:col-span-2' },
+  { aspect: '2/3', style: 'photographic', palette: 'glacier', seed: 3110, span: 'col-span-3 lg:col-span-2' },
+]
+
+const spec = (style: ArtStyle, palette: string, seed: number): ProceduralSpec => ({ style, palette: PALETTES[palette], seed })
+
+function DownloadButton({ s, format, w, h }: { s: ProceduralSpec; format: 'png' | 'svg'; w: number; h: number }) {
+  const [busy, setBusy] = useState(false)
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true)
+        try {
+          await downloadArt(s, { width: w, height: h, format, filename: `atrium-${s.style}-${s.seed}.${format}` })
+        } finally {
+          setBusy(false)
+        }
+      }}
+      aria-label={`Download ${format.toUpperCase()}`}
+      className="inline-flex h-7 items-center gap-1 rounded-sm border border-line bg-overlay/90 px-2 text-xs text-ink shadow-e1 backdrop-blur-sm transition-colors duration-(--dur-1) hover:bg-hover disabled:opacity-50 pointer-coarse:h-11"
+    >
+      <Download aria-hidden className="size-3.5" />
+      {format.toUpperCase()}
+    </button>
+  )
+}
+
+function ArtDemo() {
+  const [state, setState] = useState<'ready' | 'generating' | 'failed'>('generating')
+  const board = useMemo(
+    () =>
+      Array.from({ length: 10 }, (_, i) => {
+        const rng = createRng(`board${i}`)
+        const styles: ArtStyle[] = ['photographic', 'illustration', '3d', 'abstract', 'editorial']
+        return spec(styles[i % 5], rng.pick(Object.keys(PALETTES)), rng.int(1, 99_999))
+      }),
+    [],
+  )
+  return (
+    <div className="flex flex-col gap-12">
+      <Demo title="ProceduralArt · every style" note="deterministic per seed · re-composed per aspect">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          {STYLE_SET.map((x) => (
+            <figure key={x.style} className="m-0 flex flex-col gap-2">
+              <ArtFrame simulated aspect={1}>
+                <ProceduralArt spec={spec(x.style, x.palette, x.seed)} title={`${x.label} artwork, seed ${x.seed}`} />
+              </ArtFrame>
+              <figcaption className="flex items-baseline justify-between text-xs">
+                <span className="text-ink-2">{x.label}</span>
+                <span className="font-mono text-2xs text-ink-4">#{x.seed}</span>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      </Demo>
+      <Demo title="ProceduralArt · aspect ratios">
+        <div className="grid grid-cols-6 items-start gap-4">
+          {ASPECTS.map((x) => (
+            <figure key={x.aspect} className={cn('m-0 flex flex-col gap-2', x.span)}>
+              <ArtFrame aspect={x.aspect} simulated caption={`${x.aspect.replace('/', ':')} · ${x.style}`}>
+                <ProceduralArt spec={spec(x.style, x.palette, x.seed)} title={`${x.style} artwork at ${x.aspect}`} />
+              </ArtFrame>
+            </figure>
+          ))}
+        </div>
+      </Demo>
+      <Demo title="ProceduralArt · seed variety (a Studio board)">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+          {board.map((s, i) => (
+            <ArtFrame key={i} aspect={i % 3 === 0 ? '4/5' : 1} radius="sm">
+              <ProceduralArt spec={s} title={`${s.style} artwork`} />
+            </ArtFrame>
+          ))}
+        </div>
+      </Demo>
+      <Demo
+        title="ArtFrame · states, badge, actions, real downloads"
+        note={
+          <span className="flex gap-1.5">
+            {(['ready', 'generating', 'failed'] as const).map((st) => (
+              <GButton key={st} pressed={state === st} onClick={() => setState(st)}>
+                {st[0].toUpperCase() + st.slice(1)}
+              </GButton>
+            ))}
+          </span>
+        }
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <ArtFrame
+            aspect="3/2"
+            simulated
+            caption="v3 · 1536×1024"
+            actions={
+              <>
+                <DownloadButton s={spec('photographic', 'glacier', 9001)} format="png" w={1536} h={1024} />
+                <DownloadButton s={spec('photographic', 'glacier', 9001)} format="svg" w={1536} h={1024} />
+              </>
+            }
+          >
+            <ProceduralArt spec={spec('photographic', 'glacier', 9001)} title="Photographic artwork, glacier palette" />
+          </ArtFrame>
+          <ArtFrame aspect="3/2" simulated state={state} caption={state === 'generating' ? 'v4 · rendering' : 'v4'}>
+            <ProceduralArt spec={spec('3d', 'orchard', 314)} title="3D artwork, orchard palette" />
+          </ArtFrame>
+        </div>
+      </Demo>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------------------------------ */
 
 export default function Section() {
   const topRef = useRef<HTMLDivElement>(null)
@@ -985,6 +1126,9 @@ export default function Section() {
       </Group>
       <Group title="Charts">
         <ChartsDemo />
+      </Group>
+      <Group title="Generative art">
+        <ArtDemo />
       </Group>
     </section>
   )

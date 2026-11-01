@@ -89,6 +89,7 @@ export function Input({
         CONTROL_SURFACE,
         controlStateClasses({ invalid: field.invalid, disabled: field.disabled }),
         'flex w-full min-w-0 items-center gap-2',
+        props.readOnly && 'bg-transparent',
         s.box,
         s.pad,
         wrapperClassName,
@@ -104,7 +105,7 @@ export function Input({
     >
       {Icon && <Icon data-input-adornment aria-hidden className={cn(s.icon, 'shrink-0 text-ink-3')} strokeWidth={1.75} />}
       {prefix && (
-        <span data-input-adornment className="shrink-0 text-sm text-ink-3 select-none">
+        <span data-input-adornment className="-mr-1.5 shrink-0 text-sm text-ink-3 select-none">
           {prefix}
         </span>
       )}

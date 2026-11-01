@@ -1,50 +1,60 @@
 import type { KnowledgeItem } from '@/core/types'
 import { AGENT, COLLECTION, INVESTIGATION, KNOWLEDGE, PROJECT } from '../../ids'
-import { agentActor, type SeedCtx } from '../helpers'
+import { agentActor, dayLabel, type SeedCtx } from '../helpers'
 import { KNO } from '../keys'
 import { PORTBASE_REPORT, PORTBASE_SOURCES_APPENDIX } from '../reports'
 import { item } from './build'
 
-export function researchKnowledge({ clock }: SeedCtx): KnowledgeItem[] {
-  const { back } = clock
+const MIN = 60_000
+
+export function researchKnowledge({ clock, at }: SeedCtx): KnowledgeItem[] {
+  const { day } = clock
+  const radarUpdates = `
+## Updates from the competitor radar
+- **${dayLabel(at.radarM2)}:** Portbase introduced a usage-based Insights tier priced per tracked shipment (portbase.example/pricing). This changes recommendation 3: compare Lumen with Insights on depth (lane-level cost, scorecards, alerts), not on the pricing model.
+- **${dayLabel(at.radarM1)}:** Portbase raised list prices on its Pro plan by about 8% (portbase.example/pricing).`
+
   return [
     item({
       id: KNOWLEDGE.portbaseTeardown,
       kind: 'report',
       title: 'Competitor teardown: Portbase',
-      summary: 'Portbase wins on onboarding speed and polish, prices per user with analytics only from its Business plan, and has gaps in lane-level cost analysis and support responsiveness.',
+      summary: 'Portbase sells annual, per-site contracts to enterprise shippers; strongest on customs workflows, weakest on invoicing and self-serve onboarding. Since then it added a usage-based Insights tier and raised Pro prices.',
       tags: ['competitor', 'portbase', 'positioning', 'pricing'],
       collectionId: COLLECTION.research,
       projectIds: [PROJECT.landscape],
       source: { type: 'research', ref: { kind: 'investigation', id: INVESTIGATION.portbase } },
       author: agentActor(AGENT.scout),
-      createdAt: back(11, 2),
-      content: `${PORTBASE_REPORT.trim()}\n\n${PORTBASE_SOURCES_APPENDIX.trim()}\n\n*Saved from the Research investigation "Portbase positioning & pricing" by Scout. Web sources were simulated.*`,
+      pinned: true,
+      createdAt: at.portbase2 + 20 * MIN,
+      updatedAt: at.radarM1 + 25 * MIN,
+      content: `${PORTBASE_REPORT.trim()}\n${radarUpdates}\n\n${PORTBASE_SOURCES_APPENDIX.trim()}\n\n*Saved from the Research investigation "Portbase positioning & pricing" by Scout and kept current by the competitor radar. Web sources were simulated.*`,
     }),
 
     item({
       id: KNOWLEDGE.freightlyNotes,
       kind: 'note',
       title: 'Freightly product notes',
-      summary: 'Freightly targets small and mid-sized brokers with fast self-serve setup and per-load pricing (with spend caps added later); analytics and enterprise features are thin.',
+      summary: 'Freightly targets small and mid-sized brokers with fast self-serve setup and per-load pricing in three public tiers; analytics and enterprise features are thin, but it is hiring enterprise sellers in Europe.',
       tags: ['competitor', 'freightly', 'usage-pricing', 'notes'],
       collectionId: COLLECTION.research,
       projectIds: [PROJECT.landscape],
       source: { type: 'manual' },
-      createdAt: back(26, 4),
-      updatedAt: back(12, 5),
+      createdAt: day(34, 16, 30),
+      updatedAt: at.radarM2 + 25 * MIN,
       content: `
 # Freightly product notes
 
-From Freightly's public webinar recording, their changelog, and two prospects who evaluated them. Updated after their pricing change.
+From Freightly's public webinar recording, their changelog, and two prospects who evaluated them. Kept current by the competitor radar and Scout's pricing-page check.
 
 ## Who they are
 Freightly is a freight visibility and customer-portal tool for small and mid-sized brokers. Strong self-serve motion: a free tier, card checkout and setup in an afternoon.
 
-## Pricing (from their latest changelog)
-- Moved from per-seat to per-load pricing: a free tier for low volume, then a per-load fee that falls with volume.
-- A few weeks later the changelog added monthly spend caps and usage notifications. My read is that some customers were surprised by their bills. That is an inference, not something they have said.
-- No published discount for annual commitments.
+## Pricing
+- Per-load pricing in three public tiers (Free, Standard, Scale); Enterprise is "contact sales".
+- The fee per load falls as volume grows.
+- A few weeks after the switch, the changelog added monthly spend caps and usage notifications. My read is that some customers were surprised by their bills. That is an inference, not something they have said.
+- Scout's daily check of the pricing page has found no change since these notes.
 
 ## Strengths
 - Fast setup; integrations with common carriers mostly just work.
@@ -58,16 +68,17 @@ Freightly is a freight visibility and customer-portal tool for small and mid-siz
 
 ## How they show up in our deals
 - Rarely head-to-head in the mid-market. More often an incumbent we replace when a broker grows into enterprise needs (Kestrelway Air Freight in Q3).
+- When a broker starts serving enterprise shippers, the incumbent we meet is usually Portbase, not Freightly.
 - One prospect called Freightly's pricing "easy to forecast", which is interesting given the spend caps.
+
+## Radar updates
+- **${dayLabel(at.radarM4)}:** hiring six enterprise account executives in Rotterdam and Hamburg. A sign they want bigger European accounts.
+- **${dayLabel(at.radarM2)}:** shipped carbon reporting for ocean freight.
 
 ## Implications for Lumen
 - Per-load pricing supports a shipment-based value metric in our market.
 - Their spend caps are a warning: ship bill-shock guardrails on day one.
-- Analytics depth is not their focus, so they are unlikely to compete with Lumen directly soon.
-
-## Follow-ups
-- [ ] Review the new per-load pricing page in detail
-- [x] Ask the competitor radar workflow to watch their changelog
+- Analytics depth is not their focus yet; the European enterprise hiring is the thing to watch.
 `,
     }),
 
@@ -75,43 +86,47 @@ Freightly is a freight visibility and customer-portal tool for small and mid-siz
       id: KNOWLEDGE.marketSizing,
       kind: 'doc',
       title: 'Market sizing: mid-market freight portals',
-      summary: 'Bottom-up working model from our CRM: about $110M serviceable market for Atlas core and roughly $9M for Lumen at 30% attach. Assumptions are not yet validated externally.',
+      summary: 'Bottom-up and top-down ranges, refreshed by Scout: roughly $42M–$100M serviceable market for Atlas core and $2.5M–$9.6M for Lumen. Directories were de-duplicated before comparing methods.',
       tags: ['market-sizing', 'strategy', 'tam', 'lumen'],
       collectionId: COLLECTION.research,
       projectIds: [PROJECT.landscape, PROJECT.lumen],
       source: { type: 'manual' },
-      createdAt: back(47, 6),
-      updatedAt: back(33, 2),
+      createdAt: day(47, 14, 0),
+      updatedAt: at.scoutSizing + 15 * MIN,
       content: `
 # Market sizing: mid-market freight portals
 
-**Status:** working model. The assumptions have not been validated externally; use it for prioritization, and do not put it in the board deck without caveats.
+**Status:** working model, last refreshed by Scout. We report ranges, not points. Use it for prioritization; do not put it in the board deck without the caveats below.
 
 ## Definition
-Mid-market means freight forwarders, 3PLs and asset-light carriers with 50 to 1,000 employees in North America and Europe that give their customers a portal for tracking, documents and invoices.
+Mid-market means freight forwarders, shippers and asset-light carriers with 50 to 500 employees in North America and the EU that give their customers a portal for tracking, documents and invoices. Large enterprise shippers, where Portbase sells most of its contracts, are outside this definition.
 
-## Approach: bottom-up from our CRM
-1. **Accounts that fit our ideal customer profile:** the CRM lists about 2,300 companies matching the definition, from sales lists, events and inbound leads. Coverage is unknown and probably weakest in Europe.
-2. **Atlas core ACV:** the average across all current Growth and Enterprise accounts is about $48,000. The top 10 accounts average about $93,000, so the mean is sensitive to the mix.
-3. **Lumen ACV:** a blended $13,500 a year, assuming a 60/40 mix of Core and Pro plus typical overage, with Enterprise deals counted separately.
+## Method
+**Bottom-up:** accounts in the segment × share that already offer a portal × annual contract value.
+- Accounts: 1,900 to 2,600, from two trade-association member directories and a customs-broker census, cross-checked against the roughly 2,300 matching companies in our CRM.
+- Portal adoption: 55% to 70%, from directory profiles and sales notes.
+- Atlas core ACV: $40,000 to $55,000. The nine Growth and Enterprise accounts in our top 15 average about $87,000, so the lower bound leans on smaller accounts.
 
-| Layer | Accounts | ACV | Annual value |
-|---|---|---|---|
-| Serviceable market, Atlas core | 2,300 | $48,000 | about $110M |
-| Lumen add-on at 30% attach | 690 | $13,500 | about $9.3M |
-| Obtainable in 3 years (5% of core) | 115 | $48,000 | about $5.5M ARR |
+**Top-down:** a cross-check against two analyst summaries of the freight software market. One vendor report is kept only as weak evidence. All three are simulated web sources in this workspace.
 
-## Sensitivities
-- If the CRM covers only 60% of the market, the serviceable market is about $184M.
-- An attach rate between 15% and 35% moves Lumen between about $4.7M and $10.9M.
-- A 10% change in core ACV moves the serviceable market by about $11M.
+| Layer | Low | High |
+|---|---|---|
+| Serviceable market, Atlas core | about $42M | about $100M |
+| Lumen add-on (20% to 35% attach, $12,000 to $15,000 ACV) | about $2.5M | about $9.6M |
+| Obtainable in 3 years (4% to 6% of core) | about $1.7M ARR | about $6.0M ARR |
+
+## Reconciling the two methods
+Before de-duplication, the bottom-up range sat 45% above the top-down one. Most of the gap came from 3PL subsidiaries listed separately in both directories. After removing the duplicates, the methods differ by under 20%, which we accept for a working model.
+
+## Confidence
+- Medium for the account count, low for portal adoption.
+- The ACV range comes from our own customer base and may not hold for European accounts.
 
 ## What would change our mind
-- Evidence that companies under 200 employees rarely buy portals at all, which would shrink the account count.
-- Faster portal adoption among larger enterprises, which would make the upper bound of 1,000 employees too conservative.
+- Evidence that companies under 100 employees rarely buy portals, which would shrink the account count.
+- Faster portal adoption among enterprise shippers moving down-market.
 
 ## Validation plan
-- Cross-check the account count against two industry directories (Scout).
 - Interview five European non-customers about how they provide portals today.
 - Revisit after Lumen's first quarter with real attach data.
 `,
@@ -121,27 +136,27 @@ Mid-market means freight forwarders, 3PLs and asset-light carriers with 50 to 1,
       id: KNOWLEDGE.churnInterviews,
       kind: 'doc',
       title: 'Churn interview synthesis (6 customers)',
-      summary: 'Six interviews (four churned, two at risk): slow time to first value, export-and-rebuild reporting, slow integration support, per-seat pricing, and SSO logouts at Halden.',
+      summary: 'Six interviews (four churned, two at risk): slow time to first value, export-and-rebuild reporting, slow integration support, per-seat pricing, and SSO sign-outs at Halden.',
       tags: ['churn', 'interviews', 'customers', 'retention'],
       collectionId: COLLECTION.research,
       projectIds: [PROJECT.landscape, PROJECT.ops],
       source: { type: 'manual' },
-      createdAt: back(21, 5),
-      updatedAt: back(15, 3),
+      createdAt: day(21, 17, 0),
+      updatedAt: day(15, 10, 30),
       content: `
 # Churn interview synthesis (6 customers)
 
 **Interviewer:** Morgan Lee, with Theo Brandt on three calls · **Method:** 45-minute semi-structured calls, notes coded by theme.
 
 ## Participants
-| Account | Status | Segment | Tenure | Moved to |
+| Account | Status | Plan | Tenure | Moved to |
 |---|---|---|---|---|
 | Larkmoor Transport | Churned | Growth | 2.5 years | ShipLoom |
 | Granitefold Trucking | Churned | Starter | 1 year | Email and spreadsheets |
 | Bluefen Maritime | Churned | Growth | 3 years | Portbase |
 | Orchard Row Distribution | Churned | Growth | 1.5 years | In-house portal |
-| Coastal Cargo | At risk | Growth | 2 years | Evaluating options |
-| Halden Logistics | At risk | Enterprise | 4 years | Not decided |
+| Coastal Cargo | At risk | Starter | 2 years | Evaluating options |
+| Halden Logistics | At risk | Growth | 4 years | Not decided |
 
 ## Themes
 ### 1. Slow time to first value (4 of 6)
@@ -159,19 +174,19 @@ EDI and TMS mapping problems waited days for tier-2 help. In each case the escal
 Warehouse leads and customers' own staff needed occasional access. Seats made that expensive, so people shared logins and the audit trail suffered.
 
 ### 5. Session reliability with SSO (1 of 6)
-Halden's dispatchers keep getting logged out after signing in with SSO.
+Halden's dispatchers keep getting signed out partway through the day after signing in with SSO.
 > "It makes the whole product feel fragile." IT lead, Halden Logistics
 
 ## Who they compared us with
-- Two had evaluated Portbase. Bluefen switched, citing the look of the customer-facing portal; its former CSM later heard about slow support responses there.
+- Bluefen moved to Portbase to get customs filings in the same tool as tracking. Its former CSM later heard that the implementation took months.
 - Larkmoor moved to ShipLoom on price.
 
 ## Recommendations
 1. **Onboarding:** target 10 days to first value with integration templates for the five most common TMSs and a named onboarding engineer for Growth and Enterprise.
 2. **Lumen:** position it as the end of the Monday spreadsheet; prioritize scorecards and lane trends.
-3. **Support:** add an integration specialist to the tier-2 rotation; offer Enterprise a faster S1 response.
+3. **Support:** add an integration specialist to the tier-2 rotation.
 4. **Pricing:** do not price Lumen per seat.
-5. **Halden:** fix the SSO session expiry before their renewal conversation.
+5. **Halden:** fix the SSO sign-outs before their renewal conversation.
 
 ## Caveats
 Six interviews: four churned and two at risk. Self-reported reasons tend to over-represent product and support and under-represent budget or acquisitions.
@@ -182,13 +197,13 @@ Six interviews: four churned and two at risk. Self-reported reasons tend to over
       id: KNO.winloss,
       kind: 'note',
       title: 'Win/loss notes: Q3 competitive deals',
-      summary: 'Nine competitive Q3 deals: five wins, four losses (two to Portbase on ready-made portal design, one to ShipLoom on price, one no decision).',
+      summary: 'Nine competitive Q3 deals: five wins, four losses. We beat Portbase on invoicing and time to go-live and lost when customs or day-one analytics decided the deal.',
       tags: ['win-loss', 'competitive', 'sales', 'portbase'],
       collectionId: COLLECTION.research,
       projectIds: [PROJECT.landscape],
       source: { type: 'manual' },
-      createdAt: back(34, 3),
-      updatedAt: back(29, 5),
+      createdAt: day(34, 11, 0),
+      updatedAt: day(29, 15, 20),
       content: `
 # Win/loss notes: Q3 competitive deals
 
@@ -196,19 +211,19 @@ Nine competitive deals closed last quarter. Notes from deal reviews with Ravi Me
 
 | Deal | Segment | Outcome | Competitor | Deciding factor, in the buyer's words |
 |---|---|---|---|---|
-| Brightwater Haulage (expansion) | Growth | Won | Portbase | Lane-level reporting and the API |
+| Brightwater Haulage (expansion) | Growth | Won | Portbase | Invoices and payments in the portal |
 | Kestrelway Air Freight | Growth | Won | Freightly | SSO and an audit log |
-| Tidewell Intermodal (upsell) | Enterprise | Won | Portbase | Your team understood EDI |
+| Tidewell Intermodal (upsell) | Enterprise | Won | Portbase | Live in two weeks, not a quarter |
 | Ferncliff Couriers | Starter | Won | ShipLoom | Support answered in hours, not days |
 | Quarrystone Haulage | Starter | Won | none | Referral |
-| Selwyn Freight Partners | Growth | Lost | Portbase | Their portal was ready out of the box |
-| Hartcliff Global Forwarding | Growth | Lost | Portbase | Customer-facing design and a faster go-live |
+| Selwyn Freight Partners | Growth | Lost | Portbase | Customs filings in the same tool |
+| Hartcliff Global Forwarding | Growth | Lost | Portbase | Their analytics module was ready on day one |
 | Larchfield Logistics | Starter | Lost | ShipLoom | Price |
 | Merriton Shipping | Growth | Lost | No decision | Budget frozen |
 
 ## Patterns
-- **We win** when the buyer has an operations or IT evaluator who cares about data: API, EDI, SSO and lane-level reporting.
-- **We lose to Portbase** when the evaluation is led by customer experience or sales and the demo centres on the customer-facing portal.
+- **We beat Portbase** on invoicing in the portal and on time to go-live. Their per-site implementation projects are slow.
+- **We lose to Portbase** when customs is part of the scope, or when analytics is a day-one requirement. Lumen should close the second gap.
 - **ShipLoom** wins at the low end on price.
 
 ## Requests from sales

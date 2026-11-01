@@ -1,6 +1,7 @@
 import type { ButtonHTMLAttributes, MouseEvent, ReactNode, Ref } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { toAriaKeyShortcuts } from '@/ui/hooks/hotkeys'
 import type { Placement } from './positioning'
 import { Spinner } from './Spinner'
 import { Tooltip } from './Tooltip'
@@ -66,6 +67,7 @@ export function IconButton({
       type={type}
       aria-label={label}
       aria-pressed={active}
+      aria-keyshortcuts={shortcut ? toAriaKeyShortcuts(shortcut) : undefined}
       aria-busy={loading || undefined}
       disabled={disabled}
       data-disabled={inert ? '' : undefined}

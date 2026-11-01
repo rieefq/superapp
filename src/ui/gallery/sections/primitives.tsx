@@ -262,8 +262,8 @@ function FormsBlock() {
           <Field label="City" error="Pick the city closest to your team." required>
             <Select options={CITIES} placeholder="Type to jump…" />
           </Field>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-ink-3">Sort by</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="shrink-0 text-sm whitespace-nowrap text-ink-3">Sort by</span>
             <Select
               variant="ghost"
               size="sm"
@@ -275,7 +275,7 @@ function FormsBlock() {
                 { value: 'cost', label: 'Cost' },
               ]}
             />
-            <Select size="sm" aria-label="Disabled select" disabled options={[{ value: 'x', label: 'Disabled' }]} defaultValue="x" />
+            <Select size="sm" aria-label="Disabled select" disabled options={[{ value: 'x', label: 'Disabled' }]} defaultValue="x" className="w-36" />
           </div>
         </Specimen>
       </Grid>

@@ -9,14 +9,14 @@ import { productKnowledge } from './product'
 import { researchKnowledge } from './research'
 
 export function buildCollections({ clock }: SeedCtx): Collection[] {
-  const { back } = clock
+  const { day } = clock
   return [
-    { id: COLLECTION.product, name: 'Product', description: 'PRDs, pricing, personas, policies and planning docs.', hue: 'sky', icon: 'Package', createdAt: back(62) },
-    { id: COLLECTION.engineering, name: 'Engineering', description: 'ADRs, plans, handbooks and incident reports.', hue: 'cyan', icon: 'Code2', createdAt: back(62) },
-    { id: COLLECTION.research, name: 'Research', description: 'Competitor teardowns, market sizing, interviews and win/loss notes.', hue: 'violet', icon: 'Microscope', createdAt: back(48) },
-    { id: COLLECTION.brand, name: 'Brand', description: 'Voice, messaging and launch materials.', hue: 'amber', icon: 'Palette', createdAt: back(60) },
-    { id: COLLECTION.meetings, name: 'Meetings', description: 'Meeting notes and call transcripts synced from Notion and the meeting recorder.', hue: 'mint', icon: 'Users', createdAt: back(45) },
-    { id: COLLECTION.notes, name: 'Notes', description: 'Personal reading notes and learning plans.', hue: 'rose', icon: 'NotebookPen', createdAt: back(90) },
+    { id: COLLECTION.product, name: 'Product', description: 'PRDs, pricing, personas, policies and planning docs.', hue: 'sky', icon: 'Package', createdAt: day(62, 9, 0) },
+    { id: COLLECTION.engineering, name: 'Engineering', description: 'ADRs, plans, handbooks and incident reports.', hue: 'cyan', icon: 'Code2', createdAt: day(62, 9, 0) },
+    { id: COLLECTION.research, name: 'Research', description: 'Competitor teardowns, market sizing, interviews and win/loss notes.', hue: 'violet', icon: 'Microscope', createdAt: day(48, 9, 0) },
+    { id: COLLECTION.brand, name: 'Brand', description: 'Voice, messaging and launch materials.', hue: 'amber', icon: 'Palette', createdAt: day(60, 9, 0) },
+    { id: COLLECTION.meetings, name: 'Meetings', description: 'Meeting notes and call transcripts synced from Notion and the meeting recorder.', hue: 'mint', icon: 'Users', createdAt: day(45, 9, 0) },
+    { id: COLLECTION.notes, name: 'Notes', description: 'Personal reading notes and learning plans.', hue: 'rose', icon: 'NotebookPen', createdAt: day(90, 9, 0) },
   ]
 }
 

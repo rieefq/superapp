@@ -10,6 +10,7 @@ export {
   matchesCombo,
   parseCombo,
   setMacPlatformOverride,
+  toAriaKeyShortcuts,
   type KeyEventLike,
   type ParsedCombo,
 } from './hotkeys'

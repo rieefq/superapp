@@ -101,7 +101,7 @@ export function SegmentedControl<T extends string = string>({
       className={cn(
         'relative inline-flex shrink-0 items-center gap-0.5 rounded-sm border border-line bg-sunken p-[3px]',
         s.root,
-        fullWidth && 'flex w-full',
+        fullWidth ? 'flex w-full' : 'w-fit max-w-full',
         groupDisabled && 'opacity-50',
         className,
       )}

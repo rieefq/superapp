@@ -23,7 +23,8 @@ import { useFloating } from './useFloating'
 /** Moving between tooltips within this window skips the open delay. */
 const SKIP_DELAY_MS = 300
 let lastClosedAt = 0
-let closeActive: (() => void) | null = null
+/** The open tooltip's close function; a neighbour opening calls it with instant=true (no cross-fade). */
+let closeActive: ((instant?: boolean) => void) | null = null
 
 export interface TooltipProps {
   content: ReactNode
@@ -58,6 +59,7 @@ export function Tooltip({
   className,
 }: TooltipProps) {
   const [openState, setOpenState] = useState(false)
+  const [instantExit, setInstantExit] = useState(false)
   const open = !disabled && (controlledOpen ?? openState) && content != null && content !== ''
   const [anchor, setAnchor] = useState<HTMLElement | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -65,8 +67,9 @@ export function Tooltip({
   const id = useId()
   const reduced = useReducedMotion()
 
-  const close = useCallback(() => {
+  const close = useCallback((instant = false) => {
     clearTimeout(timer.current)
+    setInstantExit(instant)
     setOpenState((was) => {
       if (was) lastClosedAt = Date.now()
       return false
@@ -75,8 +78,9 @@ export function Tooltip({
 
   const show = useCallback(() => {
     clearTimeout(timer.current)
-    if (closeActive && closeActive !== close) closeActive()
+    if (closeActive && closeActive !== close) closeActive(true)
     closeActive = close
+    setInstantExit(false)
     setOpenState(true)
   }, [close])
 
@@ -95,7 +99,7 @@ export function Tooltip({
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close()
+      if (e.key === 'Escape') close(true)
     }
     document.addEventListener('keydown', onKey, true)
     return () => document.removeEventListener('keydown', onKey, true)
@@ -117,7 +121,7 @@ export function Tooltip({
     },
     onPointerDown: () => {
       blockedUntilLeave.current = true
-      close()
+      close(true)
     },
     onFocus: (e: ReactFocusEvent<HTMLElement>) => {
       if (tooltipsSuppressed() || blockedUntilLeave.current) return
@@ -129,7 +133,7 @@ export function Tooltip({
       }
       if (keyboard && e.currentTarget.getAttribute('aria-expanded') !== 'true') show()
     },
-    onBlur: close,
+    onBlur: () => close(),
   })
 
   return (
@@ -144,7 +148,7 @@ export function Tooltip({
               role="tooltip"
               initial={preset.initial}
               animate={preset.animate}
-              exit={preset.exit}
+              exit={instantExit ? { opacity: 0, transition: { duration: 0 } } : preset.exit}
               transition={preset.transition}
               className={cn(
                 'pointer-events-none fixed top-0 left-0 z-(--z-tooltip) flex max-w-[280px] items-center gap-2 rounded-xs bg-inverse px-2 py-1',
@@ -153,7 +157,7 @@ export function Tooltip({
               )}
             >
               <span className="text-pretty">{content}</span>
-              {shortcut && <KbdCombo combo={shortcut} variant="plain" tone="inverse" />}
+              {shortcut && <KbdCombo aria-hidden combo={shortcut} variant="plain" tone="inverse" />}
             </motion.div>
           </Portal>
         )}

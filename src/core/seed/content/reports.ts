@@ -9,66 +9,61 @@ export const PORTBASE_REPORT = `
 *Investigation report · standard depth · 10 sources: 2 from workspace knowledge, 8 simulated web sources*
 
 ## Executive summary
-Portbase sells itself as the all-in-one customer experience platform for logistics and wins on onboarding speed and polish rather than analytics depth [3][4][6]. It prices per user, includes its new Insights analytics only from the Business plan upward, and offers no usage-based option [3]. That leaves three openings for Atlas: lane-level cost analytics, predictable usage-based pricing for Lumen, and support responsiveness, which is the most consistent complaint about Portbase in public reviews and in our own interviews [2][6]. The main threat is that Portbase is moving into our core mid-market segment [5].
+Portbase sells annual, per-site contracts to enterprise shippers, with a one-time implementation fee [3][9]. Its clear strength is customs: filings, document checks and broker hand-offs run inside the portal, and that is what its case studies and reviewers praise [4][5][6]. It is weakest on invoicing and on self-serve onboarding: invoices leave as exports to the customer's ERP, and every new site goes live through an implementation project [7][8][9]. For Atlas, that means we can win mid-market forwarders on invoicing and time to go-live, while we stay exposed on analytics until Lumen ships [1][2][8].
 
-## Positioning
-- The pricing page and launch posts lead with "launch your customer portal in days" and a gallery of templates [3][4].
-- Analytics (Portbase Insights) is presented as a feature of the platform, not as a separate product line [4].
-- In two of our Q3 losses, prospects named Portbase's ready-made portal as the deciding factor [1].
+## Who they sell to
+- Enterprise shippers with many sites. Forwarders appear in the case studies mostly as partners of those shippers [4][5].
+- The pitch is "one portal for customs, documents and tracking" [3].
+- Our market sizing puts most of Portbase's customers outside our mid-market segment; the overlap grows when a forwarder works for an enterprise shipper [2].
 
 ## Pricing and packaging
-- Three plans (Starter, Business and Enterprise), priced per user per month on annual terms; Insights is included from Business upward [3].
-- We found no metered or per-shipment option on the pricing page or in the documentation [3][10].
-- Implication: customers who share dashboards with many occasional users pay more the more they share, which is the opposite of the behaviour we want to encourage with Lumen.
+- Annual contracts priced per site, plus a one-time implementation fee. Plans are Starter, Pro and Enterprise [3].
+- Two sources disagreed on the Enterprise floor price. The lower figure predates the per-site model, so the newer source wins; confidence is medium [3][10].
+- At the time of this report there was no usage-based option [3].
 
-## Product: Insights compared with Lumen
-| Area | Portbase Insights | Atlas Lumen |
+## Product compared with Atlas
+| Area | Portbase | Atlas |
 |---|---|---|
-| Standard shipment KPIs | Yes [4][8] | Yes |
-| Carrier scorecards | Basic on-time ranking [8] | On-time, damage and invoice accuracy |
-| Lane-level cost analysis | Limited; reviewers describe exporting to spreadsheets [6][8] | Cost per shipment and per kg by lane |
-| Custom reports | Fixed templates [6][8] | Filters and saved views; no custom SQL in v1 |
-| Alerts | Email digests [4] | Thresholds on the account's own baseline (Pro) |
-| API access | Documented, with lower default limits than Atlas Growth [10] | Lumen read API |
+| Customs workflows | Strong: filings, document checks, broker hand-offs [4][6] | Document storage only |
+| Invoicing | Weak: invoices exported to the customer's ERP [7] | Invoices and payments in the portal, moving to Stripe Billing |
+| Onboarding | An implementation project per site [8][9] | Self-serve setup, about three weeks to first value today |
+| Tracking | Comparable for ocean and road [6] | Comparable |
+| Analytics | Insights module: standard KPIs; lane-level cost needs exports [8] | Lumen (launching): scorecards, lane cost trends, alerts |
 
 ## Customer sentiment
-- Public reviews praise setup speed and design; recurring complaints concern rigid reporting and slow support responses [6].
-- Two customers in our churn interviews had evaluated Portbase. One, Bluefen Maritime, switched for the look of the customer-facing portal and later told its former CSM about slow support responses [2].
-
-## Market moves
-- Portbase announced new funding aimed at mid-market forwarders [5]. Trend coverage describes customer portals as becoming table stakes for 3PLs [7].
-- A survey-style piece suggests operations buyers increasingly ask for exception management rather than more dashboards [9]. Credibility is low; treat it as directional.
+- Reviewers praise customs coverage and reliability; recurring complaints concern invoicing workarounds and long implementations [6][7][8].
+- In our own notes, Portbase is the incumbent we meet when a broker starts serving enterprise shippers [1].
 
 ## Where we are exposed
-1. **First impressions.** Our onboarding takes about three weeks today [2], and onboarding speed is Portbase's strongest claim.
-2. **Demo polish.** Prospects led by customer experience or sales teams respond to Portbase's customer-facing design [1].
-3. **Segment overlap.** Portbase's move upmarket puts it in more of our mid-market deals [5].
+1. **Customs.** Enterprise shippers that want customs in the same tool will choose Portbase.
+2. **Analytics until Lumen ships.** Insights gives Portbase a ready answer to "show me the numbers" [8].
+3. **Onboarding.** We are faster than Portbase's implementation projects, but three weeks is still slow for smaller customers.
 
 ## Recommendations
-1. Lead Lumen messaging with lane-level cost and carrier scorecards, where Insights is thinnest.
-2. Keep Lumen usage-based: "share with everyone, pay for shipments" contrasts cleanly with per-user pricing.
-3. Make support responsiveness a proof point by publishing first-response targets by plan.
-4. Give sales a battlecard and a demo that opens on lane cost by carrier rather than on the tracking page.
-5. Revisit next quarter: Portbase could add a usage-based option quickly.
+1. Lead mid-market deals with invoicing in the portal and time to go-live.
+2. Do not compete on customs; integrate with customs brokers instead.
+3. Position Lumen's lane-level cost analysis against Insights' standard KPIs.
+4. Make the per-site cost visible for forwarders with many small sites.
+5. Ask the competitor radar to watch Portbase's pricing page.
 
 ## Confidence and gaps
 - Web sources in this workspace are simulated; findings that rest only on them are rated medium or low confidence.
-- We could not verify Portbase's actual price points beyond its plan structure.
-- Internal evidence is a small sample: four Q3 losses and six churn interviews.
+- We could not verify price points beyond the plan structure and the floor-price conflict.
+- No customer interviews about Portbase in this round.
 `
 
 export const PORTBASE_SOURCES_APPENDIX = `
 ## Sources
-1. Win/loss notes: Q3 competitive deals (workspace knowledge)
-2. Churn interview synthesis (6 customers) (workspace knowledge)
+1. Freightly product notes (workspace knowledge)
+2. Market sizing: mid-market freight portals (workspace knowledge)
 3. Pricing, Portbase. portbase.example (simulated source)
-4. Introducing Portbase Insights. portbase.example (simulated source)
-5. Portbase raises new funding to court mid-market forwarders. freighttechweekly.example (simulated source)
+4. Case study: customs and tracking in one portal for a consumer-goods shipper. portbase.example (simulated source)
+5. Case study: how a forwarder network shares customs documents. portbase.example (simulated source)
 6. Portbase reviews: customer portal software. stackrank-reviews.example (simulated source)
-7. Customer portals are becoming table stakes for 3PLs. supplychainsignal.example (simulated source)
-8. Hands-on with Portbase Insights. loadboardreview.example (simulated source)
-9. What operations leaders want from visibility tools. opsleaderquarterly.example (simulated source)
-10. Portbase API reference: limits and webhooks. portbase.example (simulated source)
+7. Portbase reviews: billing and invoicing. freightsoftwarereviews.example (simulated source)
+8. Portbase in practice: a reviewer roundup. loadboardreview.example (simulated source)
+9. Portbase changelog, last six months. portbase.example (simulated source)
+10. Analyst note: customer portals in freight. logisticsanalyst.example (simulated source)
 `
 
 export const CHURN_REPORT_DRAFT = `

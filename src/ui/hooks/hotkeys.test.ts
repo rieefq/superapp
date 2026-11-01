@@ -7,6 +7,7 @@ import {
   hasCommandModifier,
   matchesCombo,
   parseCombo,
+  toAriaKeyShortcuts,
   type KeyEventLike,
 } from './hotkeys'
 
@@ -121,6 +122,20 @@ describe('formatCombo', () => {
     expect(hasCommandModifier('f8')).toBe(true)
     expect(hasCommandModifier('/')).toBe(false)
     expect(hasCommandModifier('shift+?')).toBe(false)
+  })
+})
+
+describe('toAriaKeyShortcuts', () => {
+  it('maps combos to ARIA key names per platform', () => {
+    expect(toAriaKeyShortcuts('mod+k', true)).toBe('Meta+K')
+    expect(toAriaKeyShortcuts('mod+shift+k', false)).toBe('Control+Shift+K')
+    expect(toAriaKeyShortcuts('mod+backspace', true)).toBe('Meta+Backspace')
+    expect(toAriaKeyShortcuts('escape')).toBe('Escape')
+    expect(toAriaKeyShortcuts('f8')).toBe('F8')
+  })
+
+  it('omits sequences (ARIA treats spaces as alternatives)', () => {
+    expect(toAriaKeyShortcuts('g c')).toBeUndefined()
   })
 })
 

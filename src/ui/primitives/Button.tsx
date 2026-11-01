@@ -2,6 +2,7 @@ import type { ButtonHTMLAttributes, MouseEvent, ReactNode, Ref } from 'react'
 import { Link, type LinkProps } from 'react-router'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { toAriaKeyShortcuts } from '@/ui/hooks/hotkeys'
 import { KbdCombo } from './Kbd'
 import { Spinner } from './Spinner'
 
@@ -82,7 +83,7 @@ function ButtonContent({ size, variant, leadingIcon: Leading, trailingIcon: Trai
         {Leading && <Leading aria-hidden className={cn(ICON_SIZE[size], '-ml-0.5 shrink-0')} strokeWidth={1.75} />}
         {children != null && <span className="truncate">{children}</span>}
         {Trailing && <Trailing aria-hidden className={cn(ICON_SIZE[size], '-mr-0.5 shrink-0')} strokeWidth={1.75} />}
-        {kbd && <KbdCombo combo={kbd} variant="plain" tone={inverse ? 'inverse' : 'default'} className="ml-1" />}
+        {kbd && <KbdCombo aria-hidden combo={kbd} variant="plain" tone={inverse ? 'inverse' : 'default'} className="ml-1" />}
       </span>
       {loading && (
         <span className="absolute inset-0 grid place-items-center">
@@ -131,6 +132,7 @@ export function Button({
       aria-busy={loading || undefined}
       data-disabled={inert ? '' : undefined}
       data-variant={variant}
+      aria-keyshortcuts={kbd ? toAriaKeyShortcuts(kbd) : undefined}
       className={buttonClassName({ variant, size, fullWidth, className })}
       onClick={(e: MouseEvent<HTMLButtonElement>) => {
         if (loading) {
@@ -172,7 +174,12 @@ export function ButtonLink({
   ...props
 }: ButtonLinkProps) {
   return (
-    <Link data-variant={variant} className={buttonClassName({ variant, size, fullWidth, className })} {...props}>
+    <Link
+      data-variant={variant}
+      aria-keyshortcuts={kbd ? toAriaKeyShortcuts(kbd) : undefined}
+      className={buttonClassName({ variant, size, fullWidth, className })}
+      {...props}
+    >
       <ButtonContent size={size} variant={variant} leadingIcon={leadingIcon} trailingIcon={trailingIcon} kbd={kbd}>
         {children as ReactNode}
       </ButtonContent>

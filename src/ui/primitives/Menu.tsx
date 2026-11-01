@@ -18,6 +18,7 @@ import { Check, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useControllableState } from '@/ui/hooks/useControllableState'
 import { useReducedMotion } from '@/ui/hooks/useReducedMotion'
+import { toAriaKeyShortcuts } from '@/ui/hooks/hotkeys'
 import { KbdCombo } from './Kbd'
 import { focusElement, getTabbables, registerReturnTarget, suppressTooltips, useLayer } from './layers'
 import { floatingMotion } from './motion'
@@ -318,6 +319,7 @@ function MenuPanel({
                 role={item.type === 'checkbox' ? 'menuitemcheckbox' : item.type === 'radio' ? 'menuitemradio' : 'menuitem'}
                 aria-checked={checked}
                 aria-disabled={item.disabled || undefined}
+                aria-keyshortcuts={item.shortcut ? toAriaKeyShortcuts(item.shortcut) : undefined}
                 tabIndex={-1}
                 data-active={active === index ? '' : undefined}
                 onPointerMove={() => {
@@ -356,7 +358,9 @@ function MenuPanel({
                   <span className="truncate">{item.label}</span>
                   {item.description && <span className="text-xs text-ink-3 text-pretty">{item.description}</span>}
                 </span>
-                {item.shortcut && <KbdCombo combo={item.shortcut} variant="plain" className={cn('ml-4', item.description && 'mt-0.5 self-start')} />}
+                {item.shortcut && (
+                  <KbdCombo aria-hidden combo={item.shortcut} variant="plain" className={cn('ml-4', item.description && 'mt-0.5 self-start')} />
+                )}
               </div>
             )
           })}

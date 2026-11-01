@@ -235,6 +235,42 @@ export function formatShortcut(shortcut: string, mac = isMacPlatform()): string 
     .join(' then ')
 }
 
+const ARIA_KEY_NAMES: Record<string, string> = {
+  escape: 'Escape',
+  enter: 'Enter',
+  backspace: 'Backspace',
+  delete: 'Delete',
+  tab: 'Tab',
+  arrowup: 'ArrowUp',
+  arrowdown: 'ArrowDown',
+  arrowleft: 'ArrowLeft',
+  arrowright: 'ArrowRight',
+  ' ': 'Space',
+  pageup: 'PageUp',
+  pagedown: 'PageDown',
+  home: 'Home',
+  end: 'End',
+}
+
+/**
+ * Value for the aria-keyshortcuts attribute: 'mod+shift+k' → 'Meta+Shift+K' (macOS) / 'Control+Shift+K'.
+ * Sequences ('g c') are space-separated alternatives in ARIA, so they are omitted (returns undefined).
+ */
+export function toAriaKeyShortcuts(shortcut: string, mac = isMacPlatform()): string | undefined {
+  const trimmed = shortcut.trim()
+  if (!trimmed || /\s/.test(trimmed)) return undefined
+  const c = parseCombo(trimmed)
+  if (!c.key) return undefined
+  const parts: string[] = []
+  if (c.ctrl || (c.mod && !mac)) parts.push('Control')
+  if (c.alt) parts.push('Alt')
+  if (c.shift) parts.push('Shift')
+  if (c.meta || (c.mod && mac)) parts.push('Meta')
+  const key = ARIA_KEY_NAMES[c.key] ?? (/^f\d{1,2}$/.test(c.key) ? c.key.toUpperCase() : c.key.length === 1 ? c.key.toUpperCase() : c.key)
+  parts.push(key)
+  return parts.join('+')
+}
+
 /** Does the combo use a modifier that makes it safe to fire while typing in a field? */
 export function hasCommandModifier(combo: string | ParsedCombo): boolean {
   const c = typeof combo === 'string' ? parseCombo(combo) : combo

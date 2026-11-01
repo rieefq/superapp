@@ -4,8 +4,8 @@ import { dayLabel, type SeedCtx } from '../helpers'
 import { KNO } from '../keys'
 import { item } from './build'
 
-export function brandKnowledge({ clock, dates }: SeedCtx): KnowledgeItem[] {
-  const { back } = clock
+export function brandKnowledge({ clock, dates, at }: SeedCtx): KnowledgeItem[] {
+  const { back, wd, day } = clock
   return [
     item({
       id: KNOWLEDGE.brandVoice,
@@ -17,8 +17,8 @@ export function brandKnowledge({ clock, dates }: SeedCtx): KnowledgeItem[] {
       projectIds: [PROJECT.lumen],
       source: { type: 'integration', integrationId: 'notion' },
       pinned: true,
-      createdAt: back(59, 2),
-      updatedAt: back(24, 4),
+      createdAt: day(59, 15, 0),
+      updatedAt: day(24, 11, 10),
       content: `
 # Brand voice guide
 
@@ -68,13 +68,13 @@ Lead with the answer, then the reason, then the next step. Name the person who w
       id: KNOWLEDGE.messagingHouse,
       kind: 'doc',
       title: 'Lumen messaging house',
-      summary: 'Lumen’s core message, three pillars with proof points, audience angles, tagline shortlist and words to avoid.',
+      summary: 'Lumen’s core message, three pillars with proof points, audience angles, the chosen tagline (“From tracking to knowing.”) and words to avoid.',
       tags: ['messaging', 'positioning', 'launch', 'lumen'],
       collectionId: COLLECTION.brand,
       projectIds: [PROJECT.lumen],
       source: { type: 'manual' },
-      createdAt: back(23, 5),
-      updatedAt: back(7, 3),
+      createdAt: day(23, 14, 0),
+      updatedAt: at.heroCopyPick + 20 * 60_000,
       content: `
 # Lumen messaging house
 
@@ -106,10 +106,11 @@ Lumen is built on the shipment, tracking and invoice data customers already keep
 | Heads of operations | Service levels, cost, carrier leverage | Pillar 3 |
 | IT and data teams | Security and data ownership | Foundation, plus warehouse sync (Enterprise) |
 
-## Tagline shortlist
-- See every shipment's story.
-- Exceptions, caught early.
-- From spreadsheet Mondays to answers in minutes.
+## Tagline
+**From tracking to knowing.** Atlas shows where shipments are; Lumen shows why they are late. It won the landing-page test against "Fewer surprises at the dock." and closes the hero video.
+
+Earlier shortlist: "See every shipment's story." · "Exceptions, caught early." · "From spreadsheet Mondays to answers in minutes."
+
 
 ## Words to avoid
 - "Visibility" on its own: every competitor says it.
@@ -127,7 +128,7 @@ Lumen is built on the shipment, tracking and invoice data customers already keep
       collectionId: COLLECTION.brand,
       projectIds: [PROJECT.lumen],
       source: { type: 'manual' },
-      createdAt: back(25, 3),
+      createdAt: day(25, 10, 0),
       updatedAt: back(0, 2, 20),
       content: `
 # Lumen launch checklist
@@ -138,16 +139,19 @@ Launch: **${dayLabel(dates.launch)}** · Owner: Morgan Lee · Marketing: Aisha B
 - [x] Private beta complete with 8 design partners
 - [x] Beta feedback fixes shipped (alert thresholds)
 - [ ] Pricing and packaging locked (due ${dayLabel(dates.pricingLock)})
-- [ ] Lumen usage reported to Stripe as metered usage (depends on the Stripe cutover, ${dayLabel(dates.cutover)})
+- [ ] Lumen usage reported to Stripe as metered usage (depends on the first Stripe cutover cohort, ${dayLabel(dates.cutover)})
+- [x] Open beta running: 23 accounts
 - [ ] Customer preview flag plan: available to existing customers two weeks before launch
 
 ## Website and content
 - [x] Messaging house approved
-- [ ] Hero copy final (variant 3b selected; Aisha reviewing)
+- [x] Hero copy picked: "From tracking to knowing." (won the test)
 - [ ] Landing page build
-- [ ] Hero video (storyboard in progress with Muse)
+- [x] Hero video beat sheet (Muse)
+- [ ] Hero video storyboard frames (Muse, in progress)
 - [ ] Keynote deck v2 review
-- [ ] Six social posts for launch week
+- [x] Social cutdowns: nine images, three formats × three messages
+- [ ] Captions and alt text final for launch week
 
 ## Customers
 - [ ] Launch email to existing customers (draft in review)
@@ -165,7 +169,7 @@ Launch: **${dayLabel(dates.launch)}** · Owner: Morgan Lee · Marketing: Aisha B
 ## Launch day
 - [ ] Lumen available in Settings → Add-ons for all plans
 - [ ] Publish the landing page and launch post
-- [ ] Herald posts the launch summary to #product-updates (approval required)
+- [ ] Herald posts the launch summary to #product (approval required)
 
 ## After launch (first two weeks)
 - [ ] Review attach rate and weekly active users
@@ -183,8 +187,8 @@ Launch: **${dayLabel(dates.launch)}** · Owner: Morgan Lee · Marketing: Aisha B
       collectionId: COLLECTION.brand,
       projectIds: [PROJECT.lumen],
       source: { type: 'manual' },
-      createdAt: back(6, 5),
-      updatedAt: back(2, 3),
+      createdAt: wd(4, 14, 0),
+      updatedAt: wd(1, 16, 0),
       content: `
 # Lumen launch FAQ (internal)
 
@@ -218,10 +222,10 @@ Yes, on Enterprise: dashboards can be scoped using the customer's SSO groups.
 Admins get usage alerts at 80% and 100% of included volume. For the first three months, overage is capped at 25% of the plan fee.
 
 **Is there a trial?**
-Existing customers can turn on Lumen two weeks before launch and use it free until launch day. Design partners get 50% off their first year.
+The open beta (23 accounts) runs until launch. All existing customers can turn on Lumen two weeks before launch and use it free until launch day. Design partners get 50% off their first year.
 
 **How does it compare with Portbase Insights?**
-Insights covers standard KPIs but is thin on lane-level cost analysis and custom reporting. A full battlecard is in progress; see the Portbase teardown in the meantime.
+Insights covers standard KPIs, but lane-level cost needs exports. Portbase now prices its Insights tier per tracked shipment too, so compare depth (lane cost, scorecards, alerts), not the pricing model. The battlecard is in progress; see the Portbase teardown in the meantime.
 
 **Who do I ask?**
 Product: Morgan Lee. Messaging: Aisha Bello. Deals and pricing exceptions: Ravi Menon.

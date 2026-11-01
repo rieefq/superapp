@@ -4,8 +4,8 @@ import type { SeedCtx } from '../helpers'
 import { MSG } from '../keys'
 import { item } from './build'
 
-export function notesKnowledge({ clock }: SeedCtx): KnowledgeItem[] {
-  const { back } = clock
+export function notesKnowledge({ clock, at }: SeedCtx): KnowledgeItem[] {
+  const { day } = clock
   return [
     item({
       id: KNOWLEDGE.agentPatterns,
@@ -16,15 +16,15 @@ export function notesKnowledge({ clock }: SeedCtx): KnowledgeItem[] {
       collectionId: COLLECTION.notes,
       projectIds: [PROJECT.fieldNotes],
       source: { type: 'manual' },
-      createdAt: back(24, 6),
-      updatedAt: back(18, 1),
+      createdAt: day(24, 21, 15),
+      updatedAt: at.saturday + 120 * 60_000,
       content: `
 # Notes: reliable agent patterns
 
 Collected while building the Sentinel, Forge and Herald workflows, from a few engineering write-ups, and from a lot of trial and error. These are my working principles, not settled truth.
 
 ## 1. Autonomy is a budget, not a setting
-Agents earn autonomy per action, not per agent. Sentinel can label tickets on its own because a wrong label is cheap to fix; posting to Slack still asks, because a wrong alert at 2 a.m. is not.
+Agents earn autonomy per action, not per agent. Sentinel can label tickets on its own because a wrong label is cheap to fix; posting to Slack still asks, because a wrong alert at 2 a.m. is not. Keep tool surfaces small, too: give each agent the fewest tools that do the job. Sentinel has no tool that can email a customer.
 
 ## 2. Side effects need a gate
 Reading is cheap; writing is where agents hurt you. Anything that sends, merges, pays or deletes should pause for approval until the agent has a track record on that exact action. The approval must show the exact payload (the message, the diff, the command). "Approve action?" is not a real approval.
@@ -32,8 +32,8 @@ Reading is cheap; writing is where agents hurt you. Anything that sends, merges,
 ## 3. Idempotency everywhere
 Agents retry and networks fail mid-step. Every tool call that changes something needs a natural key (an email message-id, a pull request number, an invoice id) so that running it twice does nothing the second time. Sentinel creating two tasks for the same email thread was our first real agent bug.
 
-## 4. Checkpoints over heroics
-Long runs should persist after every step so that a crash or a page reload resumes the run instead of restarting it. Plans should be data, a list of steps, rather than one giant prompt.
+## 4. Explicit plans and checkpoints
+Plans should be data, a list of steps the agent writes down before acting, rather than one giant prompt. Long runs should persist after every step so that a crash or a page reload resumes the run instead of restarting it.
 
 ## 5. Make the work visible
 Every step should record what it did, what it read, what it produced, how long it took and what it cost. If I cannot reconstruct why an agent did something from its trace, it should not be doing it unattended.
@@ -42,7 +42,7 @@ Every step should record what it did, what it read, what it produced, how long i
 For classification work, ask for a confidence and route low-confidence cases to a person. A good handoff says what the agent tried and why it stopped.
 
 ## 7. Evaluate on your own data
-Generic benchmarks did not predict how Sentinel would do on our tickets. A shadow week against Theo's labels did.
+Generic benchmarks did not predict how Sentinel would do on our tickets. Comparing its labels with Theo's on a week of real tickets did.
 
 ## 8. Budgets and kill switches
 Set a monthly spend cap per agent, and make sure the pause button actually stops work that is already in flight.
@@ -67,8 +67,8 @@ Set a monthly spend cap per agent, and make sure the pause button actually stops
       collectionId: COLLECTION.notes,
       projectIds: [PROJECT.fieldNotes, PROJECT.atlas],
       source: { type: 'manual' },
-      createdAt: back(33, 2),
-      updatedAt: back(16, 5),
+      createdAt: day(33, 20, 40),
+      updatedAt: day(16, 21, 10),
       content: `
 # Notes: design systems that scale
 
@@ -102,8 +102,8 @@ Notes from a design-systems meetup talk, "Tokens all the way down" by Ines Calde
       collectionId: COLLECTION.notes,
       projectIds: [PROJECT.fieldNotes],
       source: { type: 'chat', ref: { kind: 'message', id: MSG.rustSaved } },
-      createdAt: back(16, 3, 58),
-      updatedAt: back(2, 9),
+      createdAt: day(16, 21, 2),
+      updatedAt: day(2, 20, 30),
       content: `
 # Rust learning plan (6 weeks, about 4 hours a week)
 
@@ -139,8 +139,8 @@ Goal: read and write small Rust programs comfortably, and finish a CLI tool by w
       collectionId: COLLECTION.notes,
       projectIds: [PROJECT.fieldNotes],
       source: { type: 'manual' },
-      createdAt: back(38, 4),
-      updatedAt: back(3, 8),
+      createdAt: day(38, 19, 30),
+      updatedAt: day(3, 21, 0),
       content: `
 # Notes: managing through ambiguity
 
