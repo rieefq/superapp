@@ -2,7 +2,7 @@ import type { KnowledgeItem } from '@/core/types'
 import { AGENT, COLLECTION, INVESTIGATION, KNOWLEDGE, PROJECT } from '../../ids'
 import { agentActor, dayLabel, type SeedCtx } from '../helpers'
 import { KNO } from '../keys'
-import { PORTBASE_REPORT, PORTBASE_SOURCES_APPENDIX } from '../reports'
+import { TIDEWELL_REPORT, TIDEWELL_SOURCES_APPENDIX } from '../reports'
 import { item } from './build'
 
 const MIN = 60_000
@@ -11,24 +11,24 @@ export function researchKnowledge({ clock, at }: SeedCtx): KnowledgeItem[] {
   const { day } = clock
   const radarUpdates = `
 ## Updates from the competitor radar
-- **${dayLabel(at.radarM2)}:** Portbase introduced a usage-based Insights tier priced per tracked shipment (portbase.example/pricing). This changes recommendation 3: compare Lumen with Insights on depth (lane-level cost, scorecards, alerts), not on the pricing model.
-- **${dayLabel(at.radarM1)}:** Portbase raised list prices on its Pro plan by about 8% (portbase.example/pricing).`
+- **${dayLabel(at.radarM2)}:** Tidewell introduced a usage-based Insights tier priced per tracked shipment (tidewell.example/pricing). This changes recommendation 3: compare Lumen with Insights on depth (lane-level cost, scorecards, alerts), not on the pricing model.
+- **${dayLabel(at.radarM1)}:** Tidewell raised list prices on its Pro plan by about 8% (tidewell.example/pricing).`
 
   return [
     item({
-      id: KNOWLEDGE.portbaseTeardown,
+      id: KNOWLEDGE.tidewellTeardown,
       kind: 'report',
-      title: 'Competitor teardown: Portbase',
-      summary: 'Portbase sells annual, per-site contracts to enterprise shippers; strongest on customs workflows, weakest on invoicing and self-serve onboarding. Since then it added a usage-based Insights tier and raised Pro prices.',
-      tags: ['competitor', 'portbase', 'positioning', 'pricing'],
+      title: 'Competitor teardown: Tidewell',
+      summary: 'Tidewell sells annual, per-site contracts to enterprise shippers; strongest on customs workflows, weakest on invoicing and self-serve onboarding. Since then it added a usage-based Insights tier and raised Pro prices.',
+      tags: ['competitor', 'tidewell', 'positioning', 'pricing'],
       collectionId: COLLECTION.research,
       projectIds: [PROJECT.landscape],
-      source: { type: 'research', ref: { kind: 'investigation', id: INVESTIGATION.portbase } },
+      source: { type: 'research', ref: { kind: 'investigation', id: INVESTIGATION.tidewell } },
       author: agentActor(AGENT.scout),
       pinned: true,
-      createdAt: at.portbase2 + 20 * MIN,
+      createdAt: at.tidewell2 + 20 * MIN,
       updatedAt: at.radarM1 + 25 * MIN,
-      content: `${PORTBASE_REPORT.trim()}\n${radarUpdates}\n\n${PORTBASE_SOURCES_APPENDIX.trim()}\n\n*Saved from the Research investigation "Portbase positioning & pricing" by Scout and kept current by the competitor radar. Web sources were simulated.*`,
+      content: `${TIDEWELL_REPORT.trim()}\n${radarUpdates}\n\n${TIDEWELL_SOURCES_APPENDIX.trim()}\n\n*Saved from the Research investigation "Tidewell positioning & pricing" by Scout and kept current by the competitor radar. Web sources were simulated.*`,
     }),
 
     item({
@@ -68,7 +68,7 @@ Freightly is a freight visibility and customer-portal tool for small and mid-siz
 
 ## How they show up in our deals
 - Rarely head-to-head in the mid-market. More often an incumbent we replace when a broker grows into enterprise needs (Kestrelway Air Freight in Q3).
-- When a broker starts serving enterprise shippers, the incumbent we meet is usually Portbase, not Freightly.
+- When a broker starts serving enterprise shippers, the incumbent we meet is usually Tidewell, not Freightly.
 - One prospect called Freightly's pricing "easy to forecast", which is interesting given the spend caps.
 
 ## Radar updates
@@ -99,7 +99,7 @@ Freightly is a freight visibility and customer-portal tool for small and mid-siz
 **Status:** working model, last refreshed by Scout. We report ranges, not points. Use it for prioritization; do not put it in the board deck without the caveats below.
 
 ## Definition
-Mid-market means freight forwarders, shippers and asset-light carriers with 50 to 500 employees in North America and the EU that give their customers a portal for tracking, documents and invoices. Large enterprise shippers, where Portbase sells most of its contracts, are outside this definition.
+Mid-market means freight forwarders, shippers and asset-light carriers with 50 to 500 employees in North America and the EU that give their customers a portal for tracking, documents and invoices. Large enterprise shippers, where Tidewell sells most of its contracts, are outside this definition.
 
 ## Method
 **Bottom-up:** accounts in the segment × share that already offer a portal × annual contract value.
@@ -153,7 +153,7 @@ Before de-duplication, the bottom-up range sat 45% above the top-down one. Most 
 |---|---|---|---|---|
 | Larkmoor Transport | Churned | Growth | 2.5 years | ShipLoom |
 | Granitefold Trucking | Churned | Starter | 1 year | Email and spreadsheets |
-| Bluefen Maritime | Churned | Growth | 3 years | Portbase |
+| Bluefen Maritime | Churned | Growth | 3 years | Tidewell |
 | Orchard Row Distribution | Churned | Growth | 1.5 years | In-house portal |
 | Coastal Cargo | At risk | Starter | 2 years | Evaluating options |
 | Halden Logistics | At risk | Growth | 4 years | Not decided |
@@ -178,7 +178,7 @@ Halden's dispatchers keep getting signed out partway through the day after signi
 > "It makes the whole product feel fragile." IT lead, Halden Logistics
 
 ## Who they compared us with
-- Bluefen moved to Portbase to get customs filings in the same tool as tracking. Its former CSM later heard that the implementation took months.
+- Bluefen moved to Tidewell to get customs filings in the same tool as tracking. Its former CSM later heard that the implementation took months.
 - Larkmoor moved to ShipLoom on price.
 
 ## Recommendations
@@ -197,8 +197,8 @@ Six interviews: four churned and two at risk. Self-reported reasons tend to over
       id: KNO.winloss,
       kind: 'note',
       title: 'Win/loss notes: Q3 competitive deals',
-      summary: 'Nine competitive Q3 deals: five wins, four losses. We beat Portbase on invoicing and time to go-live and lost when customs or day-one analytics decided the deal.',
-      tags: ['win-loss', 'competitive', 'sales', 'portbase'],
+      summary: 'Nine competitive Q3 deals: five wins, four losses. We beat Tidewell on invoicing and time to go-live and lost when customs or day-one analytics decided the deal.',
+      tags: ['win-loss', 'competitive', 'sales', 'tidewell'],
       collectionId: COLLECTION.research,
       projectIds: [PROJECT.landscape],
       source: { type: 'manual' },
@@ -211,23 +211,23 @@ Nine competitive deals closed last quarter. Notes from deal reviews with Ravi Me
 
 | Deal | Segment | Outcome | Competitor | Deciding factor, in the buyer's words |
 |---|---|---|---|---|
-| Brightwater Haulage (expansion) | Growth | Won | Portbase | Invoices and payments in the portal |
+| Brightwater Haulage (expansion) | Growth | Won | Tidewell | Invoices and payments in the portal |
 | Kestrelway Air Freight | Growth | Won | Freightly | SSO and an audit log |
-| Tidewell Intermodal (upsell) | Enterprise | Won | Portbase | Live in two weeks, not a quarter |
+| Tidewell Intermodal (upsell) | Enterprise | Won | Tidewell | Live in two weeks, not a quarter |
 | Ferncliff Couriers | Starter | Won | ShipLoom | Support answered in hours, not days |
 | Quarrystone Haulage | Starter | Won | none | Referral |
-| Selwyn Freight Partners | Growth | Lost | Portbase | Customs filings in the same tool |
-| Hartcliff Global Forwarding | Growth | Lost | Portbase | Their analytics module was ready on day one |
+| Selwyn Freight Partners | Growth | Lost | Tidewell | Customs filings in the same tool |
+| Hartcliff Global Forwarding | Growth | Lost | Tidewell | Their analytics module was ready on day one |
 | Larchfield Logistics | Starter | Lost | ShipLoom | Price |
 | Merriton Shipping | Growth | Lost | No decision | Budget frozen |
 
 ## Patterns
-- **We beat Portbase** on invoicing in the portal and on time to go-live. Their per-site implementation projects are slow.
-- **We lose to Portbase** when customs is part of the scope, or when analytics is a day-one requirement. Lumen should close the second gap.
+- **We beat Tidewell** on invoicing in the portal and on time to go-live. Their per-site implementation projects are slow.
+- **We lose to Tidewell** when customs is part of the scope, or when analytics is a day-one requirement. Lumen should close the second gap.
 - **ShipLoom** wins at the low end on price.
 
 ## Requests from sales
-1. A Portbase battlecard.
+1. A Tidewell battlecard.
 2. A demo path that opens with lane cost by carrier (Lumen) instead of the tracking page.
 3. Faster sandbox setup for trials.
 `,

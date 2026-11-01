@@ -108,7 +108,7 @@ export { Divider } from './Divider'
 export type { DividerProps } from './Divider'
 export { VisuallyHidden } from './VisuallyHidden'
 export type { VisuallyHiddenProps } from './VisuallyHidden'
-export { DynamicIcon, getIcon, isIconName, ICONS, PICKABLE_ICONS } from './DynamicIcon'
+export { DynamicIcon, getIcon, isIconName, resolveIconName, ICONS, ICON_ALIASES, PICKABLE_ICONS } from './DynamicIcon'
 export type { DynamicIconProps, IconName } from './DynamicIcon'
 
 // Layout

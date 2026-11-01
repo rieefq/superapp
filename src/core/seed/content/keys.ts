@@ -19,8 +19,8 @@ export const MSG = {
   tokensTask: 'msg_tokens_06', // → token rename task
   retroUpload: 'msg_retro_01', // → retro CSV saved to knowledge
   retroTasks: 'msg_retro_04', // → PR size limit, same-day flaky tickets, focus mornings
-  portbaseStart: 'msg_portbase_04', // → INVESTIGATION.portbase
-  battlecardTask: 'msg_portbase_08', // → battlecard task
+  tidewellStart: 'msg_tidewell_04', // → INVESTIGATION.tidewell
+  battlecardTask: 'msg_tidewell_08', // → battlecard task
   pricingScenarios: 'msg_pricing_04', // → Ledger revenue scenarios task
   pricingResearch: 'msg_pricing_08', // → INVESTIGATION.pricingTrends (in-flight run)
   launchTasks: 'msg_launch_06', // → sales brief + webinar tasks

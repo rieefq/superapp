@@ -1,6 +1,7 @@
-import type { HTMLAttributes, KeyboardEvent, MouseEvent, ReactNode, Ref } from 'react'
+import { useId, type HTMLAttributes, type MouseEvent, type ReactNode, type Ref } from 'react'
 import { Link } from 'react-router'
 import { cn } from '@/lib/cn'
+import { PrimitiveStyles } from './styles'
 
 export type SurfaceVariant = 'flat' | 'raised' | 'sunken'
 
@@ -26,18 +27,21 @@ export function Surface({ variant = 'raised', padding = 'none', radius = 'md', a
   return <Tag className={cn(VARIANT[variant], PADDING[padding], RADIUS[radius], className)} {...(props as HTMLAttributes<HTMLElement>)} />
 }
 
-const INTERACTIVE_INSIDE = 'a,button,input,select,textarea,label,[role="button"],[role="menuitem"],[role="checkbox"],[role="switch"],[contenteditable="true"]'
-
 export interface CardProps extends Omit<SurfaceProps, 'onClick'> {
   /** Hover/press affordances; also implied by onClick or `to`. */
   interactive?: boolean
-  /** Selected state (accent edge — selection, not status). */
+  /** Selected state (accent edge — selection, not status). Announced via aria-pressed with onClick. */
   selected?: boolean
   disabled?: boolean
   /** Makes the whole card a router link. Avoid nested interactive content when using it. */
   to?: string
-  /** Makes the card a button-like target. Clicks on nested buttons/links inside are ignored. */
-  onClick?: (e: MouseEvent<HTMLElement> | KeyboardEvent<HTMLElement>) => void
+  /**
+   * Makes the whole card clickable through a full-size overlay <button>. Nested buttons, links and menus
+   * stay independently clickable (no nested-interactive violations).
+   */
+  onClick?: (e: MouseEvent<HTMLButtonElement>) => void
+  /** Accessible name of the card's click action (defaults to the card's text content). */
+  label?: string
   children?: ReactNode
 }
 
@@ -54,12 +58,15 @@ export function Card({
   disabled,
   to,
   onClick,
+  label,
   className,
   children,
   as: Tag = 'div',
-  onKeyDown,
+  id: idProp,
   ...props
 }: CardProps) {
+  const autoId = useId()
+  const id = idProp ?? `card-${autoId}`
   const isInteractive = !disabled && (interactive || !!onClick || !!to)
   const classes = cn(
     'relative block text-left',
@@ -77,43 +84,38 @@ export function Card({
 
   if (to && !disabled) {
     return (
-      <Link to={to} data-selected={selected ? '' : undefined} className={classes} {...(props as HTMLAttributes<HTMLAnchorElement>)}>
+      <Link to={to} id={id} data-selected={selected ? '' : undefined} className={classes} {...(props as HTMLAttributes<HTMLAnchorElement>)}>
         {children}
       </Link>
     )
   }
 
-  // Ignore clicks from nested controls and from portaled content (e.g. a menu opened inside the card).
-  const fromNested = (e: { target: EventTarget; currentTarget: EventTarget }) => {
-    const current = e.currentTarget as Element
-    const target = e.target as Element
-    if (!current.contains(target)) return true
-    const hit = target.closest?.(INTERACTIVE_INSIDE)
-    return !!hit && hit !== current && current.contains(hit)
+  if (onClick) {
+    return (
+      <Tag
+        id={id}
+        data-selected={selected ? '' : undefined}
+        className={cn(classes, 'isolate', !disabled && 'atrium-passthrough')}
+        {...(props as HTMLAttributes<HTMLElement>)}
+      >
+        <PrimitiveStyles />
+        <button
+          type="button"
+          data-card-overlay=""
+          disabled={disabled}
+          aria-label={label}
+          aria-labelledby={label ? undefined : id}
+          aria-pressed={selected !== undefined ? selected : undefined}
+          onClick={onClick}
+          className="absolute inset-0 -z-10 cursor-pointer rounded-[inherit] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed"
+        />
+        {children}
+      </Tag>
+    )
   }
 
   return (
-    <Tag
-      role={onClick && !disabled ? 'button' : undefined}
-      tabIndex={onClick && !disabled ? 0 : undefined}
-      aria-disabled={disabled || undefined}
-      aria-pressed={onClick && selected !== undefined ? selected : undefined}
-      data-selected={selected ? '' : undefined}
-      onClick={(e: MouseEvent<HTMLElement>) => {
-        if (disabled || !onClick || fromNested(e)) return
-        onClick(e)
-      }}
-      onKeyDown={(e: KeyboardEvent<HTMLElement>) => {
-        onKeyDown?.(e as KeyboardEvent<HTMLElement>)
-        if (e.defaultPrevented || disabled || !onClick || e.target !== e.currentTarget) return
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onClick(e)
-        }
-      }}
-      className={classes}
-      {...(props as HTMLAttributes<HTMLElement>)}
-    >
+    <Tag id={idProp} data-selected={selected ? '' : undefined} aria-disabled={disabled || undefined} className={classes} {...(props as HTMLAttributes<HTMLElement>)}>
       {children}
     </Tag>
   )

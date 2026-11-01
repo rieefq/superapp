@@ -37,10 +37,17 @@ export function ArtFrame({
   ...props
 }: ArtFrameProps) {
   const ratio = parseAspect(aspect) ?? 1
-  const badgeNode = badge ?? (simulated ? <SimTag className="bg-sim-tint/95">Simulated preview</SimTag> : null)
+  const badgeNode =
+    badge ??
+    (simulated ? (
+      <SimTag className="bg-sim-tint/95">
+        <span className="@max-[239px]:hidden">Simulated preview</span>
+        <span className="@min-[240px]:hidden">Simulated</span>
+      </SimTag>
+    ) : null)
   return (
     <div
-      className={cn('group/art relative isolate w-full overflow-hidden bg-sunken', RADIUS[radius], className)}
+      className={cn('group/art @container relative isolate w-full overflow-hidden bg-sunken', RADIUS[radius], className)}
       style={{ aspectRatio: String(ratio), ...style }}
       aria-busy={state === 'generating' || undefined}
       {...props}
@@ -72,7 +79,7 @@ export function ArtFrame({
         <div className="pointer-events-none absolute inset-x-2 bottom-2 flex items-end justify-between gap-2">
           <span className="pointer-events-auto">{badgeNode}</span>
           {caption && (
-            <span className="truncate rounded-xs bg-overlay/85 px-1.5 py-0.5 font-mono text-2xs text-ink-2 backdrop-blur-sm">{caption}</span>
+            <span className="truncate rounded-xs bg-overlay/85 px-1.5 py-0.5 font-mono text-2xs text-ink-2 backdrop-blur-sm @max-[199px]:hidden">{caption}</span>
           )}
         </div>
       )}

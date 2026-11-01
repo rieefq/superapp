@@ -181,6 +181,11 @@ export interface InflightSpec {
    * 'waiting'; otherwise the run is 'running' and the engine starts step `done` next.
    */
   waiting?: { approvalId: ID; capability: Capability; requestedBy: ActorRef; sinceMinutes: number }
+  /**
+   * Wall-clock windows of the completed steps as [startMinutesAgo, endMinutesAgo], for runs
+   * that must line up with rows the content part created (e.g. sources found by a search step).
+   */
+  windows?: [number, number][]
   summary: string
   outputs?: EntityRef[]
   onSuccessPatches?: SeedPatch[]
@@ -197,16 +202,20 @@ export function materializeInflight(spec: InflightSpec, now: number): Materializ
   const startedAt = pausedAt - busyMs
   const createdAt = startedAt - rng.int(600, 1_500)
 
+  const windows = spec.windows
+  if (windows && windows.length !== spec.done) throw new Error(`seed: ${spec.id} needs one window per completed step`)
   const steps: RunStep[] = []
-  let t = startedAt
+  let t = windows?.[0] ? now - windows[0][0] * 60 * SECOND : startedAt
   doneSteps.forEach((p, index) => {
     const step = planToStep(spec.id, index, p)
+    const window = windows?.[index]
     step.status = 'done'
-    step.startedAt = t
-    step.endedAt = t + p.durationMs
+    step.startedAt = window ? now - window[0] * 60 * SECOND : t
+    step.endedAt = window ? now - window[1] * 60 * SECOND : t + p.durationMs
     steps.push(step)
     t = step.endedAt + (gaps[index] ?? 0)
   })
+  const firstStart = steps[0]?.startedAt ?? startedAt
 
   const approvals: Approval[] = []
   if (spec.waiting) {
@@ -251,8 +260,8 @@ export function materializeInflight(spec: InflightSpec, now: number): Materializ
     usage: sumUsage(doneSteps.map((p) => usageOf(p.tokens ?? 0))),
     progress: Math.round((spec.done / spec.plan.length) * 100) / 100,
     script: { factory: SCRIPTED_FACTORY, params, seed: spec.seed, cursor: spec.done },
-    createdAt,
-    startedAt,
+    createdAt: Math.min(createdAt, firstStart - 800),
+    startedAt: Math.min(startedAt, firstStart),
   }
   if (spec.agentId) run.agentId = spec.agentId
   if (spec.workflowId) run.workflowId = spec.workflowId

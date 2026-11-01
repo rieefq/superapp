@@ -157,6 +157,10 @@ describe('seed operations', () => {
     })
     const slackStep = ops.runs['run_seed_herald_digest']?.steps.find((s) => s.approvalId === 'apv_seed_slack')
     expect(slackStep?.integrationId).toBe('slack')
+    for (const a of Object.values(ops.approvals).filter((x) => x.preview?.label === '#product')) {
+      const words = (a.preview?.content ?? '').split(/\s+/).filter(Boolean).length
+      expect(words, a.id).toBeLessThan(250)
+    }
   })
 
   it('gives in-flight runs a resumable script consistent with their steps', () => {
@@ -423,6 +427,12 @@ describe('seed operations', () => {
     for (const { where, ref } of allRefs(ops)) {
       const table = tables[ref.kind]
       if (table && Object.keys(seed[table]).length > 0) expect(seed[table][ref.id], `${where} → ${ref.kind}:${ref.id}`).toBeDefined()
+    }
+    // A run belongs to the same project as the investigation, task or thread it came from.
+    for (const run of Object.values(ops.runs)) {
+      const o = run.origin
+      const row = o?.kind === 'investigation' ? seed.investigations[o.id] : o?.kind === 'task' ? seed.tasks[o.id] : o?.kind === 'thread' ? seed.threads[o.id] : undefined
+      if (row) expect(run.projectId, `${run.id} vs ${o?.kind}:${o?.id}`).toBe(row.projectId)
     }
   })
 

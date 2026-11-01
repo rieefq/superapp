@@ -24,7 +24,7 @@ describe('angles and titles', () => {
       'What interventions are discussed, and what supports them?',
       'What do our own notes and customer conversations suggest?',
     ])
-    expect(deriveAngles('Portbase vs Freightly', 3)[0]).toBe('How do Portbase and Freightly differ in scope and capabilities?')
+    expect(deriveAngles('Tidewell vs Freightly', 3)[0]).toBe('How do Tidewell and Freightly differ in scope and capabilities?')
     expect(deriveAngles('EU e-invoicing mandate: impact on Atlas', 4, { projectName: 'Atlas Portal v2' })[1]).toBe('Which parts of Atlas Portal v2 and operations would be affected?')
     expect(investigationTitle('why do logistics customers churn??')).toBe('Why do logistics customers churn')
   })
@@ -57,10 +57,10 @@ describe('synthesizeFindings', () => {
 
 describe('buildReport', () => {
   it('cites sources by their position and states the method honestly', () => {
-    const sources = [src(1, { kind: 'knowledge', simulated: false, title: 'Churn interviews' }), src(2, { mentions: ['Portbase'] }), src(3, { status: 'discarded' })]
+    const sources = [src(1, { kind: 'knowledge', simulated: false, title: 'Churn interviews' }), src(2, { mentions: ['Tidewell'] }), src(3, { status: 'discarded' })]
     const report = buildReport({
-      title: 'Portbase vs Freightly',
-      question: 'Portbase vs Freightly for carriers?',
+      title: 'Tidewell vs Freightly',
+      question: 'Tidewell vs Freightly for carriers?',
       depth: 'standard',
       angles: ['A?'],
       findings: [{ text: 'Finding one.', sourceIds: ['src_2', 'src_1'] }, { text: 'Uses a discarded source.', sourceIds: ['src_3'] }],
@@ -69,7 +69,7 @@ describe('buildReport', () => {
     })
     expect(report).toContain('1. Finding one. [1][2]')
     expect(report).toContain('2. Uses a discarded source.\n')
-    expect(report).toContain('| Dimension | Portbase | Freightly | What to verify |')
+    expect(report).toContain('| Dimension | Tidewell | Freightly | What to verify |')
     expect(report).toContain('Of 2 sources consulted, 1 came from your knowledge base')
     expect(report).toContain('1 is a simulated web source')
     expect(report).toContain('1 discarded source was excluded')

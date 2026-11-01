@@ -153,7 +153,8 @@ function MenuPanel({
   const typeahead = useTypeahead()
   const floating = useFloating({ open: true, anchor, placement, offset, padding: 8 })
   const preset = floatingMotion(floating.side, reduced)
-  const hasCheck = flat.some((i) => i.type === 'checkbox' || i.type === 'radio')
+  // One shared leading slot (icon, or the check/radio indicator) keeps every label on the same column.
+  const hasLeading = flat.some((i) => i.icon || i.type === 'checkbox' || i.type === 'radio')
   const labels = useMemo(() => flat.map((i) => i.label), [flat])
   const isDisabled = useCallback((i: number) => !!flat[i]?.disabled, [flat])
   // While exiting (fade-out), the panel is no longer an interactive layer.
@@ -329,30 +330,27 @@ function MenuPanel({
                 className={cn(
                   'group/item flex shrink-0 cursor-pointer items-center gap-2 rounded-sm px-2 text-sm outline-none select-none',
                   item.description ? 'py-1.5' : 'h-8 [[data-density=compact]_&]:h-7 pointer-coarse:h-11',
-                  danger ? 'text-fail-ink focus:bg-fail-tint' : 'text-ink-2 focus:bg-hover focus:text-ink',
+                  danger ? 'text-fail-ink focus:bg-fail-tint' : 'text-ink-2 focus:bg-ink/8 focus:text-ink',
                   item.disabled && 'cursor-not-allowed opacity-45',
                 )}
               >
-                {hasCheck && (
-                  <span aria-hidden className="grid size-4 shrink-0 place-items-center">
-                    {checked &&
-                      (item.type === 'radio' ? (
-                        <span className="size-1.5 rounded-full bg-current" />
-                      ) : (
-                        <Check className="size-3.5" strokeWidth={2.25} />
-                      ))}
+                {hasLeading && (
+                  <span aria-hidden className={cn('grid size-4 shrink-0 place-items-center', item.description && 'mt-0.5 self-start')}>
+                    {item.type === 'checkbox' || item.type === 'radio' ? (
+                      checked ? (
+                        item.type === 'radio' ? (
+                          <span className="size-1.5 rounded-full bg-current" />
+                        ) : (
+                          <Check className="size-3.5" strokeWidth={2.25} />
+                        )
+                      ) : null
+                    ) : Icon ? (
+                      <Icon
+                        className={cn('size-4', danger ? 'text-fail-ink' : 'text-ink-3 group-focus/item:text-ink-2')}
+                        strokeWidth={1.75}
+                      />
+                    ) : null}
                   </span>
-                )}
-                {Icon && (
-                  <Icon
-                    aria-hidden
-                    className={cn(
-                      'size-4 shrink-0',
-                      danger ? 'text-fail-ink' : 'text-ink-3 group-focus/item:text-ink-2',
-                      item.description && 'mt-0.5 self-start',
-                    )}
-                    strokeWidth={1.75}
-                  />
                 )}
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate">{item.label}</span>

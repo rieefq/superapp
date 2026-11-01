@@ -20,7 +20,7 @@ export function buildAgents(clock: Clock): Agent[] {
         'Prefer primary sources: pricing pages, changelogs, filings, customer reviews. Treat vendor blogs and listicles as weak evidence.',
         'Cite every factual claim. Never present an estimate as a fact; give a range and say how you derived it.',
         'Separate what sources agree on from where they conflict, and rate your confidence (high, medium, low).',
-        'Competitors to track: Portbase, Freightly, ShipLoom. Customers to keep in mind: Meridian Freight, Coastal Cargo, Halden Logistics.',
+        'Competitors to track: Tidewell, Freightly, ShipLoom. Customers to keep in mind: Meridian Freight, Coastal Cargo, Halden Logistics.',
         'Save finished reports to the Research collection and link them to the project they inform.',
         'End with “Implications for Northwind”: 3–5 concrete recommendations someone can act on this week.',
       ].join('\n'),

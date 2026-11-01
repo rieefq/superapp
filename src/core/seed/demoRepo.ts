@@ -4,16 +4,14 @@
  *
  * A small but coherent React 19 + TypeScript + vitest + Playwright app (the `main` branch).
  * The seeded coding sessions build on realistic problems that are visible in this code:
- * - Sessions follow ADR-012 (15-minute in-memory access token, `atlas_rt` refresh cookie,
- *   refresh at 80%). src/pages/LoginCallback.tsx: the IdP-initiated SAML callback stores tokens
- *   with `session.set()`, which never schedules the refresh, so those users are signed out after
- *   15 minutes (fixed in session `ses_sso` with a single `establishSession()`).
- * - e2e/checkout.spec.ts › pays an open invoice: sleeps 2 s, then clicks Pay with a 1 s timeout.
- *   Pay stays disabled until the outstanding-balance banner loads, and that request only starts
- *   after the invoice request resolves (session `ses_flaky`).
- * - src/api/invoices.ts + src/billing/stripe.ts: the in-house invoicer midway through a migration
- *   to Stripe Billing behind `VITE_FLAG_STRIPE_BILLING` (session `ses_stripe`).
- * - The dashboard bundle split and size budget from session `ses_bundle` (PR #214) are merged here.
+ * - src/auth/session.ts: the refresh timer reuses `tokenLifetimeMs`, remembered once at SSO
+ *   login. When the IdP issues shorter-lived tokens on refresh, the next refresh is scheduled
+ *   too late and users are signed out early (fixed in session `ses_sso`).
+ * - e2e/checkout.spec.ts: waits on a fixed 3 s timeout, then reads the status once (session
+ *   `ses_flaky`). The remaining flake is an out-of-order poll response in src/pages/Checkout.tsx.
+ * - src/api/invoices.ts + src/billing/stripe.ts: legacy invoicing midway through a migration to
+ *   Stripe Billing behind `VITE_FLAG_STRIPE_BILLING` (session `ses_stripe`).
+ * - The dashboard bundle split from session `ses_bundle` (PR #214) is already merged here.
  */
 export interface DemoRepoFile {
   path: string
@@ -65,9 +63,6 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test -- --reporter=dot
-      - run: npm run build
-      - name: Bundle size budget
-        run: npm run size
 
   e2e:
     name: Playwright
@@ -114,9 +109,10 @@ variables below in \`.env.local\`.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| \`VITE_API_BASE_URL\` | \`https://api.atlas.northwind.example\` | portal-api base URL (also serves \`/auth/*\`) |
+| \`VITE_API_BASE_URL\` | \`https://api.atlas.northwind.example\` | portal-api base URL |
+| \`VITE_SSO_ISSUER\` | \`https://login.northwind.example\` | OIDC issuer used for SSO |
+| \`VITE_SSO_CLIENT_ID\` | \`atlas-portal\` | OIDC client id |
 | \`VITE_FLAG_STRIPE_BILLING\` | \`false\` | Serve invoices from Stripe Billing (migration in progress) |
-| \`VITE_FLAG_BALANCE_BANNER\` | \`true\` | Outstanding-balance banner on checkout |
 
 ## Scripts
 
@@ -128,27 +124,26 @@ variables below in \`.env.local\`.
 | \`npm run lint\` | ESLint, zero warnings allowed |
 | \`npm test\` | Unit tests (vitest + jsdom) |
 | \`npm run e2e\` | Playwright against \`vite preview\` |
-| \`npm run size\` | Bundle budget: the entry chunk must stay under 300 kB gzipped |
 
 ## Project layout
 
 \`\`\`
 src/
   api/          portal-api client (retries, backoff) and resource modules
-  auth/         sign-in flows (password, SSO) and the in-memory session (ADR-012)
+  auth/         SSO (OIDC + PKCE) and the in-memory session
   billing/      plans and the Stripe Billing adapter
   components/   UI built on @northwind/ui
   hooks/        data and session hooks
   lib/          pure helpers: dates, money, formatting
   pages/        route-level screens
-e2e/            Playwright specs (portal-api is mocked)
+e2e/            Playwright specs (portal-api and the IdP are mocked)
 docs/           architecture notes
 \`\`\`
 
 ## Testing
 
 - Unit tests live next to the code (\`*.test.ts\`). Pure helpers in \`src/lib\` must stay at 100% branch coverage.
-- E2E specs mock every portal-api call with \`page.route\`; they never need a backend.
+- E2E specs mock every network call with \`page.route\`; they never need a backend.
 - **No fixed sleeps.** Use web-first assertions (\`await expect(locator).toHaveText(...)\`) or wait for
   the request you depend on. \`waitForTimeout\` is how flaky tests are born.
 
@@ -175,24 +170,23 @@ per-organization access. The browser never holds a secret.
 
 \`\`\`
  Browser (this repo)                     Northwind backend
- ┌──────────────────────┐  /auth/*       ┌──────────────────┐   SAML / OIDC
- │ auth/sso, session    │ ─────────────▶ │ portal-api       │ ◀──────────▶ customer IdPs
- │ api/client (retries) │ ── Bearer ───▶ │  /v1  /v2/billing│ ──▶ carriers, Postgres
- │ pages, components    │                │                  │ ──▶ Stripe Billing
+ ┌──────────────────────┐   OIDC + PKCE  ┌──────────────────┐
+ │ auth/sso, session    │ ─────────────▶ │ IdP (login.*)    │
+ │ api/client (retries) │ ── Bearer ───▶ │ portal-api       │──▶ carriers, Postgres
+ │ pages, components    │                │  /v1  /v2/billing│──▶ Stripe Billing
  └──────────────────────┘                └──────────────────┘
 \`\`\`
 
 ## Auth and sessions (ADR-012)
 
-- Sign-in paths (\`src/auth/sso.ts\`): password, SP-initiated SSO (starts on our login page)
-  and IdP-initiated SSO (starts on the customer's IdP dashboard and lands on
-  \`/auth/saml/callback\`). portal-api speaks SAML/OIDC; every path ends with a token set.
-- The access token is a 15-minute JWT held **in memory only** (\`src/auth/session.ts\`).
-  The refresh token is the \`atlas_rt\` cookie (\`HttpOnly; Secure; SameSite=Lax; Path=/auth/refresh\`).
-- The client refreshes silently at ~80% of the access-token lifetime (about 12 minutes),
-  and once on the first \`401\` (\`api/client.ts\`). If the refresh fails, the user signs in again.
-- **No sign-in path may store tokens without scheduling the refresh** (ADR-012): if the
-  scheduler does not run, the user is logged out after 15 minutes.
+- Sign-in is OIDC authorization code + PKCE against the Northwind IdP (\`src/auth/sso.ts\`).
+- Tokens live **in memory only** (\`src/auth/session.ts\`); a reload runs a silent SSO round-trip.
+- The access token is refreshed \`REFRESH_LEAD_MS\` (60 s) before it expires. The IdP applies
+  each customer's session policy on refresh, so a refreshed token can live shorter than
+  the one issued at login. **Always schedule the next refresh from the expiry of the token
+  you currently hold**, never from a lifetime remembered at login.
+- A \`401\` from portal-api ends the session (\`api/client.ts\`), which sends the user back
+  through SSO.
 
 ## API client
 
@@ -208,24 +202,17 @@ per-organization access. The browser never holds a secret.
 Invoices are moving from the legacy invoicing service (\`/billing/v1\`, decimal-string amounts)
 to **Stripe Billing**, exposed by portal-api under \`/v2/billing\`.
 
-1. \`src/billing/stripe.ts\` maps Stripe objects to the portal's \`Invoice\` type (the in-house
-   invoicer's records keep coming from \`/billing/v1\` until cutover).
+1. \`src/billing/stripe.ts\` maps Stripe objects to the portal's \`Invoice\` type.
 2. \`src/api/invoices.ts\` picks the source with \`VITE_FLAG_STRIPE_BILLING\`; legacy stays the default.
 3. Cut over per customer once totals reconcile for two consecutive billing cycles, then remove
    the legacy path.
 
 Amounts are integer minor units everywhere (\`src/lib/money.ts\`). Never use floats for money.
 
-Checkout (\`src/pages/Checkout.tsx\`) shows the account's outstanding balance above the Pay button
-(\`VITE_FLAG_BALANCE_BANNER\`). Pay stays disabled until the balance has loaded, so nobody pays
-against a stale amount. The banner's query caused the checkout latency incident; it is backed by
-a composite index on \`invoice_events\` now.
-
 ## Performance budget
 
 - Route-level code splitting: every page is its own chunk (\`src/routes.tsx\`).
 - The dashboard chart (recharts + d3, ~430 kB) is lazy-loaded after first paint.
-- CI fails when the entry chunk exceeds 300 kB gzipped (\`npm run size\`, size-limit).
 - \`build.chunkSizeWarningLimit\` is 450 kB; a build warning is a regression.
 - Target: dashboard interactive in under 2.5 s on a mid-range laptop over fast 4G.
 
@@ -234,7 +221,7 @@ a composite index on \`invoice_events\` now.
 | Layer | Tool | Scope |
 | --- | --- | --- |
 | Unit | vitest + jsdom | \`lib/\`, \`auth/\`, \`api/\`, \`billing/\` |
-| E2E | Playwright | sign-in, billing, checkout; portal-api mocked with \`page.route\` |
+| E2E | Playwright | sign-in, checkout, billing; API and IdP mocked with \`page.route\` |
 
 E2E tests must not depend on timing. Wait for UI state with web-first assertions, never with
 fixed timeouts.
@@ -244,60 +231,60 @@ fixed timeouts.
       'e2e/checkout.spec.ts',
       `import { expect, test, type Page } from '@playwright/test'
 
+const ISSUER = 'https://login.northwind.example'
 const API = 'https://api.atlas.northwind.example'
-const TOKENS = {
-  accessToken: 'e2e-access',
-  expiresIn: 900,
-  user: { id: 'usr_e2e', email: 'qa@e2e-logistics.example', orgId: 'org_e2e' },
-}
-const OPEN_INVOICE = {
-  invoice_id: 'inv_e2e_0142',
-  invoice_no: 'NW-2025-0142',
-  state: 'ISSUED',
-  currency: 'USD',
-  total: '1890.00',
-  balance: '1890.00',
-  issue_date: '2025-06-02T00:00:00Z',
-  due_date: '2025-07-02T00:00:00Z',
-  pdf_link: null,
-}
 
-/** Match one portal-api path, ignoring the query string. */
-const api = (path: string) => (url: URL) => url.origin === API && url.pathname === path
-
+/** Fake the IdP: bounce straight back to the callback and mint an unsigned id_token. */
 async function signIn(page: Page) {
-  await page.route(api('/auth/password'), (route) => route.fulfill({ json: TOKENS }))
-  await page.goto('/login?return_to=/billing')
-  await page.getByLabel('Work email').fill('qa@e2e-logistics.example')
-  await page.getByLabel('Password').fill('correct horse battery staple')
-  await page.getByRole('button', { name: 'Sign in' }).click()
+  await page.route(\`\${ISSUER}/oauth2/authorize**\`, async (route) => {
+    const authorize = new URL(route.request().url())
+    const callback = new URL(authorize.searchParams.get('redirect_uri') ?? '')
+    callback.searchParams.set('code', 'e2e-code')
+    callback.searchParams.set('state', authorize.searchParams.get('state') ?? '')
+    await route.fulfill({ status: 302, headers: { location: callback.toString() } })
+  })
+
+  const claims = { sub: 'usr_e2e', email: 'qa@e2e-logistics.example', org_id: 'org_e2e' }
+  const idToken = ['e30', Buffer.from(JSON.stringify(claims)).toString('base64url'), 'sig'].join('.')
+  await page.route(\`\${ISSUER}/oauth2/token\`, (route) =>
+    route.fulfill({
+      json: { access_token: 'e2e-access', refresh_token: 'e2e-refresh', id_token: idToken, expires_in: 3600, token_type: 'Bearer' },
+    }),
+  )
 }
 
-test.describe('billing checkout', () => {
+test.describe('plan upgrade checkout', () => {
   test.beforeEach(async ({ page }) => {
-    await page.route(api('/v1/account'), (route) =>
-      route.fulfill({ json: { id: 'acc_e2e', name: 'E2E Logistics', plan: 'growth', seats: 18 } }),
-    )
-    await page.route(api('/billing/v1/accounts/org_e2e/invoices'), (route) =>
-      route.fulfill({ json: { invoices: [OPEN_INVOICE], next_page_token: null } }),
-    )
-    await page.route(api('/billing/v1/accounts/org_e2e/invoices/inv_e2e_0142'), (route) => route.fulfill({ json: OPEN_INVOICE }))
-    await page.route(api('/v1/accounts/org_e2e/balance'), (route) => route.fulfill({ json: { amount: 189_000, currency: 'USD' } }))
-    await page.route(api('/v1/accounts/org_e2e/invoices/inv_e2e_0142/pay'), (route) => route.fulfill({ json: { status: 'paid' } }))
     await signIn(page)
+    await page.route(\`\${API}/v1/account\`, (route) =>
+      route.fulfill({ json: { id: 'acc_e2e', name: 'E2E Logistics', plan: 'starter', seats: 8 } }),
+    )
+    await page.route(\`\${API}/v1/billing/upgrades\`, (route) => route.fulfill({ json: { id: 'upg_e2e', status: 'processing' } }))
+
+    let polls = 0
+    await page.route(\`\${API}/v1/billing/upgrades/upg_e2e\`, (route) => {
+      polls += 1
+      return route.fulfill({ json: { id: 'upg_e2e', status: polls >= 2 ? 'confirmed' : 'processing' } })
+    })
   })
 
-  test('lists open invoices with a Pay link', async ({ page }) => {
-    await expect(page.getByRole('link', { name: 'Pay NW-2025-0142' })).toBeVisible()
+  test('shows the monthly total for the selected plan', async ({ page }) => {
+    await page.goto('/billing/upgrade')
+    await page.getByRole('radio', { name: /Enterprise/ }).check()
+    await page.getByLabel('Seats').fill('60')
+    await expect(page.getByTestId('order-total')).toHaveText('$2,690.00 / month')
   })
 
-  test('pays an open invoice', async ({ page }) => {
-    await page.getByRole('link', { name: 'Pay NW-2025-0142' }).click()
+  test('upgrades from Starter to Growth', async ({ page }) => {
+    await page.goto('/billing/upgrade')
+    await page.getByRole('radio', { name: /Growth/ }).check()
+    await page.getByLabel('Seats').fill('20')
+    await expect(page.getByTestId('order-total')).toHaveText('$1,065.00 / month')
+    await page.getByRole('button', { name: 'Confirm upgrade' }).click()
 
-    // Give the outstanding-balance banner time to load, then pay.
-    await page.waitForTimeout(2000)
-    await page.getByRole('button', { name: 'Pay $1,890.00' }).click({ timeout: 1_000 })
-    await expect(page.getByRole('status')).toHaveText('Payment received. Thank you!')
+    // Payment confirmation is polled every second; give it time to arrive.
+    await page.waitForTimeout(3000)
+    expect(await page.getByRole('status').textContent()).toContain('Payment confirmed')
   })
 })
 `,
@@ -368,8 +355,7 @@ export default tseslint.config(
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "playwright test",
-    "size": "size-limit"
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@northwind/ui": "^4.2.0",
@@ -381,8 +367,6 @@ export default tseslint.config(
   "devDependencies": {
     "@eslint/js": "^9.34.0",
     "@playwright/test": "^1.55.0",
-    "@size-limit/file": "^11.2.0",
-    "@testing-library/react": "^16.3.0",
     "@types/node": "^22.18.0",
     "@types/react": "^19.1.12",
     "@types/react-dom": "^19.1.9",
@@ -390,20 +374,11 @@ export default tseslint.config(
     "eslint": "^9.34.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "jsdom": "^26.1.0",
-    "size-limit": "^11.2.0",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.41.0",
     "vite": "^7.1.4",
     "vitest": "^3.2.4"
-  },
-  "size-limit": [
-    {
-      "name": "Entry chunk (dashboard first load)",
-      "path": "dist/assets/index-*.js",
-      "limit": "300 kB",
-      "gzip": true
-    }
-  ]
+  }
 }
 `,
     ),
@@ -439,22 +414,25 @@ export default defineConfig({
     ),
     file(
       'src/App.tsx',
-      `import { Suspense } from 'react'
-import { Navigate, Outlet, useLocation } from 'react-router'
+      `import { Suspense, useEffect } from 'react'
+import { Outlet, useLocation } from 'react-router'
 import { Spinner } from '@northwind/ui'
+import { beginLogin } from './auth/sso'
 import { Header } from './components/Header'
 import { useSession } from './hooks/useSession'
 
-/** Authenticated shell: every route below \`/\` requires a session. */
+/** Authenticated shell: every route below \`/\` requires an SSO session. */
 export function App() {
   const session = useSession()
   const location = useLocation()
+  const returnTo = location.pathname + location.search
 
-  if (!session) {
-    // Tokens live in memory (ADR-012), so a reload or an expired session lands here.
-    const returnTo = encodeURIComponent(location.pathname + location.search)
-    return <Navigate to={\`/login?return_to=\${returnTo}\`} replace />
-  }
+  useEffect(() => {
+    // No session (first visit, reload, or it just ended): run SSO and come back here.
+    if (!session) void beginLogin(returnTo)
+  }, [session, returnTo])
+
+  if (!session) return <FullPageSpinner label="Signing you in…" />
 
   return (
     <div className="app-shell">
@@ -481,25 +459,22 @@ function FullPageSpinner({ label }: { label: string }) {
     file(
       'src/api/client.test.ts',
       `import { afterEach, describe, expect, it, vi } from 'vitest'
-import { refresh } from '../auth/session'
+import { endSession } from '../auth/session'
 import { ApiError, backoff, request } from './client'
 
-const session = { accessToken: 'test-token' }
 vi.mock('../auth/session', () => ({
-  getSession: () => session,
-  refresh: vi.fn(),
+  getSession: () => ({ accessToken: 'test-token' }),
+  endSession: vi.fn(),
 }))
 
-function json(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
+function json(status: number, body: unknown, headers: Record<string, string> = {}): Response {
+  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...headers } })
 }
 
 describe('request', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
     vi.useRealTimers()
-    vi.mocked(refresh).mockReset()
-    session.accessToken = 'test-token'
   })
 
   it('retries idempotent requests on 503 and returns the eventual response', async () => {
@@ -521,30 +496,18 @@ describe('request', () => {
     const fetchMock = vi.fn().mockResolvedValue(json(503, { code: 'unavailable', message: 'Try again later' }))
     vi.stubGlobal('fetch', fetchMock)
 
-    await expect(request('/v1/billing/invoices/inv_1/pay', { method: 'POST', body: {} })).rejects.toBeInstanceOf(ApiError)
+    await expect(request('/v1/billing/upgrades', { method: 'POST', body: {} })).rejects.toBeInstanceOf(ApiError)
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('refreshes once on 401 and retries with the new token', async () => {
-    vi.mocked(refresh).mockImplementation(async () => {
-      session.accessToken = 'fresh-token'
-      return true
-    })
-    const fetchMock = vi.fn().mockResolvedValueOnce(json(401, { code: 'token_expired' })).mockResolvedValueOnce(json(200, { id: 'acc_1' }))
+  it('sends the session token and ends the session on 401', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(json(401, { code: 'token_expired' }))
     vi.stubGlobal('fetch', fetchMock)
 
-    await expect(request('/v1/account')).resolves.toEqual({ id: 'acc_1' })
-    const retried = fetchMock.mock.calls[1]?.[1] as RequestInit
-    expect((retried.headers as Record<string, string>).authorization).toBe('Bearer fresh-token')
-    expect(refresh).toHaveBeenCalledOnce()
-  })
-
-  it('gives up when the refresh is refused', async () => {
-    vi.mocked(refresh).mockResolvedValue(false)
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json(401, { code: 'token_expired' })))
-
     await expect(request('/v1/account')).rejects.toMatchObject({ status: 401, code: 'token_expired' })
-    expect(refresh).toHaveBeenCalledOnce()
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit
+    expect((init.headers as Record<string, string>).authorization).toBe('Bearer test-token')
+    expect(endSession).toHaveBeenCalledOnce()
   })
 })
 
@@ -559,7 +522,7 @@ describe('backoff', () => {
     ),
     file(
       'src/api/client.ts',
-      `import { getSession, refresh } from '../auth/session'
+      `import { endSession, getSession } from '../auth/session'
 import { config } from '../config'
 
 export class ApiError extends Error {
@@ -596,7 +559,6 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   const idempotent = method === 'GET' || method === 'PUT' || method === 'DELETE'
   const retries = idempotent ? (options.retries ?? 3) : 0
   const url = buildUrl(path, query)
-  let refreshed = false
 
   for (let attempt = 0; ; attempt++) {
     let res: Response
@@ -615,12 +577,8 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 
     if (res.ok) return (res.status === 204 ? undefined : await res.json()) as T
 
-    // ADR-012: refresh on the first 401, then retry once with the new access token.
-    if (res.status === 401 && !refreshed) {
-      refreshed = true
-      if (await refresh()) continue
-    }
     const error = await toApiError(res)
+    if (res.status === 401) endSession() // expired or revoked token: restart SSO
     if (attempt < retries && RETRYABLE_STATUS.has(res.status)) {
       await sleep(error.retryAfterMs ?? backoff(attempt), signal)
       continue
@@ -689,7 +647,7 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 import { api } from './client'
 
 /**
- * Invoices from the in-house invoicer (/billing/v1), which Stripe Billing is replacing.
+ * Legacy invoicing service (Northwind Billing v1), being replaced by Stripe Billing.
  * See docs/ARCHITECTURE.md → Billing. Amounts arrive as decimal strings and states
  * are upper-case; everything is normalized to the portal's Invoice type here.
  */
@@ -729,16 +687,6 @@ export async function listInvoices(accountId: string, cursor?: string): Promise<
 export async function getInvoice(accountId: string, invoiceId: string): Promise<Invoice> {
   const invoice = await api.get<LegacyInvoice>(\`/billing/v1/accounts/\${accountId}/invoices/\${invoiceId}\`)
   return fromLegacy(invoice)
-}
-
-/** Total of the account's open invoices in one currency (powers the checkout balance banner). */
-export function getOutstandingBalance(accountId: string, currency: Money['currency'], signal?: AbortSignal): Promise<Money> {
-  return api.get<Money>(\`/v1/accounts/\${accountId}/balance\`, { currency }, signal)
-}
-
-/** Pay an open invoice with the card on file. Not retried automatically (POST). */
-export function payInvoice(accountId: string, invoiceId: string): Promise<{ status: 'paid' | 'failed' }> {
-  return api.post<{ status: 'paid' | 'failed' }>(\`/v1/accounts/\${accountId}/invoices/\${invoiceId}/pay\`, {})
 }
 
 /** Email the invoice PDF to the account's billing contact again. */
@@ -808,25 +756,23 @@ export function getWeeklyVolume(weeks = 12, signal?: AbortSignal): Promise<Volum
     file(
       'src/auth/session.test.ts',
       `import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { clear, getSession, login, REFRESH_AT, subscribe, type TokenSet } from './session'
+import { endSession, getSession, REFRESH_LEAD_MS, startSession, subscribe } from './session'
+import { exchangeRefreshToken, type TokenSet } from './sso'
 
-const MINUTE = 60_000
+vi.mock('./sso', () => ({ exchangeRefreshToken: vi.fn() }))
+
+const HOUR_MS = 60 * 60 * 1000
 
 function tokens(overrides: Partial<TokenSet> = {}): TokenSet {
   return {
     accessToken: 'access-1',
-    expiresIn: 900,
-    user: { id: 'usr_42', email: 'dispatch@haldenlogistics.example', orgId: 'org_halden' },
+    refreshToken: 'refresh-1',
+    idToken: 'id-1',
+    expiresIn: 3600,
+    claims: { sub: 'usr_42', email: 'dispatch@meridianfreight.example', org_id: 'org_meridian' },
     ...overrides,
   }
 }
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
-}
-
-const refreshCalls = (fetchMock: ReturnType<typeof vi.fn>) =>
-  fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/auth/refresh')).length
 
 describe('session', () => {
   beforeEach(() => {
@@ -835,40 +781,38 @@ describe('session', () => {
   })
 
   afterEach(() => {
-    clear()
+    endSession()
     vi.useRealTimers()
-    vi.unstubAllGlobals()
+    vi.mocked(exchangeRefreshToken).mockReset()
   })
 
-  it('stores the session in memory with the access-token expiry', () => {
-    const session = login(tokens())
-    expect(session).toMatchObject({ userId: 'usr_42', orgId: 'org_halden', accessToken: 'access-1' })
-    expect(session.expiresAt).toBe(Date.now() + 15 * MINUTE)
-    expect(getSession()).toBe(session)
+  it('starts a session from the SSO token set', () => {
+    const session = startSession(tokens())
+    expect(session.userId).toBe('usr_42')
+    expect(session.orgId).toBe('org_meridian')
+    expect(session.expiresAt).toBe(Date.now() + HOUR_MS)
+    expect(getSession()).toEqual(session)
   })
 
-  it('refreshes at 80% of the access-token lifetime and keeps refreshing', async () => {
-    const fetchMock = vi.fn().mockImplementation(async () => json(tokens({ accessToken: 'access-2' })))
-    vi.stubGlobal('fetch', fetchMock)
-    login(tokens())
+  it('refreshes one minute before the access token expires', async () => {
+    vi.mocked(exchangeRefreshToken).mockResolvedValue(tokens({ accessToken: 'access-2', refreshToken: 'refresh-2' }))
+    startSession(tokens())
 
-    await vi.advanceTimersByTimeAsync(15 * MINUTE * REFRESH_AT - 1)
-    expect(refreshCalls(fetchMock)).toBe(0)
+    await vi.advanceTimersByTimeAsync(HOUR_MS - REFRESH_LEAD_MS - 1)
+    expect(exchangeRefreshToken).not.toHaveBeenCalled()
+
     await vi.advanceTimersByTimeAsync(1)
-    expect(refreshCalls(fetchMock)).toBe(1)
+    expect(exchangeRefreshToken).toHaveBeenCalledWith('refresh-1')
     expect(getSession()?.accessToken).toBe('access-2')
-
-    await vi.advanceTimersByTimeAsync(12 * MINUTE)
-    expect(refreshCalls(fetchMock)).toBe(2)
   })
 
   it('ends the session when the refresh token is rejected', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ code: 'refresh_reuse_detected' }, 401)))
+    vi.mocked(exchangeRefreshToken).mockRejectedValue(new Error('invalid_grant'))
     const seen: Array<string | null> = []
     const unsubscribe = subscribe((s) => seen.push(s?.accessToken ?? null))
 
-    login(tokens())
-    await vi.advanceTimersByTimeAsync(12 * MINUTE)
+    startSession(tokens())
+    await vi.advanceTimersByTimeAsync(HOUR_MS)
 
     expect(getSession()).toBeNull()
     expect(seen).toEqual(['access-1', null])
@@ -879,36 +823,30 @@ describe('session', () => {
     ),
     file(
       'src/auth/session.ts',
-      `import { authUrl } from '../config'
+      `import { exchangeRefreshToken, type TokenSet } from './sso'
 
 /**
- * Client side of ADR-012 (docs/ARCHITECTURE.md → Auth).
- * - The access token is a 15-minute JWT held in memory only, never in localStorage.
- * - The refresh token is the HttpOnly \`atlas_rt\` cookie; the browser sends it to /auth/refresh only.
- * - The client refreshes at about 80% of the access-token lifetime, and on the first 401.
+ * In-memory session for the signed-in user (docs/ARCHITECTURE.md → Auth, ADR-012).
+ * Access tokens are short-lived: we refresh them shortly before they expire and
+ * notify subscribers (useSession) so the API client always sends a valid token.
  */
-export interface TokenSet {
-  accessToken: string
-  /** Access-token lifetime in seconds (900 per ADR-012). */
-  expiresIn: number
-  user: { id: string; email: string; orgId: string }
-}
-
 export interface Session {
   userId: string
   email: string
   orgId: string
   accessToken: string
+  refreshToken: string
   /** Epoch ms after which portal-api rejects the access token. */
   expiresAt: number
 }
 
 type Listener = (session: Session | null) => void
 
-/** Refresh at 80% of the access-token lifetime: about 12 of 15 minutes. */
-export const REFRESH_AT = 0.8
+/** Refresh this long before the access token expires. */
+export const REFRESH_LEAD_MS = 60_000
 
 let current: Session | null = null
+let tokenLifetimeMs = 0
 let refreshTimer: ReturnType<typeof setTimeout> | null = null
 const listeners = new Set<Listener>()
 
@@ -923,56 +861,51 @@ export function subscribe(listener: Listener): () => void {
   }
 }
 
-/** Store a token set and notify subscribers. */
-export function set(tokens: TokenSet, now = Date.now()): Session {
-  current = {
-    userId: tokens.user.id,
-    email: tokens.user.email,
-    orgId: tokens.user.orgId,
-    accessToken: tokens.accessToken,
-    expiresAt: now + tokens.expiresIn * 1000,
-  }
+/** Start a session from the token set returned by the SSO callback. */
+export function startSession(tokens: TokenSet, now = Date.now()): Session {
+  tokenLifetimeMs = tokens.expiresIn * 1000
+  current = toSession(tokens, now)
+  scheduleRefresh()
   emit()
   return current
 }
 
-/** Password and SP-initiated SSO sign-in finish here: store the tokens and start the silent refresh. */
-export function login(tokens: TokenSet): Session {
-  const session = set(tokens)
-  scheduleRefresh(tokens.expiresIn)
-  return session
-}
-
-/** Silent refresh. Rotates the atlas_rt cookie; ends the session when the server refuses. */
-export async function refresh(): Promise<boolean> {
-  const res = await fetch(authUrl('/auth/refresh'), { method: 'POST', credentials: 'include' }).catch(() => null)
-  if (!res?.ok) {
-    clear()
-    return false
-  }
-  const tokens = (await res.json()) as TokenSet
-  set(tokens)
-  scheduleRefresh(tokens.expiresIn)
-  return true
-}
-
-/** Sign out here and at portal-api (revokes the refresh-token family). */
-export async function logout(): Promise<void> {
-  clear()
-  await fetch(authUrl('/auth/logout'), { method: 'POST', credentials: 'include' }).catch(() => undefined)
-}
-
-/** Drop the in-memory session without calling the server. */
-export function clear(): void {
+export function endSession(): void {
   if (refreshTimer) clearTimeout(refreshTimer)
   refreshTimer = null
   current = null
   emit()
 }
 
-function scheduleRefresh(expiresInSec: number): void {
+/** Exchange the refresh token now. Ends the session if the IdP rejects it. */
+export async function refreshNow(): Promise<void> {
+  if (!current) return
+  try {
+    const tokens = await exchangeRefreshToken(current.refreshToken)
+    current = toSession(tokens, Date.now())
+    scheduleRefresh()
+    emit()
+  } catch {
+    // Refresh token revoked or expired: the next render starts a fresh SSO login.
+    endSession()
+  }
+}
+
+function scheduleRefresh(): void {
   if (refreshTimer) clearTimeout(refreshTimer)
-  refreshTimer = setTimeout(() => void refresh(), expiresInSec * 1000 * REFRESH_AT)
+  const delay = Math.max(0, tokenLifetimeMs - REFRESH_LEAD_MS)
+  refreshTimer = setTimeout(() => void refreshNow(), delay)
+}
+
+function toSession(tokens: TokenSet, now: number): Session {
+  return {
+    userId: tokens.claims.sub,
+    email: tokens.claims.email,
+    orgId: tokens.claims.org_id,
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+    expiresAt: now + tokens.expiresIn * 1000,
+  }
 }
 
 function emit(): void {
@@ -982,64 +915,119 @@ function emit(): void {
     ),
     file(
       'src/auth/sso.ts',
-      `import { authUrl } from '../config'
-import type { TokenSet } from './session'
+      `import { config } from '../config'
 
-/**
- * Sign-in flows. Every flow ends with a call to portal-api that returns a TokenSet and
- * sets the atlas_rt refresh cookie, so requests here always send credentials.
- *
- * - Password: POST /auth/password.
- * - SP-initiated SSO: we send the user to their IdP via /auth/sso/start; the IdP comes back
- *   to /auth/callback with a one-time code (SAML or OIDC, portal-api hides the difference).
- * - IdP-initiated SSO: the user starts from their IdP dashboard; portal-api consumes the SAML
- *   assertion and redirects to /auth/saml/callback with a one-time ticket.
- */
-
-export class SignInError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'SignInError'
-  }
+/** Token set returned by the IdP token endpoint (OIDC authorization code + PKCE). */
+export interface TokenSet {
+  accessToken: string
+  refreshToken: string
+  idToken: string
+  /** Lifetime of this access token in seconds, as reported by the IdP. */
+  expiresIn: number
+  claims: { sub: string; email: string; org_id: string }
 }
 
-export function signInWithPassword(email: string, password: string): Promise<TokenSet> {
-  return post('/auth/password', { email, password })
+interface TokenResponse {
+  access_token: string
+  refresh_token: string
+  id_token: string
+  expires_in: number
+  token_type: 'Bearer'
 }
 
-/** SP-initiated SSO: portal-api picks the customer's IdP from the email domain. */
-export function startSsoLogin(email: string, returnTo = '/'): void {
-  const url = new URL(authUrl('/auth/sso/start'))
-  url.searchParams.set('email', email)
-  url.searchParams.set('return_to', returnTo)
+const VERIFIER_KEY = 'atlas.pkce.verifier'
+const STATE_KEY = 'atlas.pkce.state'
+
+/** Redirect to the IdP. \`returnTo\` is restored after the callback. */
+export async function beginLogin(returnTo = '/'): Promise<void> {
+  const verifier = randomString(64)
+  const state = randomString(24)
+  sessionStorage.setItem(VERIFIER_KEY, verifier)
+  sessionStorage.setItem(STATE_KEY, JSON.stringify({ state, returnTo }))
+
+  const url = new URL('/oauth2/authorize', config.sso.issuer)
+  url.search = new URLSearchParams({
+    response_type: 'code',
+    client_id: config.sso.clientId,
+    redirect_uri: redirectUri(),
+    scope: 'openid email profile offline_access',
+    code_challenge: await sha256Base64Url(verifier),
+    code_challenge_method: 'S256',
+    state,
+  }).toString()
   window.location.assign(url.toString())
 }
 
-/** SP-initiated callback: exchange the one-time code for tokens. */
-export function completeSsoLogin(code: string): Promise<TokenSet> {
-  return post('/auth/sso/token', { code })
-}
+/** Exchange the authorization code from the callback URL for a token set. */
+export async function completeLogin(params: URLSearchParams): Promise<{ tokens: TokenSet; returnTo: string }> {
+  const saved = JSON.parse(sessionStorage.getItem(STATE_KEY) ?? 'null') as { state: string; returnTo: string } | null
+  const verifier = sessionStorage.getItem(VERIFIER_KEY)
+  if (!saved || !verifier || params.get('state') !== saved.state) {
+    throw new Error('Sign-in could not be verified. Please try again.')
+  }
+  sessionStorage.removeItem(VERIFIER_KEY)
+  sessionStorage.removeItem(STATE_KEY)
 
-/** IdP-initiated callback: redeem the ticket portal-api issued for the SAML assertion. */
-export function redeemIdpTicket(ticket: string): Promise<TokenSet> {
-  return post('/auth/saml/ticket', { ticket })
-}
-
-/** Only allow same-origin paths as post-login destinations. */
-export function safeReturnTo(value: string | null): string {
-  return value && value.startsWith('/') && !value.startsWith('//') ? value : '/'
-}
-
-async function post(path: string, body: Record<string, string>): Promise<TokenSet> {
-  const res = await fetch(authUrl(path), {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
+  const tokens = await tokenRequest({
+    grant_type: 'authorization_code',
+    code: params.get('code') ?? '',
+    code_verifier: verifier,
+    redirect_uri: redirectUri(),
   })
-  if (res.status === 401 || res.status === 403) throw new SignInError('Those details didn’t work. Please try again.')
-  if (!res.ok) throw new SignInError(\`Sign-in failed (\${res.status}). Please try again.\`)
-  return (await res.json()) as TokenSet
+  return { tokens, returnTo: saved.returnTo }
+}
+
+/** Trade a refresh token for a new token set. The IdP rotates refresh tokens on every use. */
+export function exchangeRefreshToken(refreshToken: string): Promise<TokenSet> {
+  return tokenRequest({ grant_type: 'refresh_token', refresh_token: refreshToken })
+}
+
+/** IdP logout URL; ends the SSO session and returns to the portal. */
+export function logoutUrl(): string {
+  const url = new URL('/oauth2/logout', config.sso.issuer)
+  url.searchParams.set('client_id', config.sso.clientId)
+  url.searchParams.set('post_logout_redirect_uri', window.location.origin)
+  return url.toString()
+}
+
+async function tokenRequest(body: Record<string, string>): Promise<TokenSet> {
+  const res = await fetch(new URL('/oauth2/token', config.sso.issuer), {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ client_id: config.sso.clientId, ...body }),
+  })
+  if (!res.ok) throw new Error(\`Token endpoint returned \${res.status}\`)
+  const json = (await res.json()) as TokenResponse
+  return {
+    accessToken: json.access_token,
+    refreshToken: json.refresh_token,
+    idToken: json.id_token,
+    expiresIn: json.expires_in,
+    claims: decodeClaims(json.id_token),
+  }
+}
+
+/** Reads (does not verify) the id_token payload; portal-api verifies every access token. */
+function decodeClaims(idToken: string): TokenSet['claims'] {
+  const payload = idToken.split('.')[1] ?? ''
+  return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))) as TokenSet['claims']
+}
+
+function redirectUri(): string {
+  return new URL(config.sso.redirectPath, window.location.origin).toString()
+}
+
+function randomString(length: number): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(length))
+  return Array.from(bytes, (b) => (b % 36).toString(36)).join('')
+}
+
+async function sha256Base64Url(input: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
+  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\\+/g, '-')
+    .replace(/\\//g, '_')
+    .replace(/=+$/, '')
 }
 `,
     ),
@@ -1228,7 +1216,7 @@ function summarize(shipments: Shipment[], now = Date.now()) {
       'src/components/Header.tsx',
       `import { NavLink } from 'react-router'
 import { Avatar, Button } from '@northwind/ui'
-import { logout } from '../auth/session'
+import { logoutUrl } from '../auth/sso'
 import { initials } from '../lib/format'
 
 const NAV = [
@@ -1258,7 +1246,8 @@ export function Header({ email }: { email: string }) {
 
       <div className="app-header__account">
         <Avatar label={email} initials={initials(email)} />
-        <Button variant="ghost" size="sm" onClick={() => void logout()}>
+        {/* Tokens live in memory, so leaving the page is enough locally; the IdP ends SSO. */}
+        <Button variant="ghost" size="sm" onClick={() => window.location.assign(logoutUrl())}>
           Sign out
         </Button>
       </div>
@@ -1270,15 +1259,12 @@ export function Header({ email }: { email: string }) {
     file(
       'src/components/InvoiceList.tsx',
       `import { useEffect, useState } from 'react'
-import { Link } from 'react-router'
 import { Badge, Button, Card, Skeleton, type BadgeTone } from '@northwind/ui'
-import { api } from '../api/client'
 import { listInvoices, resendInvoice } from '../api/invoices'
-import { PLANS } from '../billing/plans'
 import { useRequiredSession } from '../hooks/useSession'
 import { formatShortDate, isOverdue } from '../lib/date'
 import { formatMoney } from '../lib/money'
-import type { Account, Invoice, InvoiceStatus } from '../types'
+import type { Invoice, InvoiceStatus } from '../types'
 
 const STATUS_TONE: Record<InvoiceStatus, BadgeTone> = {
   draft: 'neutral',
@@ -1290,18 +1276,15 @@ const STATUS_TONE: Record<InvoiceStatus, BadgeTone> = {
 
 export function InvoiceList() {
   const { orgId } = useRequiredSession()
-  const [account, setAccount] = useState<Account | null>(null)
   const [invoices, setInvoices] = useState<Invoice[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [resent, setResent] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([api.get<Account>('/v1/account'), listInvoices(orgId)])
-      .then(([acc, page]) => {
-        if (cancelled) return
-        setAccount(acc)
-        setInvoices(page.items)
+    listInvoices(orgId)
+      .then((page) => {
+        if (!cancelled) setInvoices(page.items)
       })
       .catch((err: unknown) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err))
@@ -1316,17 +1299,11 @@ export function InvoiceList() {
     setResent(invoice.number)
   }
 
-  const plan = account ? PLANS[account.plan] : null
-
   return (
     <section className="page">
       <header className="page-header">
         <h1>Billing</h1>
-        {plan && account && (
-          <p className="muted">
-            {plan.name} plan · {account.seats} seats · {formatMoney(plan.basePrice)} / month base
-          </p>
-        )}
+        <Button href="/billing/upgrade">Upgrade plan</Button>
       </header>
 
       {resent && <p className="notice">Invoice {resent} was sent to your billing contact.</p>}
@@ -1364,11 +1341,6 @@ export function InvoiceList() {
                   </td>
                   <td className="numeric">{formatMoney(invoice.amountDue)}</td>
                   <td className="actions">
-                    {invoice.status === 'open' && (
-                      <Link to={\`/billing/pay/\${invoice.id}\`} aria-label={\`Pay \${invoice.number}\`}>
-                        Pay
-                      </Link>
-                    )}
                     {invoice.pdfUrl && (
                       <a href={invoice.pdfUrl} target="_blank" rel="noreferrer">
                         PDF
@@ -1496,19 +1468,18 @@ export function VolumeChart({ weeks }: { weeks: number }) {
 const env = import.meta.env
 
 export const config = {
-  /** portal-api; also serves the /auth/* endpoints (ADR-012). */
   apiBaseUrl: env.VITE_API_BASE_URL ?? 'https://api.atlas.northwind.example',
+  sso: {
+    issuer: env.VITE_SSO_ISSUER ?? 'https://login.northwind.example',
+    clientId: env.VITE_SSO_CLIENT_ID ?? 'atlas-portal',
+    /** Must match a redirect URI registered for the client at the IdP. */
+    redirectPath: '/auth/callback',
+  },
   flags: {
-    /** Serve invoices from Stripe Billing instead of the in-house invoicer. */
+    /** Serve invoices from Stripe Billing instead of the legacy invoicing service. */
     stripeBilling: env.VITE_FLAG_STRIPE_BILLING === 'true',
-    /** Outstanding-balance banner on checkout (turned off during the latency incident). */
-    balanceBanner: env.VITE_FLAG_BALANCE_BANNER !== 'false',
   },
 } as const
-
-export function authUrl(path: string): string {
-  return new URL(path, config.apiBaseUrl).toString()
-}
 `,
     ),
     file(
@@ -1679,6 +1650,55 @@ export function isOverdue(dueIso: string | null, now = new Date()): boolean {
 `,
     ),
     file(
+      'src/lib/format.test.ts',
+      `import { describe, expect, it } from 'vitest'
+import { compactNumber, formatPercent, formatWeight, initials, pluralize } from './format'
+
+describe('formatWeight', () => {
+  it('uses kilograms below a tonne', () => {
+    expect(formatWeight(840)).toBe('840 kg')
+    expect(formatWeight(12.4)).toBe('12 kg')
+  })
+
+  it('switches to tonnes with one decimal, dropping trailing zeros', () => {
+    expect(formatWeight(12_500)).toBe('12.5 t')
+    expect(formatWeight(12_000)).toBe('12 t')
+    expect(formatWeight(240_000)).toBe('240 t')
+  })
+})
+
+describe('formatPercent', () => {
+  it('formats ratios', () => {
+    expect(formatPercent(0.873)).toBe('87%')
+    expect(formatPercent(0.873, 1)).toBe('87.3%')
+  })
+})
+
+describe('pluralize', () => {
+  it('picks the right form', () => {
+    expect(pluralize(1, 'shipment')).toBe('1 shipment')
+    expect(pluralize(3, 'shipment')).toBe('3 shipments')
+    expect(pluralize(2, 'customs hold', 'customs holds')).toBe('2 customs holds')
+  })
+})
+
+describe('initials', () => {
+  it('handles names and email addresses', () => {
+    expect(initials('Dana Whitfield')).toBe('DW')
+    expect(initials('priya.raman@coastalcargo.example')).toBe('PR')
+    expect(initials('dispatch@meridianfreight.example')).toBe('DI')
+  })
+})
+
+describe('compactNumber', () => {
+  it('abbreviates thousands', () => {
+    expect(compactNumber(1_284)).toBe('1.3K')
+    expect(compactNumber(950)).toBe('950')
+  })
+})
+`,
+    ),
+    file(
       'src/lib/format.ts',
       `import type { ShipmentStatus } from '../types'
 
@@ -1823,80 +1843,90 @@ createRoot(container).render(
     ),
     file(
       'src/pages/Checkout.tsx',
-      `import { useEffect, useState } from 'react'
-import { useParams } from 'react-router'
-import { Button, Card, Skeleton } from '@northwind/ui'
-import { getInvoice, getOutstandingBalance, payInvoice } from '../api/invoices'
-import { config } from '../config'
-import { useRequiredSession } from '../hooks/useSession'
-import { formatShortDate } from '../lib/date'
+      `import { useEffect, useMemo, useState } from 'react'
+import { Button, Card, Input, RadioGroup } from '@northwind/ui'
+import { api } from '../api/client'
+import { canUpgrade, monthlyTotal, PLANS } from '../billing/plans'
 import { formatMoney } from '../lib/money'
-import type { Invoice, Money } from '../types'
+import type { Account, PlanId } from '../types'
 
-type PayState = 'idle' | 'paying' | 'paid' | 'failed'
+type UpgradeStatus = 'processing' | 'confirmed' | 'failed'
 
-/** Pay one open invoice with the card on file (/billing/pay/:invoiceId). */
+interface Upgrade {
+  id: string
+  status: UpgradeStatus
+}
+
+/** portal-api confirms the card payment asynchronously; poll until it settles. */
+const POLL_INTERVAL_MS = 1_000
+
 export function Checkout() {
-  const { invoiceId = '' } = useParams()
-  const { orgId } = useRequiredSession()
-  const [invoice, setInvoice] = useState<Invoice | null>(null)
-  const [balance, setBalance] = useState<Money | null>(null)
-  const [state, setState] = useState<PayState>('idle')
-  const [error, setError] = useState<string | null>(null)
+  const [account, setAccount] = useState<Account | null>(null)
+  const [plan, setPlan] = useState<PlanId>('growth')
+  const [seats, setSeats] = useState(PLANS.growth.includedSeats)
+  const [upgradeId, setUpgradeId] = useState<string | null>(null)
+  const [status, setStatus] = useState<UpgradeStatus | null>(null)
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    const controller = new AbortController()
-    getInvoice(orgId, invoiceId)
-      .then(setInvoice)
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
-    return () => controller.abort()
-  }, [orgId, invoiceId])
+    void api.get<Account>('/v1/account').then((a) => {
+      setAccount(a)
+      setSeats((current) => Math.max(current, a.seats))
+    })
+  }, [])
 
-  // The banner needs the invoice currency, so its request starts only after the invoice loads.
   useEffect(() => {
-    if (!invoice || !config.flags.balanceBanner) return
-    const controller = new AbortController()
-    getOutstandingBalance(orgId, invoice.amountDue.currency, controller.signal)
-      .then(setBalance)
-      .catch(() => setBalance(invoice.amountDue))
-    return () => controller.abort()
-  }, [orgId, invoice])
+    if (!upgradeId) return
+    const timer = setInterval(async () => {
+      const upgrade = await api.get<Upgrade>(\`/v1/billing/upgrades/\${upgradeId}\`)
+      setStatus(upgrade.status)
+      if (upgrade.status !== 'processing') clearInterval(timer)
+    }, POLL_INTERVAL_MS)
+    return () => clearInterval(timer)
+  }, [upgradeId])
 
-  // Pay stays disabled until the banner shows the current balance, so nobody pays a stale amount.
-  const ready = invoice !== null && (balance !== null || !config.flags.balanceBanner)
+  const total = useMemo(() => monthlyTotal(plan, seats), [plan, seats])
+  const options = Object.values(PLANS).filter((p) => !account || canUpgrade(account.plan, p.id))
 
-  async function pay() {
-    if (!invoice) return
-    setState('paying')
-    const result = await payInvoice(orgId, invoice.id).catch(() => ({ status: 'failed' as const }))
-    setState(result.status)
+  async function confirm() {
+    setSubmitting(true)
+    try {
+      const upgrade = await api.post<Upgrade>('/v1/billing/upgrades', { plan, seats })
+      setStatus(upgrade.status)
+      setUpgradeId(upgrade.id)
+    } finally {
+      setSubmitting(false)
+    }
   }
-
-  if (error) return <p role="alert">Couldn’t load this invoice: {error}</p>
-  if (!invoice) return <Skeleton rows={4} />
 
   return (
     <section className="page">
-      <h1>Pay invoice {invoice.number}</h1>
-      {config.flags.balanceBanner && (
-        <div className="balance-banner" data-testid="balance-banner">
-          {balance ? \`Outstanding balance: \${formatMoney(balance)}\` : 'Checking your outstanding balance…'}
-        </div>
-      )}
+      <h1>Upgrade your plan</h1>
       <Card>
-        <dl className="summary">
-          <dt>Issued</dt>
-          <dd>{formatShortDate(invoice.issuedAt)}</dd>
-          <dt>Due</dt>
-          <dd>{invoice.dueAt ? formatShortDate(invoice.dueAt) : 'On receipt'}</dd>
-          <dt>Amount due</dt>
-          <dd>{formatMoney(invoice.amountDue)}</dd>
-        </dl>
-        <Button onClick={() => void pay()} disabled={!ready || state === 'paying' || state === 'paid'}>
-          Pay {formatMoney(invoice.amountDue)}
+        <RadioGroup
+          label="Plan"
+          value={plan}
+          onChange={(value) => setPlan(value as PlanId)}
+          options={options.map((p) => ({
+            value: p.id,
+            label: p.name,
+            description: \`\${formatMoney(p.basePrice)} / month · \${p.includedSeats} seats included\`,
+          }))}
+        />
+        <Input label="Seats" type="number" min={1} value={seats} onChange={(e) => setSeats(Number(e.target.value))} />
+        <p className="order-total" data-testid="order-total">
+          {formatMoney(total)} / month
+        </p>
+        <Button onClick={() => void confirm()} disabled={submitting || status === 'processing'}>
+          Confirm upgrade
         </Button>
-        {state === 'paid' && <p role="status">Payment received. Thank you!</p>}
-        {state === 'failed' && <p role="alert">The payment didn’t go through. Your card was not charged.</p>}
+        {status && (
+          <p role="status" className="checkout-status">
+            {status === 'processing' && 'Processing payment…'}
+            {status === 'confirmed' && \`Payment confirmed. You’re on \${PLANS[plan].name}.\`}
+            {status === 'failed' && 'Payment failed. Your card was not charged.'}
+          </p>
+        )}
       </Card>
     </section>
   )
@@ -1904,115 +1934,45 @@ export function Checkout() {
 `,
     ),
     file(
-      'src/pages/Login.tsx',
-      `import { useState, type FormEvent } from 'react'
-import { useNavigate, useSearchParams } from 'react-router'
-import { Button, Input } from '@northwind/ui'
-import { login } from '../auth/session'
-import { safeReturnTo, signInWithPassword, startSsoLogin } from '../auth/sso'
-
-/** Sign-in page: password, or SP-initiated SSO for accounts with an identity provider. */
-export function Login() {
-  const navigate = useNavigate()
-  const [params] = useSearchParams()
-  const returnTo = safeReturnTo(params.get('return_to'))
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-
-  async function onSubmit(event: FormEvent) {
-    event.preventDefault()
-    setBusy(true)
-    setError(null)
-    try {
-      login(await signInWithPassword(email, password))
-      navigate(returnTo, { replace: true })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign-in failed')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <main className="auth-page">
-      <h1>Sign in to Atlas</h1>
-      <form onSubmit={(e) => void onSubmit(e)} noValidate>
-        <Input label="Work email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-        <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-        {error && <p role="alert">{error}</p>}
-        <Button type="submit" disabled={busy}>
-          Sign in
-        </Button>
-      </form>
-      <Button variant="secondary" onClick={() => startSsoLogin(email, returnTo)} disabled={!email.includes('@')}>
-        Continue with SSO
-      </Button>
-    </main>
-  )
-}
-`,
-    ),
-    file(
       'src/pages/LoginCallback.tsx',
       `import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router'
-import * as session from '../auth/session'
-import { completeSsoLogin, redeemIdpTicket, safeReturnTo } from '../auth/sso'
+import { useNavigate } from 'react-router'
+import { Button, Spinner } from '@northwind/ui'
+import { startSession } from '../auth/session'
+import { beginLogin, completeLogin } from '../auth/sso'
 
-/** SP-initiated SSO lands here (/auth/callback?code=…) after the user signed in at their IdP. */
+/** Landing route for the IdP redirect: exchanges the code, starts the session, returns the user. */
 export function LoginCallback() {
   const navigate = useNavigate()
-  const [params] = useSearchParams()
-  const error = useOnce(async () => {
-    const tokens = await completeSsoLogin(params.get('code') ?? '')
-    session.login(tokens)
-    navigate(safeReturnTo(params.get('return_to')), { replace: true })
-  })
-  return <CallbackStatus error={error} />
-}
-
-/**
- * IdP-initiated SSO lands here (/auth/saml/callback?ticket=…) when the user opens Atlas from
- * their identity provider's dashboard. portal-api has already consumed the SAML assertion.
- */
-export function SamlCallback() {
-  const navigate = useNavigate()
-  const [params] = useSearchParams()
-  const error = useOnce(async () => {
-    const tokens = await redeemIdpTicket(params.get('ticket') ?? '')
-    session.set(tokens)
-    navigate(safeReturnTo(params.get('relay_state')), { replace: true })
-  })
-  return <CallbackStatus error={error} />
-}
-
-/** Run a sign-in exchange once. StrictMode runs effects twice in development; codes are single-use. */
-function useOnce(exchange: () => Promise<void>): string | null {
   const [error, setError] = useState<string | null>(null)
   const started = useRef(false)
+
   useEffect(() => {
+    // StrictMode runs effects twice in development, but an authorization code is single-use.
     if (started.current) return
     started.current = true
-    exchange().catch((err: unknown) => setError(err instanceof Error ? err.message : 'Sign-in failed'))
-  })
-  return error
-}
+    completeLogin(new URLSearchParams(window.location.search))
+      .then(({ tokens, returnTo }) => {
+        startSession(tokens)
+        navigate(returnTo, { replace: true })
+      })
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Sign-in failed'))
+  }, [navigate])
 
-function CallbackStatus({ error }: { error: string | null }) {
   if (error) {
     return (
-      <main className="auth-page">
+      <div className="app-loading">
         <p role="alert">{error}</p>
-        <a href="/login">Back to sign-in</a>
-      </main>
+        <Button onClick={() => void beginLogin('/')}>Try again</Button>
+      </div>
     )
   }
+
   return (
-    <main className="auth-page" aria-busy="true">
-      <p aria-live="polite">Completing sign-in…</p>
-    </main>
+    <div className="app-loading" aria-live="polite">
+      <Spinner size="lg" />
+      <span>Completing sign-in…</span>
+    </div>
   )
 }
 `,
@@ -2084,8 +2044,7 @@ export function Shipments() {
       `import { lazy } from 'react'
 import type { RouteObject } from 'react-router'
 import { App } from './App'
-import { LoginCallback, SamlCallback } from './pages/LoginCallback'
-import { Login } from './pages/Login'
+import { LoginCallback } from './pages/LoginCallback'
 
 // Route-level code splitting: each screen is its own chunk, so the dashboard no longer
 // ships the shipments, billing and checkout code (and their dependencies) up front.
@@ -2095,9 +2054,7 @@ const InvoiceList = lazy(() => import('./components/InvoiceList').then((m) => ({
 const Checkout = lazy(() => import('./pages/Checkout').then((m) => ({ default: m.Checkout })))
 
 export const routes: RouteObject[] = [
-  { path: '/login', element: <Login /> },
   { path: '/auth/callback', element: <LoginCallback /> },
-  { path: '/auth/saml/callback', element: <SamlCallback /> },
   {
     path: '/',
     element: <App />,
@@ -2105,7 +2062,7 @@ export const routes: RouteObject[] = [
       { index: true, element: <Dashboard /> },
       { path: 'shipments', element: <Shipments /> },
       { path: 'billing', element: <InvoiceList /> },
-      { path: 'billing/pay/:invoiceId', element: <Checkout /> },
+      { path: 'billing/upgrade', element: <Checkout /> },
       { path: '*', element: <NotFound /> },
     ],
   },

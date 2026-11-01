@@ -162,12 +162,12 @@ export function BarChart({
           const x0 = a + (k > 0 ? GAP / 2 : 0)
           const x1 = b - (top ? 0 : GAP / 2)
           const d = barPath(x0, groupStart, Math.max(0, x1 - x0), thick, 'right', top)
-          marks.push({ key: `${c}-${p.s}`, c, s: p.s, value: p.val, d, hit: { x: a, y: bandStart, w: Math.max(6, b - a), h: bandLen }, ax: b, ay: groupStart + thick / 2 })
+          marks.push({ key: `${c}-${p.s}`, c, s: p.s, value: p.val, d, hit: { x: a - (k > 0 ? GAP : 0), y: bandStart, w: Math.max(6, b - a + (k > 0 ? GAP : 0)), h: bandLen }, ax: b, ay: groupStart + thick / 2 })
         } else {
           const y1 = a - (k > 0 ? GAP / 2 : 0)
           const y0 = b + (top ? 0 : GAP / 2)
           const d = barPath(groupStart, y0, thick, Math.max(0, y1 - y0), 'top', top)
-          marks.push({ key: `${c}-${p.s}`, c, s: p.s, value: p.val, d, hit: { x: bandStart, y: b, w: bandLen, h: Math.max(6, a - b) }, ax: groupStart + thick / 2, ay: b })
+          marks.push({ key: `${c}-${p.s}`, c, s: p.s, value: p.val, d, hit: { x: bandStart, y: b, w: bandLen, h: Math.max(6, a - b + (k > 0 ? GAP : 0)) }, ax: groupStart + thick / 2, ay: b })
         }
       })
     } else {

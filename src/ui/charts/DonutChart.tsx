@@ -79,8 +79,9 @@ function arcPath(cx: number, cy: number, ro: number, ri: number, a0: number, a1:
 
 /**
  * Donut for one whole split into ≤ 6 parts (the tail folds into "Other"). Thin ring with
- * 2px surface gaps, center readout of the hovered/focused slice, legend with values and
- * shares, arrow-key inspection and a table twin.
+ * 2px surface gaps; the center is the tooltip — it reads out the hovered/focused slice
+ * (label, value, share) without ever covering the ring. Legend with values and shares,
+ * arrow-key inspection, live announcement and a table twin.
  */
 export function DonutChart({
   slices,

@@ -92,7 +92,7 @@ Lumen is priced on active shipments (a shipment with at least one tracking event
 4. **Public launch (${dayLabel(dates.launch)}):** landing page, keynote video and launch email.
 
 ## 9. Risks and open questions
-- **Pricing confidence:** willingness to pay is untested because the beta is free. Portbase now prices its Insights tier per tracked shipment, so buyers will compare unit prices. Mitigation: design-partner pricing (50% off year one) and a bill-shock guardrail.
+- **Pricing confidence:** willingness to pay is untested because the beta is free. Tidewell now prices its Insights tier per tracked shipment, so buyers will compare unit prices. Mitigation: design-partner pricing (50% off year one) and a bill-shock guardrail.
 - **Alert noise:** early beta alerts were too noisy; thresholds now default to the account's 30-day baseline.
 - **Data scoping:** SSO-scoped dashboards depend on the session model from ADR-012 being stable.
 - **Open:** do we gate carrier scorecards out of Core? Decided with the pricing lock.
@@ -110,7 +110,7 @@ Lumen is priced on active shipments (a shipment with at least one tracking event
       source: { type: 'manual' },
       pinned: true,
       createdAt: wd(13, 11, 0),
-      updatedAt: wd(3, 15, 30),
+      updatedAt: wd(2, 14, 0),
       content: `
 # Pricing strategy memo: Atlas Lumen (draft)
 
@@ -120,7 +120,7 @@ Lumen is priced on active shipments (a shipment with at least one tracking event
 Price Lumen as a hybrid: a monthly platform fee per tier that includes a block of active shipments, plus a per-shipment overage. Three tiers: Core, Pro and Enterprise. Gate on features and volume, protect customers from bill shock, and discount design partners in year one.
 
 ## Why not seats?
-Atlas core is priced per seat, and two of six churn interviews named per-seat pricing as a reason to leave: occasional users such as warehouse leads and customers' own staff made seats expensive. Analytics value scales with shipment volume, not with the number of people looking at a chart. Seat pricing would also discourage exactly the behaviour we want, which is sharing dashboards widely. The market is moving the same way: the competitor radar picked up that Portbase now prices its Insights analytics tier per tracked shipment, so buyers will compare Lumen against a per-shipment price.
+Atlas core is priced per seat, and two of six churn interviews named per-seat pricing as a reason to leave: occasional users such as warehouse leads and customers' own staff made seats expensive. Analytics value scales with shipment volume, not with the number of people looking at a chart. Seat pricing would also discourage exactly the behaviour we want, which is sharing dashboards widely. The market is moving the same way: the competitor radar picked up that Tidewell now prices its Insights analytics tier per tracked shipment, so buyers will compare Lumen against a per-shipment price.
 
 ## Why not pure usage?
 Pure per-shipment pricing is the most direct but the least predictable. In the Meridian Freight call, Dana Whitfield said predictability matters more than the unit price because their budget is set once a year. Freightly moved to per-load pricing this year and added spend caps a few weeks later, which we read as a sign of bill-shock complaints (our inference, not confirmed).
@@ -295,7 +295,7 @@ Draft for leadership review with Grace Holloway. Three objectives; baselines are
 |---|---|---|---|
 | Accounts on Portal v2 | beta tenants only | 100% | Priya |
 | p95 page load on the shipments board | 2.4 s | under 1.5 s | Priya |
-| Invoices mismatched in the Stripe dual-run | not started | under 0.5% | Daniel |
+| Invoices mismatched in Stripe reconciliation | not started | under 0.5% | Daniel |
 
 ## Notes
 - O1 is the first step toward the PRD goal of 25% attach within two quarters of launch.

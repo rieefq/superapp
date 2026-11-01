@@ -220,7 +220,7 @@ export function DataTable<T>({
                         firstPad,
                         ci === 0 && 'text-ink',
                         ALIGN[c.align ?? 'left'],
-                        (c.mono || c.align === 'right') && 'tabular',
+                        (c.mono || c.align === 'right') && 'tabular whitespace-nowrap',
                         c.mono && 'font-mono text-xs',
                         c.hideBelow && HIDE[c.hideBelow],
                         ci === 0 && selected && 'shadow-[inset_2px_0_0_var(--accent)]',

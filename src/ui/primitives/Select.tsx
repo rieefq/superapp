@@ -373,7 +373,7 @@ export function Select<T extends string = string>({
                       className={cn(
                         'flex shrink-0 cursor-pointer items-center gap-2 rounded-sm px-2 text-sm text-ink-2 select-none',
                         opt.description ? 'py-1.5' : 'h-8 [[data-density=compact]_&]:h-7 pointer-coarse:h-11',
-                        isActive && 'bg-hover text-ink',
+                        isActive && 'bg-ink/8 text-ink',
                         isSelected && 'text-ink',
                         opt.disabled && 'cursor-not-allowed opacity-45',
                       )}

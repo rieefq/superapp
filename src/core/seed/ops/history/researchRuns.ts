@@ -14,20 +14,20 @@ export function researchRunSpecs(tl: Timeline): RunSpec[] {
   return [
     {
       ...scout,
-      id: 'run_seed_research_portbase_1',
-      title: 'Portbase positioning & pricing',
+      id: 'run_seed_research_tidewell_1',
+      title: 'Tidewell positioning & pricing',
       status: 'succeeded',
-      at: tl.portbase1,
-      origin: ref('investigation', INVESTIGATION.portbase),
+      at: tl.tidewell1,
+      origin: ref('investigation', INVESTIGATION.tidewell),
       summary:
-        'Portbase sells annual, per-site contracts to enterprise shippers. Strongest on customs workflows; weakest on invoicing and self-serve onboarding. 6 findings with sources, report drafted for review.',
+        'Tidewell sells annual, per-site contracts to enterprise shippers. Strongest on customs workflows; weakest on invoicing and self-serve onboarding. 6 findings with sources, report drafted for review.',
       steps: [
         {
           kind: 'plan', title: 'Planned 4 angles', ms: 3_400, tokens: 2_100,
-          output: '1. Who Portbase sells to and how they describe the problem\n2. Pricing and packaging, public and reported\n3. Product gaps versus Atlas: tracking, invoicing, analytics\n4. Where customers say Portbase wins and loses',
+          output: '1. Who Tidewell sells to and how they describe the problem\n2. Pricing and packaging, public and reported\n3. Product gaps versus Atlas: tracking, invoicing, analytics\n4. Where customers say Tidewell wins and loses',
         },
-        { kind: 'search', title: 'Searched: Portbase pricing tiers', ...web, input: 'Portbase pricing plans freight visibility', output: '18 results · kept 6', ms: 5_200, tokens: 3_400 },
-        { kind: 'search', title: 'Searched: Portbase customer reviews', ...web, input: 'Portbase reviews logistics operations team', output: '22 results · kept 5', ms: 4_900, tokens: 3_100 },
+        { kind: 'search', title: 'Searched: Tidewell pricing tiers', ...web, input: 'Tidewell pricing plans freight visibility', output: '18 results · kept 6', ms: 5_200, tokens: 3_400 },
+        { kind: 'search', title: 'Searched: Tidewell customer reviews', ...web, input: 'Tidewell reviews logistics operations team', output: '22 results · kept 5', ms: 4_900, tokens: 3_100 },
         {
           kind: 'browse', title: 'Read 9 pages', ...browse, ms: 41_000, tokens: 23_800,
           output: 'Pricing page, two case studies, six months of changelog, three review-site summaries and an analyst note. Two vendor listicles discarded.',
@@ -38,7 +38,7 @@ export function researchRunSpecs(tl: Timeline): RunSpec[] {
         },
         {
           kind: 'think', title: 'Cross-checked claims', ms: 8_200, tokens: 6_400,
-          output: 'Two sources disagree on Portbase’s enterprise floor price; both kept, marked low confidence.',
+          output: 'Two sources disagree on Tidewell’s enterprise floor price; both kept, marked low confidence.',
         },
         { kind: 'write', title: 'Wrote 6 findings with sources', ms: 7_100, tokens: 7_300 },
         { kind: 'write', title: 'Drafted the report', ms: 10_400, tokens: 9_900 },
@@ -46,16 +46,16 @@ export function researchRunSpecs(tl: Timeline): RunSpec[] {
     },
     {
       ...scout,
-      id: 'run_seed_research_portbase_2',
-      title: 'Portbase: enterprise pricing & contract terms (follow-up)',
+      id: 'run_seed_research_tidewell_2',
+      title: 'Tidewell: enterprise pricing & contract terms (follow-up)',
       status: 'succeeded',
-      at: tl.portbase2,
-      origin: ref('investigation', INVESTIGATION.portbase),
-      outputs: [ref('knowledge', KNOWLEDGE.portbaseTeardown)],
-      summary: 'Added contract terms (annual, per site, implementation fee) and resolved the floor-price conflict. Report saved to Knowledge as “Competitor teardown: Portbase”.',
+      at: tl.tidewell2,
+      origin: ref('investigation', INVESTIGATION.tidewell),
+      outputs: [ref('knowledge', KNOWLEDGE.tidewellTeardown)],
+      summary: 'Added contract terms (annual, per site, implementation fee) and resolved the floor-price conflict. Report saved to Knowledge as “Competitor teardown: Tidewell”.',
       steps: [
         { kind: 'plan', title: 'Focused on contract terms and the price conflict', ms: 2_100, tokens: 1_500 },
-        { kind: 'search', title: 'Searched: Portbase enterprise contract terms', ...web, output: '11 results · kept 3', ms: 4_400, tokens: 2_900 },
+        { kind: 'search', title: 'Searched: Tidewell enterprise contract terms', ...web, output: '11 results · kept 3', ms: 4_400, tokens: 2_900 },
         { kind: 'browse', title: 'Read 3 pages', ...browse, ms: 17_000, tokens: 11_200 },
         {
           kind: 'think', title: 'Resolved the floor-price conflict', ms: 5_600, tokens: 4_800,
@@ -64,7 +64,7 @@ export function researchRunSpecs(tl: Timeline): RunSpec[] {
         { kind: 'write', title: 'Updated the report and findings', ms: 7_900, tokens: 7_200 },
         {
           kind: 'write', title: 'Saved the report to Knowledge', capability: 'knowledge.write',
-          refs: [ref('knowledge', KNOWLEDGE.portbaseTeardown)], ms: 900, tokens: 600,
+          refs: [ref('knowledge', KNOWLEDGE.tidewellTeardown)], ms: 900, tokens: 600,
         },
       ],
     },

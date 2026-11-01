@@ -82,7 +82,7 @@ export function Avatar({
       role={decorative ? undefined : 'img'}
       aria-label={decorative ? undefined : name}
       aria-hidden={decorative || undefined}
-      className={cn('relative inline-flex shrink-0', className)}
+      className={cn('relative inline-flex h-fit shrink-0', className)}
       {...props}
     >
       {status === 'live' && <PrimitiveStyles />}

@@ -5,7 +5,7 @@ import { detectComparison, excerpt, keyTerms, shorten, slugify, stem, titleFromT
 describe('keyTerms', () => {
   it('keeps informative words in order, proper nouns cased', () => {
     expect(keyTerms('Why do logistics customers churn?')).toEqual(['logistics', 'customers', 'churn'])
-    expect(keyTerms('How does Portbase position against us?', 3)).toEqual(['Portbase', 'position'])
+    expect(keyTerms('How does Tidewell position against us?', 3)).toEqual(['Tidewell', 'position'])
     expect(keyTerms('Usage-based pricing trends in B2B SaaS', 4)).toEqual(['usage-based', 'pricing', 'B2B', 'SaaS'])
   })
 })
@@ -13,7 +13,7 @@ describe('keyTerms', () => {
 describe('topicPhrase', () => {
   it.each([
     ['Why do logistics customers churn?', 'logistics customers churn'],
-    ['How does Portbase position against us?', 'Portbase position'],
+    ['How does Tidewell position against us?', 'Tidewell position'],
     ['EU e-invoicing mandate: impact on Atlas', 'EU e-invoicing mandate'],
     ['Usage-based pricing trends in B2B SaaS', 'usage-based pricing trends in B2B SaaS'],
     ['Should we build or buy our analytics layer?', 'build or buy the analytics layer'],
@@ -24,10 +24,10 @@ describe('topicPhrase', () => {
 
 describe('detectComparison', () => {
   it.each([
-    ['Portbase vs Freightly: which fits mid-market carriers?', { a: 'Portbase', b: 'Freightly' }],
+    ['Tidewell vs Freightly: which fits mid-market carriers?', { a: 'Tidewell', b: 'Freightly' }],
     ['Stripe Billing vs Chargebee for usage-based pricing', { a: 'Stripe Billing', b: 'Chargebee' }],
     ['Should we use Stripe vs Chargebee?', { a: 'Stripe', b: 'Chargebee' }],
-    ['compare Portbase and Freightly on pricing', { a: 'Portbase', b: 'Freightly' }],
+    ['compare Tidewell and Freightly on pricing', { a: 'Tidewell', b: 'Freightly' }],
     ['Should we build or buy our analytics layer?', { a: 'build', b: 'buy' }],
     ['What is the difference between REST and GraphQL for mobile clients?', { a: 'REST', b: 'GraphQL' }],
   ])('%s', (q, expected) => {

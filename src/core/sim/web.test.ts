@@ -36,14 +36,14 @@ describe('simulated web corpus', () => {
 
   it('names comparison subjects and avoids reusing publications', () => {
     const usedDomains = new Set<string>()
-    const a = searchSimulatedWeb({ question: 'Portbase vs Freightly for mid-market carriers', angle: 'pricing', angleIndex: 0, count: 3, rng: createRng(1), keyPrefix: 'a', usedDomains })
-    const b = searchSimulatedWeb({ question: 'Portbase vs Freightly for mid-market carriers', angle: 'integrations', angleIndex: 1, count: 3, rng: createRng(2), keyPrefix: 'b', usedDomains })
+    const a = searchSimulatedWeb({ question: 'Tidewell vs Freightly for mid-market carriers', angle: 'pricing', angleIndex: 0, count: 3, rng: createRng(1), keyPrefix: 'a', usedDomains })
+    const b = searchSimulatedWeb({ question: 'Tidewell vs Freightly for mid-market carriers', angle: 'integrations', angleIndex: 1, count: 3, rng: createRng(2), keyPrefix: 'b', usedDomains })
     expect(new Set([...a, ...b].map((r) => r.domain)).size).toBe(6)
     expect([...a, ...b].some((r) => r.mentions.length > 0)).toBe(true)
   })
 
   it('builds queries and readable output', () => {
-    expect(buildSearchQuery('Portbase vs Freightly for mid-market carriers', 'How do they compare on pricing and packaging?')).toBe('Portbase vs Freightly pricing packaging')
+    expect(buildSearchQuery('Tidewell vs Freightly for mid-market carriers', 'How do they compare on pricing and packaging?')).toBe('Tidewell vs Freightly pricing packaging')
     expect(buildSearchQuery('Why do logistics customers churn?', '', { contrarian: true })).toBe('logistics customers churn criticism limitations')
     const out = formatSearchOutput('q', searchSimulatedWeb({ question: 'pricing tiers', angle: '', angleIndex: 0, count: 2, rng: createRng(3), keyPrefix: 'x' }))
     expect(out).toMatch(/^Query: "q"\n\n1\. .+ — .+ \(.+\.example\)\n2\. /)

@@ -3,18 +3,18 @@
  * Bracketed numbers cite the investigation's sources in order (src_<key>_1 … src_<key>_n).
  */
 
-export const PORTBASE_REPORT = `
-# Portbase positioning & pricing
+export const TIDEWELL_REPORT = `
+# Tidewell positioning & pricing
 
 *Investigation report · standard depth · 10 sources: 2 from workspace knowledge, 8 simulated web sources*
 
 ## Executive summary
-Portbase sells annual, per-site contracts to enterprise shippers, with a one-time implementation fee [3][9]. Its clear strength is customs: filings, document checks and broker hand-offs run inside the portal, and that is what its case studies and reviewers praise [4][5][6]. It is weakest on invoicing and on self-serve onboarding: invoices leave as exports to the customer's ERP, and every new site goes live through an implementation project [7][8][9]. For Atlas, that means we can win mid-market forwarders on invoicing and time to go-live, while we stay exposed on analytics until Lumen ships [1][2][8].
+Tidewell sells annual, per-site contracts to enterprise shippers, with a one-time implementation fee [3][9]. Its clear strength is customs: filings, document checks and broker hand-offs run inside the portal, and that is what its case studies and reviewers praise [4][5][6]. It is weakest on invoicing and on self-serve onboarding: invoices leave as exports to the customer's ERP, and every new site goes live through an implementation project [7][8][9]. For Atlas, that means we can win mid-market forwarders on invoicing and time to go-live, while we stay exposed on analytics until Lumen ships [1][2][8].
 
 ## Who they sell to
 - Enterprise shippers with many sites. Forwarders appear in the case studies mostly as partners of those shippers [4][5].
 - The pitch is "one portal for customs, documents and tracking" [3].
-- Our market sizing puts most of Portbase's customers outside our mid-market segment; the overlap grows when a forwarder works for an enterprise shipper [2].
+- Our market sizing puts most of Tidewell's customers outside our mid-market segment; the overlap grows when a forwarder works for an enterprise shipper [2].
 
 ## Pricing and packaging
 - Annual contracts priced per site, plus a one-time implementation fee. Plans are Starter, Pro and Enterprise [3].
@@ -22,7 +22,7 @@ Portbase sells annual, per-site contracts to enterprise shippers, with a one-tim
 - At the time of this report there was no usage-based option [3].
 
 ## Product compared with Atlas
-| Area | Portbase | Atlas |
+| Area | Tidewell | Atlas |
 |---|---|---|
 | Customs workflows | Strong: filings, document checks, broker hand-offs [4][6] | Document storage only |
 | Invoicing | Weak: invoices exported to the customer's ERP [7] | Invoices and payments in the portal, moving to Stripe Billing |
@@ -32,37 +32,37 @@ Portbase sells annual, per-site contracts to enterprise shippers, with a one-tim
 
 ## Customer sentiment
 - Reviewers praise customs coverage and reliability; recurring complaints concern invoicing workarounds and long implementations [6][7][8].
-- In our own notes, Portbase is the incumbent we meet when a broker starts serving enterprise shippers [1].
+- In our own notes, Tidewell is the incumbent we meet when a broker starts serving enterprise shippers [1].
 
 ## Where we are exposed
-1. **Customs.** Enterprise shippers that want customs in the same tool will choose Portbase.
-2. **Analytics until Lumen ships.** Insights gives Portbase a ready answer to "show me the numbers" [8].
-3. **Onboarding.** We are faster than Portbase's implementation projects, but three weeks is still slow for smaller customers.
+1. **Customs.** Enterprise shippers that want customs in the same tool will choose Tidewell.
+2. **Analytics until Lumen ships.** Insights gives Tidewell a ready answer to "show me the numbers" [8].
+3. **Onboarding.** We are faster than Tidewell's implementation projects, but three weeks is still slow for smaller customers.
 
 ## Recommendations
 1. Lead mid-market deals with invoicing in the portal and time to go-live.
 2. Do not compete on customs; integrate with customs brokers instead.
 3. Position Lumen's lane-level cost analysis against Insights' standard KPIs.
 4. Make the per-site cost visible for forwarders with many small sites.
-5. Ask the competitor radar to watch Portbase's pricing page.
+5. Ask the competitor radar to watch Tidewell's pricing page.
 
 ## Confidence and gaps
 - Web sources in this workspace are simulated; findings that rest only on them are rated medium or low confidence.
 - We could not verify price points beyond the plan structure and the floor-price conflict.
-- No customer interviews about Portbase in this round.
+- No customer interviews about Tidewell in this round.
 `
 
-export const PORTBASE_SOURCES_APPENDIX = `
+export const TIDEWELL_SOURCES_APPENDIX = `
 ## Sources
 1. Freightly product notes (workspace knowledge)
 2. Market sizing: mid-market freight portals (workspace knowledge)
-3. Pricing, Portbase. portbase.example (simulated source)
-4. Case study: customs and tracking in one portal for a consumer-goods shipper. portbase.example (simulated source)
-5. Case study: how a forwarder network shares customs documents. portbase.example (simulated source)
-6. Portbase reviews: customer portal software. stackrank-reviews.example (simulated source)
-7. Portbase reviews: billing and invoicing. freightsoftwarereviews.example (simulated source)
-8. Portbase in practice: a reviewer roundup. loadboardreview.example (simulated source)
-9. Portbase changelog, last six months. portbase.example (simulated source)
+3. Pricing, Tidewell. tidewell.example (simulated source)
+4. Case study: customs and tracking in one portal for a consumer-goods shipper. tidewell.example (simulated source)
+5. Case study: how a forwarder network shares customs documents. tidewell.example (simulated source)
+6. Tidewell reviews: customer portal software. stackrank-reviews.example (simulated source)
+7. Tidewell reviews: billing and invoicing. freightsoftwarereviews.example (simulated source)
+8. Tidewell in practice: a reviewer roundup. loadboardreview.example (simulated source)
+9. Tidewell changelog, last six months. tidewell.example (simulated source)
 10. Analyst note: customer portals in freight. logisticsanalyst.example (simulated source)
 `
 

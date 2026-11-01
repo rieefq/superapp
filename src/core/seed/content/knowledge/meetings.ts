@@ -39,7 +39,7 @@ Notes drafted by the meeting recorder, edited by Morgan.
 ### 2. Pricing
 - The draft tiers stand, but Core plus overage undercuts Pro below roughly 10,000 active shipments a month.
 - Owen prefers fewer moving parts: cap Core volume rather than raise the overage rate.
-- Portbase now prices its Insights tier per tracked shipment (competitor radar), so buyers will compare unit prices.
+- Tidewell now prices its Insights tier per tracked shipment (competitor radar), so buyers will compare unit prices.
 - Agreed: Ledger models Option A against Option B, and Morgan gets outside evidence on usage-based pricing before the lock.
 
 ### 3. Stripe cutover
@@ -124,7 +124,7 @@ Notes drafted by the meeting recorder, edited by Morgan.
 
 **[09:50] Morgan Lee:** Did you look at anything else before Lumen?
 
-**[09:56] Dana Whitfield:** We trialed Portbase's analytics module in the spring. It looked fine in the demo, but we couldn't get cost by lane and carrier without exporting, and they price per site, which doesn't work across our terminals. That's when we went back to spreadsheets.
+**[09:56] Dana Whitfield:** We trialed Tidewell's analytics module in the spring. It looked fine in the demo, but we couldn't get cost by lane and carrier without exporting, and they price per site, which doesn't work across our terminals. That's when we went back to spreadsheets.
 
 **[12:40] Morgan Lee:** On access: you sign in to Atlas with SSO. Anything there?
 

@@ -83,15 +83,13 @@ function pricingResearch(): InflightSpec {
       output: '1. How widely B2B SaaS has adopted usage-based pricing\n2. Which value metrics work, and which create friction\n3. How buyers react: predictability, caps, commits\n4. What it means for an analytics add-on like Lumen',
     },
     {
-      kind: 'search', title: 'Searched: usage-based pricing adoption in B2B SaaS', ...web, input: 'usage-based pricing adoption B2B SaaS benchmarks',
-      output: '21 results · kept 4 (simulated web corpus)', refs: sources(1, 4), durationMs: 4_600, tokens: 3_600,
+      kind: 'search', title: 'Searched: usage-based and hybrid pricing in B2B SaaS', ...web,
+      input: 'usage-based pricing adoption B2B SaaS hybrid platform fee value metric spend caps',
+      output: '21 results · kept 8 (simulated web corpus)', refs: sources(1, 8), durationMs: 4_600, tokens: 4_100,
     },
     { kind: 'browse', title: 'Read 3 sources', ...browse, refs: sources(1, 3), durationMs: 5_800, tokens: 14_200 },
-    {
-      kind: 'search', title: 'Searched: hybrid pricing, spend caps and committed use', ...web, input: 'hybrid seat usage pricing spend caps committed use B2B',
-      output: '17 results · kept 4 (simulated web corpus)', refs: sources(5, 8), durationMs: 4_400, tokens: 3_400,
-    },
-    { kind: 'browse', title: 'Read 5 sources', ...browse, refs: sources(4, 8), durationMs: 6_000, tokens: 21_500 },
+    { kind: 'browse', title: 'Read 3 more sources', ...browse, refs: sources(4, 6), durationMs: 5_600, tokens: 13_100 },
+    { kind: 'browse', title: 'Read the last 2 sources', ...browse, refs: sources(7, 8), durationMs: 4_900, tokens: 8_400 },
     {
       kind: 'think', title: 'Cross-checked claims across sources', durationMs: 4_800, tokens: 6_900,
       output: 'Sources agree on the hybrid pattern and on spend controls; they disagree on how much of the bill can be variable before procurement pushes back.',
@@ -111,6 +109,9 @@ function pricingResearch(): InflightSpec {
     modelId: 'sim-deep',
     plan,
     done: 3,
+    // Lines up with the content part: the investigation started ~38 min ago and its eight
+    // sources were found by the first search within a few minutes; three have been read.
+    windows: [[37.4, 36.9], [36.9, 33.3], [33.2, 0.4]],
     seed: 41_001,
     summary: 'Report ready for review: hybrid pricing (platform fee + metered tracked shipments) with spend controls fits Lumen best. 5 findings, 8 sources cited.',
     onSuccessPatches: [
@@ -119,7 +120,7 @@ function pricingResearch(): InflightSpec {
         id: INVESTIGATION.pricingTrends,
         patch: { status: 'review', report: PRICING_REPORT, findings: PRICING_FINDINGS },
       },
-      ...sources(1, 8).map((s) => ({ table: 'sources' as const, id: s.id, patch: { status: 'cited' } })),
+      ...sources(1, 8).map((src) => ({ table: 'sources' as const, id: src.id, patch: { status: 'cited' } })),
     ],
   }
 }
@@ -197,7 +198,7 @@ export const DIGEST_DECISIONS = [
 function heraldDigest(tl: Timeline, story: Story): InflightSpec {
   const digest = composeDigest({ tl, story, from: tl.clock.now - 7 * DAY, to: tl.clock.now, decisions: DIGEST_DECISIONS })
   const plan: StepPlan[] = [
-    { kind: 'plan', title: 'Planned this week’s digest', output: 'Window: the last 7 days · 4 active projects · decisions first', durationMs: 1_900, tokens: 1_500 },
+    { kind: 'plan', title: 'Planned this week’s digest', output: 'Window: the last 7 days · 4 active projects · decisions first · under 250 words', durationMs: 1_900, tokens: 1_500 },
     {
       kind: 'read', title: 'Collected activity from 4 projects', tool: 'workspace', capability: 'tasks.manage',
       refs: [ref('session', SESSION.sso), ref('session', SESSION.stripe), ref('investigation', INVESTIGATION.churn), ref('task', TASK.competitorBrief)],

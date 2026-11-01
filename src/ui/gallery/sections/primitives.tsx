@@ -278,6 +278,19 @@ function FormsBlock() {
             <Select size="sm" aria-label="Disabled select" disabled options={[{ value: 'x', label: 'Disabled' }]} defaultValue="x" className="w-36" />
           </div>
         </Specimen>
+        <Specimen label="Field · inline layout (settings rows)" stack>
+          <div className="flex flex-col divide-y divide-line rounded-md border border-line px-4">
+            <Field layout="inline" label="Show reasoning" hint="Display the model's thinking while it works." className="py-3">
+              <Switch defaultChecked />
+            </Field>
+            <Field layout="inline" label="Default effort" hint="Used for new conversations." className="py-3">
+              <Select options={EFFORT} defaultValue="medium" size="sm" className="w-32" />
+            </Field>
+            <Field layout="inline" label="Monthly budget" error="Budget must be at least $5." className="py-3">
+              <Input size="sm" defaultValue="2" suffix="USD" className="w-28" inputMode="decimal" />
+            </Field>
+          </div>
+        </Specimen>
       </Grid>
     </Block>
   )
@@ -1138,7 +1151,14 @@ function LayoutBlock() {
               { id: 'b', title: 'Patch', role: 'Fixes flaky tests', hue: 'mint' as const, status: 'attn' as const },
               { id: 'c', title: 'Ledger', role: 'Weekly cost digest', hue: 'amber' as const, status: 'idle' as const },
             ].map((a) => (
-              <Card key={a.id} onClick={() => setSelectedCard(a.id)} selected={selectedCard === a.id} padding="sm" className="flex flex-col gap-3">
+              <Card
+                key={a.id}
+                label={`${a.title} — ${a.role}`}
+                onClick={() => setSelectedCard(a.id)}
+                selected={selectedCard === a.id}
+                padding="sm"
+                className="flex flex-col gap-3"
+              >
                 <div className="flex items-center justify-between">
                   <Avatar name={a.title} shape="square" hue={a.hue} status={a.status} />
                   <Menu
@@ -1374,8 +1394,8 @@ function ListsBlock() {
             <NavItem to="/agents" icon={Bot} label="Agents" trailing={<Badge tone="attn">2</Badge>} />
           </nav>
         </Specimen>
-        <Specimen label="ListItem · selectable rows, row actions on hover" stack>
-          <div role="listbox" aria-label="Conversations" data-density={density} className="flex w-full flex-col gap-px">
+        <Specimen label="ListItem · clickable rows (aria-current), row actions on hover" stack>
+          <div role="group" aria-label="Conversations" data-density={density} className="flex w-full flex-col gap-px">
             {[
               { id: 'c1', label: 'Pricing objections from interviews', meta: '2m', icon: MessagesSquare },
               { id: 'c2', label: 'SSO edge cases for SAML IdPs', meta: '1h', icon: MessagesSquare, description: 'Atlas Portal v2 · 14 messages' },
@@ -1384,8 +1404,6 @@ function ListsBlock() {
             ].map((r) => (
               <ListItem
                 key={r.id}
-                role="option"
-                aria-selected={active === r.id}
                 selected={active === r.id}
                 disabled={r.disabled}
                 icon={r.icon}
@@ -1394,7 +1412,7 @@ function ListsBlock() {
                 meta={r.meta}
                 onClick={() => setActive(r.id)}
                 trailingOnHover
-                trailing={<IconButton icon={Ellipsis} label={`Actions for ${r.label}`} size="xs" tabIndex={-1} onClick={() => toast(`Actions for “${r.label}”`)} />}
+                trailing={<IconButton icon={Ellipsis} label={`Actions for ${r.label}`} size="xs" onClick={() => toast(`Actions for “${r.label}”`)} />}
               />
             ))}
             <ListItem icon={<Avatar name="Ada Park" size="sm" decorative />} label="Ada Park" description="ada@atlas.dev" meta="Owner" />

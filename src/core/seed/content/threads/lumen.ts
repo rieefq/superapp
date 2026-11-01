@@ -59,7 +59,7 @@ export function lumenThreads({ clock, dates, at }: SeedCtx): ThreadSpec[] {
 | Pure usage | A price per active shipment | Fair, but Meridian sets its budget once a year, and peak season would surprise them |
 | Hybrid | A platform fee with included shipments, plus overage | Predictable for most accounts; the draft tiers follow this model |
 
-Market context: Portbase recently moved its Insights tier to per-tracked-shipment pricing (competitor radar), so buyers will compare unit prices whatever we choose.
+Market context: Tidewell recently moved its Insights tier to per-tracked-shipment pricing (competitor radar), so buyers will compare unit prices whatever we choose.
 
 ## The draft hybrid tiers against real volumes
 Monthly active shipments from *Top accounts by ARR.csv*, priced at list (before the 50% design-partner discount):
@@ -192,7 +192,7 @@ You can follow it live in Research; sources appear as they're read. Web sources 
 
 ### 3. Enable sales (T–14 to launch day)
 - Sales brief on pricing and what not to quote yet
-- Portbase talk tracks, the internal FAQ and five help-center articles
+- Tidewell talk tracks, the internal FAQ and five help-center articles
 
 ### 4. Measure (first 30 days)
 - Attach rate and weekly active users at T+14 and T+30
@@ -233,7 +233,7 @@ Aisha's time then goes to three things only: the email, the landing page copy, a
         ai('msg_launch_06', launch + 31 * MINUTE, 'sim-swift', `
 Created two tasks in **Lumen Launch**:
 
-1. **Brief sales team on Lumen pricing**: blocked by the pricing lock. Covers the tiers, what not to quote yet, the design-partner offer and the Portbase talk tracks.
+1. **Brief sales team on Lumen pricing**: blocked by the pricing lock. Covers the tiers, what not to quote yet, the design-partner offer and the Tidewell talk tracks.
 2. **Schedule launch webinar**: 30 minutes plus Q&A during the customer preview, reusing the keynote.
 
 Both link back to this plan.`),

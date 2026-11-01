@@ -25,8 +25,8 @@ export function buildAnchors(clock: Clock) {
     ssoTurn1: wd(2, 10, 15),
     ssoTurn2: wd(1, 11, 40),
     stripeTurn1: wd(1, 15, 20),
-    portbase1: wd(15, 10, 20),
-    portbase2: wd(14, 14, 5),
+    tidewell1: wd(15, 10, 20),
+    tidewell2: wd(14, 14, 5),
     churn1: wd(3, 9, 50),
     scoutSizing: wd(18, 9, 30),
     scoutFreightly: wd(12, 16, 0),
@@ -49,7 +49,7 @@ export function buildAnchors(clock: Clock) {
     /** Chat runs the operations part records for assistant turns in content threads. */
     chat: {
       tokens: wd(14, 15, 30),
-      portbase: wd(17, 10, 45),
+      tidewell: wd(17, 10, 45),
       triage: wd(13, 14, 20),
       retro: wd(10, 9, 20),
       launchPlan: wd(9, 10, 0),

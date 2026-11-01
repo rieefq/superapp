@@ -3,7 +3,7 @@
  *
  * The user, Morgan Lee, is the product lead at Northwind Labs, a startup building
  * "Atlas" — a customer portal SaaS for freight & logistics companies. Atlas Lumen is
- * a new analytics add-on launching soon. Competitors (all fictional): Portbase,
+ * a new analytics add-on launching soon. Competitors (all fictional): Tidewell,
  * Freightly, ShipLoom. Customers (fictional): Meridian Freight, Coastal Cargo, Halden Logistics.
  * Simulated web sources use fictional publications on `.example` domains only.
  */
@@ -44,7 +44,7 @@ export const THREAD = {
   stripeRisks: 'thr_stripe_risks', // atlas — "Stripe migration risks"
   tokens: 'thr_tokens', // atlas — "Naming our design tokens"
   retro: 'thr_retro', // atlas — "Sprint 14 retro synthesis"
-  portbase: 'thr_portbase', // landscape — "How does Portbase position against us?"
+  tidewell: 'thr_tidewell', // landscape — "How does Tidewell position against us?"
   pricing: 'thr_pricing', // lumen — "Pricing tiers for Atlas Lumen"
   launchPlan: 'thr_launch_plan', // lumen — "Launch plan outline"
   heroCopy: 'thr_hero_copy', // lumen — "Hero copy variations"
@@ -68,7 +68,7 @@ export const KNOWLEDGE = {
   onboarding: 'kno_onboarding', // engineering — "New engineer onboarding guide"
   rateLimits: 'kno_rate_limits', // engineering — "Public API rate limits"
   incidentLatency: 'kno_incident_latency', // engineering — "Incident report: checkout latency (Oct 21)"
-  portbaseTeardown: 'kno_portbase_teardown', // research — "Competitor teardown: Portbase" (from investigation inv_portbase)
+  tidewellTeardown: 'kno_tidewell_teardown', // research — "Competitor teardown: Tidewell" (from investigation inv_tidewell)
   freightlyNotes: 'kno_freightly_notes', // research — "Freightly product notes"
   marketSizing: 'kno_market_sizing', // research — "Market sizing: mid-market freight portals"
   churnInterviews: 'kno_churn_interviews', // research — "Churn interview synthesis (6 customers)"
@@ -87,7 +87,7 @@ export const KNOWLEDGE = {
 } as const
 
 export const INVESTIGATION = {
-  portbase: 'inv_portbase', // complete — "Portbase positioning & pricing" (report saved to kno_portbase_teardown)
+  tidewell: 'inv_tidewell', // complete — "Tidewell positioning & pricing" (report saved to kno_tidewell_teardown)
   pricingTrends: 'inv_pricing_trends', // running — "Usage-based pricing trends in B2B SaaS" (active run)
   churn: 'inv_churn', // review — "Why do logistics customers churn?"
   einvoicing: 'inv_einvoicing', // draft — "EU e-invoicing mandate: impact on Atlas"
@@ -128,7 +128,7 @@ export const TASK = {
 
 /**
  * Source id convention: `src_<investigation-key>_<n>` (1-based), e.g. src_pricing_1 … src_pricing_8
- * for INVESTIGATION.pricingTrends, src_portbase_1 … for INVESTIGATION.portbase, src_churn_n, src_einvoicing_n.
+ * for INVESTIGATION.pricingTrends, src_tidewell_1 … for INVESTIGATION.tidewell, src_churn_n, src_einvoicing_n.
  * Seeded in-flight run ids: run_seed_inv_pricing, run_seed_ses_stripe, run_seed_herald_digest,
  * run_seed_sentinel_triage, run_seed_muse_storyboard. Pending approvals: apv_seed_npm, apv_seed_slack.
  */

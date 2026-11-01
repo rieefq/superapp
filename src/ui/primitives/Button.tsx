@@ -83,7 +83,9 @@ function ButtonContent({ size, variant, leadingIcon: Leading, trailingIcon: Trai
         {Leading && <Leading aria-hidden className={cn(ICON_SIZE[size], '-ml-0.5 shrink-0')} strokeWidth={1.75} />}
         {children != null && <span className="truncate">{children}</span>}
         {Trailing && <Trailing aria-hidden className={cn(ICON_SIZE[size], '-mr-0.5 shrink-0')} strokeWidth={1.75} />}
-        {kbd && <KbdCombo aria-hidden combo={kbd} variant="plain" tone={inverse ? 'inverse' : 'default'} className="ml-1" />}
+        {kbd && (
+          <KbdCombo aria-hidden combo={kbd} variant="plain" tone={inverse ? 'inverse' : 'default'} className="ml-1 pointer-coarse:hidden" />
+        )}
       </span>
       {loading && (
         <span className="absolute inset-0 grid place-items-center">

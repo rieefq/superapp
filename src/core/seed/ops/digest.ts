@@ -16,6 +16,10 @@ const SECTION_TITLES: Record<DigestSection, string> = {
   ops: 'Support Ops Automation',
 }
 const ORDER: DigestSection[] = ['atlas', 'lumen', 'landscape', 'ops']
+/** The digest task asks for under 250 words. */
+const MAX_WORDS = 240
+
+const wordCount = (text: string) => text.split(/\s+/).filter(Boolean).length
 
 /** Everything worth a line in a weekly digest, dated by when it happened. */
 export function storyHeadlines(tl: Timeline, story: Story): Headline[] {
@@ -38,7 +42,7 @@ export function storyHeadlines(tl: Timeline, story: Story): Headline[] {
     h(tl.studioSocial, 'lumen', 'Social cutdowns generated for LinkedIn, X and Instagram Stories.'),
     h(tl.ledgerLumenUsage, 'lumen', 'Lumen beta usage by account is in for the pricing decision (Ledger).'),
     h(tl.scoutSizing, 'landscape', 'Market sizing for mid-market freight portals refreshed (Scout).'),
-    h(tl.portbase2, 'landscape', 'Portbase teardown published in Knowledge: strong on customs workflows, weak on invoicing and self-serve.'),
+    h(tl.tidewell2, 'landscape', 'Tidewell teardown published in Knowledge: strong on customs workflows, weak on invoicing and self-serve.'),
     ...story.radarWeeks.flatMap((w) => w.items.map((item) => h(w.at, 'landscape', `Radar: ${item.text}`))),
     h(tl.churn1, 'landscape', 'Churn research (“Why do logistics customers churn?”) is ready for review.'),
     h(tl.scoutBrief, 'landscape', 'Competitor brief for the board deck is drafted (Scout).'),
@@ -73,18 +77,26 @@ export function composeDigest(input: {
   const support = supportLine(story, from, to)
   if (support) all.push({ at: to, section: 'ops', text: support })
 
-  const lines = ['*Weekly product digest*']
-  if (input.decisions?.length) {
-    lines.push('', '*Needs a decision*', ...input.decisions.map((d, i) => `${i + 1}. ${d}`))
+  // Newest first, at most three per project; drop the oldest bullets until it fits the word budget.
+  const bySection = new Map(
+    ORDER.map((section) => [section, all.filter((h) => h.section === section).sort((a, b) => b.at - a.at).slice(0, 3)]),
+  )
+  const render = () => {
+    const lines = ['*Weekly product digest*']
+    if (input.decisions?.length) lines.push('', '*Needs a decision*', ...input.decisions.map((d, i) => `${i + 1}. ${d}`))
+    for (const section of ORDER) {
+      const items = bySection.get(section) ?? []
+      if (items.length) lines.push('', `*${SECTION_TITLES[section]}*`, ...items.map((h) => `• ${h.text}`))
+    }
+    if (lines.length === 1) lines.push('', 'A quiet week: no merged work, launches or support escalations to report.')
+    return lines.join('\n')
   }
-  for (const section of ORDER) {
-    const items = all
-      .filter((h) => h.section === section)
-      .sort((a, b) => b.at - a.at)
-      .slice(0, 3)
-    if (items.length === 0) continue
-    lines.push('', `*${SECTION_TITLES[section]}*`, ...items.map((h) => `• ${h.text}`))
+  let text = render()
+  while (wordCount(text) > MAX_WORDS) {
+    const longest = [...bySection.values()].sort((a, b) => b.length - a.length)[0]
+    if (!longest || longest.length <= 1) break
+    longest.pop()
+    text = render()
   }
-  if (lines.length === 1) lines.push('', 'A quiet week: no merged work, research or support escalations to report.')
-  return lines.join('\n')
+  return text
 }

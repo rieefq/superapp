@@ -1,7 +1,8 @@
-import { isValidElement, type MouseEvent, type ReactNode, type Ref } from 'react'
+import { isValidElement, useId, type MouseEvent, type ReactNode, type Ref } from 'react'
 import { Link, NavLink } from 'react-router'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { PrimitiveStyles } from './styles'
 
 export interface ListItemProps {
   ref?: Ref<HTMLElement>
@@ -21,6 +22,10 @@ export interface ListItemProps {
   /** Router link row. */
   to?: string
   href?: string
+  /**
+   * Clickable row: a full-row <button> sits behind the content (named by the label, aria-current when
+   * selected), so `trailing` actions remain separate, valid controls.
+   */
   onClick?: (e: MouseEvent<HTMLElement>) => void
   className?: string
   title?: string
@@ -54,13 +59,29 @@ function rowClasses({ selected, disabled, interactive, twoLine }: { selected?: b
   )
 }
 
-function RowContent({ icon, label, description, meta, trailing, trailingOnHover, selected }: ListItemProps) {
+function RowContent({
+  icon,
+  label,
+  description,
+  meta,
+  trailing,
+  trailingOnHover,
+  selected,
+  labelId,
+  descriptionId,
+}: ListItemProps & { labelId?: string; descriptionId?: string }) {
   return (
     <>
       {renderIcon(icon, cn('size-4 shrink-0', selected ? 'text-ink-2' : 'text-ink-3 group-hover/row:text-ink-2', description ? 'self-start mt-0.5' : ''))}
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate">{label}</span>
-        {description && <span className="truncate text-xs text-ink-3">{description}</span>}
+        <span id={labelId} className="truncate">
+          {label}
+        </span>
+        {description && (
+          <span id={descriptionId} className="truncate text-xs text-ink-3">
+            {description}
+          </span>
+        )}
       </span>
       {meta != null && <span className="shrink-0 font-mono text-2xs text-ink-4 tabular">{meta}</span>}
       {trailing && (
@@ -83,6 +104,9 @@ function RowContent({ icon, label, description, meta, trailing, trailingOnHover,
  */
 export function ListItem(props: ListItemProps) {
   const { ref, to, href, onClick, selected, disabled, className, description, title, id, role } = props
+  const autoId = useId()
+  const labelId = `${autoId}-label`
+  const descriptionId = `${autoId}-description`
   const interactive = !!(to || href || onClick)
   const classes = cn(rowClasses({ selected, disabled, interactive, twoLine: !!description }), className)
   const aria = { 'aria-selected': props['aria-selected'], 'aria-current': props['aria-current'], title, id, role }
@@ -102,29 +126,23 @@ export function ListItem(props: ListItemProps) {
     return (
       <div
         ref={ref as Ref<HTMLDivElement>}
-        {...aria}
-        role={role ?? 'button'}
-        tabIndex={disabled ? -1 : 0}
-        aria-disabled={disabled || undefined}
+        id={id}
+        title={title}
         data-selected={selected ? '' : undefined}
-        className={classes}
-        onClick={(e) => {
-          // Ignore clicks from nested controls and from portaled content (menus opened from a row action).
-          const target = e.target as Element
-          if (!e.currentTarget.contains(target)) return
-          const nested = target.closest('button,a,input,select,textarea,[role="menuitem"],[role="checkbox"],[role="switch"]')
-          if (nested && nested !== e.currentTarget && e.currentTarget.contains(nested)) return
-          onClick(e)
-        }}
-        onKeyDown={(e) => {
-          if (e.target !== e.currentTarget) return
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            onClick(e as unknown as MouseEvent<HTMLElement>)
-          }
-        }}
+        className={cn(classes, 'isolate', !disabled && 'atrium-passthrough')}
       >
-        <RowContent {...props} />
+        <PrimitiveStyles />
+        {/* Full-row button behind the content: real button semantics, while trailing actions stay clickable. */}
+        <button
+          type="button"
+          disabled={disabled}
+          aria-labelledby={labelId}
+          aria-describedby={description ? descriptionId : undefined}
+          aria-current={props['aria-current'] ?? (selected ? 'true' : undefined)}
+          onClick={onClick}
+          className="absolute inset-0 -z-10 cursor-pointer rounded-[inherit] outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed"
+        />
+        <RowContent {...props} labelId={labelId} descriptionId={descriptionId} />
       </div>
     )
   return (

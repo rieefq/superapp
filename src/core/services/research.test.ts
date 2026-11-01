@@ -127,11 +127,11 @@ describe('research.investigate run', () => {
   })
 
   it('adds a comparison table for comparison questions', () => {
-    const created = createInvestigation({ question: 'Portbase vs Freightly: which fits mid-market carriers?', depth: 'quick' })
+    const created = createInvestigation({ question: 'Tidewell vs Freightly: which fits mid-market carriers?', depth: 'quick' })
     finish()
     const report = inv(created.id).report ?? ''
     expect(report).toContain('## Comparison')
-    expect(report).toContain('| Dimension | Portbase | Freightly | What to verify |')
+    expect(report).toContain('| Dimension | Tidewell | Freightly | What to verify |')
   })
 
   it('honours sources discarded while the run is going', () => {

@@ -83,7 +83,7 @@ export function buildNotifications(tl: Timeline, find: Lookup): Notification[] {
   const radar = find.run('run_seed_wf_radar_4')
   add({
     id: 'ntf_seed_11', kind: 'run.completed', title: 'Competitor radar: 2 updates',
-    body: 'ShipLoom plans EU e-invoicing next quarter; Portbase raised Pro list prices by about 8%.', ref: ref('run', radar.id), tone: 'info',
+    body: 'ShipLoom plans EU e-invoicing next quarter; Tidewell raised Pro list prices by about 8%.', ref: ref('run', radar.id), tone: 'info',
     at: radar.endedAt ?? radar.createdAt, readAfterMin: 70,
   })
   const digest = find.approval('apv_seed_wf_digest_4')

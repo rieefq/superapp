@@ -54,7 +54,7 @@ export function Breadcrumbs({ items, maxItems = 4, className, trailing }: Breadc
                   /
                 </li>
               )}
-              <li className={cn('flex min-w-0 items-center', last ? 'shrink' : 'shrink-[2]')}>
+              <li className={cn('flex min-w-0 items-center', last ? 'max-w-[65%] shrink-0' : 'shrink')}>
                 {c === 'collapsed' ? (
                   <Menu
                     items={menuItems}

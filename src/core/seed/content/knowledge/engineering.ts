@@ -323,7 +323,7 @@ Outbound webhooks retry with exponential backoff for up to 24 hours (8 attempts)
       projectIds: [PROJECT.atlas, PROJECT.ops],
       source: { type: 'manual' },
       createdAt: wd(8, 18, 30),
-      updatedAt: at.chat.incident + 45 * 60_000,
+      updatedAt: at.chat.incident + 62 * 60_000,
       content: `
 # Incident report: checkout latency spike
 
@@ -344,7 +344,7 @@ A release added an outstanding-balance banner to checkout. Its query against \`i
 ## Timeline (UTC)
 | Time | Event |
 |---|---|
-| 13:20 | web 4.18.0 deployed, including PR #1482 (balance banner) |
+| 13:20 | portal 2.2.1 deployed, including PR #211 (balance banner) |
 | 14:02 | Checkout latency starts climbing with afternoon traffic |
 | 14:11 | Database CPU alert fires above 90%, posted to a channel but not paged |
 | 14:19 | Coastal Cargo reports a spinning checkout to support |

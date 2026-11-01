@@ -66,7 +66,7 @@ Yes. It's a contained change with a clear reproduction, which is what Forge hand
 
 ~~~ts
 // The shape of the fix
-function scheduleRefresh(session: Session, now = Date.now()): void {
+function scheduleRefresh(session: Session, now: number): void {
   if (refreshTimer) clearTimeout(refreshTimer)
   const delay = Math.max(0, session.expiresAt - REFRESH_LEAD_MS - now)
   refreshTimer = setTimeout(() => void refreshNow(), delay)

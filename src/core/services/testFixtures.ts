@@ -63,7 +63,7 @@ export const fx = {
     id: 'col_1', name: 'Product', hue: 'sky', icon: 'Library', createdAt: T0, ...o,
   }),
   investigation: (o: Partial<Investigation> = {}): Investigation => ({
-    id: 'inv_1', title: 'Portbase positioning', question: 'How does Portbase position?', projectId: null, status: 'complete',
+    id: 'inv_1', title: 'Tidewell positioning', question: 'How does Tidewell position?', projectId: null, status: 'complete',
     depth: 'standard', angles: [], sourceIds: [], findings: [], runIds: [], createdAt: T0, updatedAt: T0, ...o,
   }),
   source: (o: Partial<Source> = {}): Source => ({

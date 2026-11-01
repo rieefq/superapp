@@ -52,7 +52,7 @@ export function DiffStat({ additions, deletions, hideBar, className, ...props }:
         −{formatNumber(deletions)}
       </span>
       {!hideBar && (
-        <span aria-hidden className="flex gap-0.5">
+        <span aria-hidden data-bar className="flex gap-0.5">
           {diffStatCells(additions, deletions).map((c, i) => (
             <span key={i} className={cn('size-2 rounded-[1.5px]', CELL_CLASS[c])} />
           ))}
@@ -225,7 +225,9 @@ export function DiffView({
                   (displayPath ?? 'Changes')
                 )}
               </span>
-              {model && !model.tooComplex && !model.unreadable && <DiffStat additions={model.stats.additions} deletions={model.stats.deletions} className="ml-1 shrink-0" />}
+              {model && !model.tooComplex && !model.unreadable && (
+                <DiffStat additions={model.stats.additions} deletions={model.stats.deletions} className="ml-1 shrink-0 max-sm:[&_[data-bar]]:hidden" />
+              )}
             </div>
           )}
           <div className="ml-auto flex items-center gap-1.5">

@@ -37,7 +37,7 @@ export function Toolbar({ variant = 'plain', className, onKeyDown, children, ...
       aria-orientation="horizontal"
       onKeyDown={handleKeyDown}
       className={cn(
-        'flex min-w-0 items-center gap-1',
+        'no-scrollbar flex min-w-0 items-center gap-1 overflow-x-auto',
         variant === 'bar' && 'h-11 shrink-0 border-b border-line px-2',
         className,
       )}

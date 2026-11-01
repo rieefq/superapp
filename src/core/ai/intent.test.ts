@@ -27,7 +27,7 @@ describe('detectIntent', () => {
     ['Research usage-based pricing trends in B2B SaaS', 'research'],
     ['Investigate why churn spiked in Q4', 'research'],
     ['Analyze the competitive landscape for freight portals', 'research'],
-    ['Compare Portbase and Freightly pricing with sources', 'research'],
+    ['Compare Tidewell and Freightly pricing with sources', 'research'],
     // build
     ['Fix the login redirect bug', 'build'],
     ['Refactor the auth middleware and add unit tests', 'build'],

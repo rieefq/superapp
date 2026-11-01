@@ -18,7 +18,7 @@ export interface Topic {
   /** Web search query: the subject plus any names in the request (companies, products). */
   query: string
   keywords: string[]
-  /** Capitalized names and acronyms from the request, e.g. ["Portbase", "SSO"]. */
+  /** Capitalized names and acronyms from the request, e.g. ["Tidewell", "SSO"]. */
   names: string[]
   domain: Domain
 }
@@ -39,7 +39,7 @@ const LEADING_VERB =
 
 const DOMAIN_KEYWORDS: Record<Exclude<Domain, 'general'>, string[]> = {
   pricing: ['pricing', 'price', 'prices', 'tier', 'tiers', 'packaging', 'discount', 'discounts', 'billing', 'revenue', 'arr', 'mrr', 'monetization', 'plans'],
-  competitors: ['competitor', 'competitors', 'competitive', 'portbase', 'freightly', 'shiploom', 'positioning', 'landscape', 'teardown'],
+  competitors: ['competitor', 'competitors', 'competitive', 'tidewell', 'freightly', 'shiploom', 'positioning', 'landscape', 'teardown'],
   churn: ['churn', 'churned', 'churning', 'retention', 'cancel', 'cancelled', 'cancellation', 'cancellations', 'renewal', 'renewals', 'attrition'],
   support: ['support', 'ticket', 'tickets', 'triage', 'escalation', 'escalations', 'sla', 'inbox', 'complaint', 'complaints'],
   launch: ['launch', 'campaign', 'announcement', 'messaging', 'copy', 'headline', 'headlines', 'brand', 'marketing', 'blog', 'social', 'tagline'],

@@ -25,8 +25,8 @@ export function buildTimeline(clock: Clock) {
     stripeTurn1: wd(1, 15, 20),
 
     // Research
-    portbase1: wd(15, 10, 20),
-    portbase2: wd(14, 14, 5),
+    tidewell1: wd(15, 10, 20),
+    tidewell2: wd(14, 14, 5),
     churn1: wd(3, 9, 50),
 
     // Agents

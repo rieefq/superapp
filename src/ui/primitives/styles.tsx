@@ -33,6 +33,15 @@ const CSS = `
 }
 .atrium-breathe { animation: atrium-breathe 2s var(--ease-standard) infinite; }
 
+/*
+ * Clickable surfaces with nested controls (cards, list rows): a full-size overlay <button> sits behind the
+ * content; content lets clicks pass through to it, while nested controls stay independently clickable.
+ */
+.atrium-passthrough { pointer-events: none; }
+.atrium-passthrough :is(a[href], button, input, select, textarea, label, summary, [role="button"], [role="link"],
+  [role="menuitem"], [role="checkbox"], [role="switch"], [role="radio"], [role="tab"], [tabindex]:not([tabindex="-1"]),
+  [data-interactive]) { pointer-events: auto; }
+
 /* Range input: hairline track, ink fill up to --pct, raised knob. */
 .atrium-range {
   -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 20px; margin: 0;

@@ -29,112 +29,115 @@ const HERALD = agentActor(AGENT.herald)
 const SENTINEL = agentActor(AGENT.sentinel)
 const LEDGER = agentActor(AGENT.ledger)
 
-export function buildTasks({ clock, dates }: SeedCtx, messages: Record<ID, Message>): Task[] {
-  const { back, ago, ahead } = clock
+export function buildTasks({ clock, dates, at }: SeedCtx, messages: Record<ID, Message>): Task[] {
+  const { back, ago, ahead, wd, day } = clock
   /** Tasks created from a message appear a minute after it. */
-  const afterMsg = (id: ID): number => (messages[id]?.createdAt ?? back(30)) + MINUTE
+  const afterMsg = (id: ID): number => (messages[id]?.createdAt ?? day(30, 10, 0)) + MINUTE
+  const flakyCreated = wd(7, 9, 0)
 
   const specs: TaskSpec[] = [
     // ------------------------------------------------------------ Atlas Portal v2
     {
       id: TASK.ssoFix, projectId: PROJECT.atlas, title: 'Fix session expiry after SSO login',
       status: 'review', priority: 'high', assignee: FORGE, milestoneId: MILESTONE.atlasGa, dueAt: ahead(1, 'd'),
-      labels: ['bug', 'auth', 'sso', 'customer-escalation'], origin: MSG.ssoTask, updatedAt: back(0, 1, 30),
+      labels: ['bug', 'auth', 'sso', 'customer-escalation'], origin: MSG.ssoTask, updatedAt: at.ssoTurn2 + 12 * MINUTE,
       description: `
-**Problem.** Users who sign in through IdP-initiated SSO are logged out about 15 minutes later, even while active. The SAML callback stores tokens but never schedules the silent refresh, so the 15-minute access token expires (ADR-012). Reported by Halden Logistics, ticket #4821.
+**Problem.** Users whose identity provider issues shorter tokens on refresh are signed out about an hour after SSO sign-in. The refresh timer reuses the lifetime of the sign-in token, so after the first refresh the next one is scheduled too late (ADR-012). Reported by Meridian Freight; Halden Logistics has seen it for weeks.
 
 **Acceptance criteria**
-- [ ] Password, SP-initiated and IdP-initiated sign-in all go through one \`establishSession()\` that always schedules the refresh
-- [ ] Tokens can't be stored from outside the session module without scheduling a refresh
-- [ ] Regression test: the IdP-initiated callback triggers exactly one \`/auth/refresh\` after ~12 minutes (fake timers)
-- [ ] A table-driven test covers all three sign-in paths
-- [ ] No change to token lifetimes, cookie attributes or the public API
-- [ ] Verified on Halden's staging tenant
-
-**Out of scope:** refresh-token reuse detection, SCIM.`,
+- [ ] Every refresh is scheduled from the expiry of the token currently held; no lifetime is remembered from sign-in
+- [ ] Regression test: after a refresh, the next one follows the refreshed token's lifetime
+- [ ] Regression test: six hours of 15-minute tokens never let the session outlive its token
+- [ ] Both tests fail on \`main\` and pass with the fix
+- [ ] No change to \`REFRESH_LEAD_MS\`, to 401 handling or to the public API
+- [ ] Verified on staging with Meridian's and Halden's session policies`,
       subtasks: [
-        ['Route every sign-in path through establishSession()', true],
-        ['Regression test for the IdP-initiated callback', true],
-        ['Table-driven test for all three sign-in paths', true],
-        ["Verify on Halden's staging tenant", false],
+        ["Schedule each refresh from the held token's expiry", true],
+        ["Regression test: the refreshed token's lifetime", true],
+        ['Regression test: six hours of 15-minute tokens', true],
+        ["Verify on staging with Meridian's and Halden's policies", false],
       ],
     },
     {
       id: TASK.stripeMigration, projectId: PROJECT.atlas, title: 'Migrate invoices to Stripe Billing',
       status: 'in_progress', priority: 'high', assignee: FORGE, milestoneId: MILESTONE.atlasBilling, dueAt: ahead(6, 'd'),
-      labels: ['billing', 'stripe', 'migration', 'backend'], createdAt: back(16, 2), updatedAt: back(0, 0, 25),
+      labels: ['billing', 'stripe', 'migration', 'frontend'], createdAt: wd(12, 10, 0), updatedAt: back(0, 0, 25),
       description: `
-Move invoice generation and payment tracking from the in-house invoicer to Stripe Billing, following phases 1–3 of the **Stripe Billing migration plan**.
+Move the portal's invoice views from the legacy invoicing service to Stripe Billing, following phase 1 of the **Stripe Billing migration plan**.
 
 **Acceptance criteria**
-- [ ] Every active account mapped to a Stripe customer (\`metadata.atlas_account_id\`)
-- [ ] Webhook handlers idempotent and replay-safe in staging
-- [ ] Open invoices and 13 months of history backfilled; totals match the invoicer to the cent for every account
-- [ ] Dual-run report with fewer than 0.5% of invoices mismatched, each mismatch explained
-- [ ] \`stripe_invoice_id\` index created concurrently before the backfill
-- [ ] No change to customers' billing dates
+- [ ] \`src/billing/stripe.ts\` maps Stripe invoices to the portal's Invoice type, with amounts in integer minor units
+- [ ] \`src/api/invoices.ts\` picks the source with \`VITE_FLAG_STRIPE_BILLING\`; legacy stays the default
+- [ ] Mapping and pagination tests pass
+- [ ] Currency comes from the Stripe invoice, never from a default
+- [ ] No secrets in the browser: Stripe is reached only through portal-api
 
 **Notes**
-- Installing the Stripe SDK runs a shell command in the session, which needs approval.
-- Invoice numbering is decided separately (*Decide invoice numbering scheme after cutover*).`,
+- Forge mapped the legacy invoicing calls first; three call sites move behind the flag.
+- Installing the \`stripe\` package runs a shell command in the session, which needs your approval.`,
       subtasks: [
+        ['Map the legacy invoicing calls in the portal', true],
         ['Map accounts to Stripe customers', true],
-        ['Recreate the price catalog in Stripe', true],
-        ['Idempotent webhook handlers', true],
-        ['Install the Stripe SDK and wire up invoice sync', false],
+        ['Add the stripe package and the invoice adapter behind the flag', false],
+        ['Mapping and pagination tests', false],
         ['Backfill open invoices and history', false],
-        ['Dual-run reconciliation report', false],
+        ['Reconcile two consecutive billing cycles per customer', false],
       ],
     },
     {
       id: TASK.bundleSize, projectId: PROJECT.atlas, title: 'Reduce dashboard bundle size',
       status: 'done', priority: 'medium', assignee: FORGE, milestoneId: MILESTONE.atlasPerf,
-      labels: ['performance', 'frontend'], createdAt: back(14, 3), completedAt: back(3, 5),
+      labels: ['performance', 'frontend'], createdAt: wd(12, 16, 0), completedAt: at.bundleMerged + 15 * MINUTE,
       description: `
-The dashboard's entry chunk is the biggest contributor to slow first loads on the dashboard and shipments board.
+The dashboard took more than 4 seconds to become interactive on a mid-range laptop: the entry chunk carried every page plus the chart library.
 
 **Acceptance criteria**
-- [x] Charts and other heavy dependencies load lazily, only on routes that use them
-- [x] Dashboard entry chunk under 300 KB gzipped
-- [x] No visual regressions (screenshot tests green)
-- [x] A bundle-size budget in CI, so regressions fail the build`,
+- [x] Every route is its own lazy chunk
+- [x] The volume chart and its chart library load after first paint
+- [x] The chunk-size warning limit is back at 450 kB, so regressions show up in the build
+- [x] No behaviour change; typecheck, lint, unit and e2e pass
+
+**Result:** initial JS for the dashboard went from 912 kB to 348 kB (−62%). Merged as PR #214.`,
       subtasks: [
-        ['Analyze the bundle and list the largest dependencies', true],
-        ['Lazy-load chart routes', true],
-        ['Add a bundle-size budget to CI', true],
+        ['Find what lands in the entry chunk', true],
+        ['Split routes into lazy chunks', true],
+        ['Lazy-load the volume chart', true],
+        ['Restore a real chunk budget', true],
       ],
     },
     {
       id: TASK.flakyTest, projectId: PROJECT.atlas, title: 'Fix flaky checkout e2e test',
       status: 'todo', priority: 'high', assignee: FORGE, dueAt: ahead(2, 'd'),
-      labels: ['testing', 'ci', 'flaky', 'checkout'], createdAt: back(8, 4), updatedAt: back(1, 2),
+      labels: ['testing', 'ci', 'flaky', 'checkout'], createdAt: flakyCreated, updatedAt: at.flakyTurn2 + 20 * MINUTE,
       description: `
-\`checkout.spec.ts › pays an open invoice\` fails intermittently on CI: 6 failures in Sprint 14, usually a timeout waiting for the Pay button. It started around the time the outstanding-balance banner shipped, so a race between the banner's fetch and the button becoming enabled is the main suspect.
+The checkout e2e spec fails on CI about one run in ten (6 failures in Sprint 14).
 
-Forge's first attempt failed. The next attempt should start by reproducing the failure deterministically.
+**What we know so far**
+- Forge's first pass replaced a fixed 3-second wait and a one-shot \`textContent()\` read with a web-first assertion. The spec passed.
+- A 20× repeat run still failed once: poll responses can arrive out of order in \`Checkout.tsx\`, so a stale "pending" response can overwrite "confirmed". That needs an app fix, not a test fix.
 
 **Acceptance criteria**
-- [ ] Root cause identified and written up in the pull request
-- [ ] No fixed sleeps: wait on an explicit condition (network idle, a test id, or the button's enabled state)
-- [ ] 50 consecutive CI runs green
-- [ ] Removed from the flaky-test quarantine lane once fixed`,
+- [ ] \`Checkout.tsx\` ignores poll responses older than the latest one it has applied
+- [ ] A unit test covers out-of-order responses
+- [ ] No fixed sleeps anywhere in the spec
+- [ ] 20 consecutive repeat runs pass on CI`,
     },
     {
       id: TSK.runbook, projectId: PROJECT.atlas, title: 'Write migration runbook for Stripe cutover',
       status: 'todo', priority: 'high', assignee: ME, milestoneId: MILESTONE.atlasBilling, dueAt: ahead(5, 'd'),
-      labels: ['billing', 'stripe', 'runbook'], origin: MSG.stripeTasks, updatedAt: back(5, 2, 50),
+      labels: ['billing', 'stripe', 'runbook'], origin: MSG.stripeTasks, updatedAt: at.chat.stripeRisks + 43 * MINUTE,
       description: `
-Step-by-step runbook for the Stripe Billing cutover on ${dayLabel(dates.cutover)}.
+Step-by-step runbook for the first Stripe Billing cohort on ${dayLabel(dates.cutover)}, reused for every later cohort.
 
-1. Freeze window and comms owner
-2. Dual-run reconciliation checks, including EU VAT
-3. Rollback trigger: more than 0.5% of invoices mismatched, or a systemic error in the first batch
+1. The per-customer flag flip, with a freeze window and comms owner for each cohort
+2. Reconciliation checks: totals, currency and duplicates
+3. Rollback: the flag off for that customer, legacy dunning back on
 4. Support macros for the first Stripe invoices
 5. Database safety from the checkout incident: EXPLAIN for new queries, the \`stripe_invoice_id\` index before the backfill, reconciliation on the read replica`,
       subtasks: [
-        ['Freeze window and comms owner', false],
-        ['Dual-run reconciliation checks', false],
-        ['Rollback trigger and steps', false],
+        ['Flag flip, freeze window and comms owner per cohort', false],
+        ['Reconciliation checks: totals, currency, duplicates', false],
+        ['Rollback steps', false],
         ['Support macros', false],
         ['Database safety checks from the incident', false],
       ],
@@ -142,13 +145,13 @@ Step-by-step runbook for the Stripe Billing cutover on ${dayLabel(dates.cutover)
     {
       id: TSK.numbering, projectId: PROJECT.atlas, title: 'Decide invoice numbering scheme after cutover',
       status: 'in_progress', priority: 'medium', assignee: ME, milestoneId: MILESTONE.atlasBilling, dueAt: ahead(2, 'd'),
-      labels: ['billing', 'decision'], origin: MSG.stripeTasks, updatedAt: back(1, 6),
+      labels: ['billing', 'decision'], origin: MSG.stripeTasks, updatedAt: wd(2, 16, 0),
       description: `
 Decide whether Stripe continues the \`NW-\` invoice sequence or starts a fresh series.
 
 - **Decision owner:** Owen Fitzgerald (RevOps). **Consulted:** Daniel Okafor.
-- **Proposal:** continue the sequence and record the boundary (last invoicer number, first Stripe number) in the cutover memo.
-- **Deadline:** before the cutover freeze.`,
+- **Proposal:** continue the sequence and record the boundary (last legacy number, first Stripe number) in the cutover memo for each cohort.
+- **Deadline:** before the first cohort.`,
       subtasks: [
         ['Write up both options', true],
         ['Check with two Enterprise accounts-payable teams', false],
@@ -170,9 +173,9 @@ Decide whether Stripe continues the \`NW-\` invoice sequence or starts a fresh s
     {
       id: TSK.queryPlan, projectId: PROJECT.atlas, title: 'Add query-plan regression check to CI',
       status: 'todo', priority: 'high', assignee: ME, milestoneId: MILESTONE.atlasBilling, dueAt: ahead(7, 'd'),
-      labels: ['reliability', 'ci', 'database'], origin: MSG.incidentSaved,
+      labels: ['reliability', 'ci', 'database'], origin: MSG.incidentTasks,
       description: `
-Incident action item 2 (owner: Priya Natarajan; tracked here).
+Incident follow-up 2 (owner: Priya Natarajan; tracked here).
 
 Fail CI when a new or changed query on a table with more than 1M rows plans a sequential scan against production-sized data.
 
@@ -185,73 +188,75 @@ Fail CI when a new or changed query on a table with more than 1M rows plans a se
     {
       id: TSK.p95Alert, projectId: PROJECT.atlas, title: 'Alert on checkout p95 > 2s for 5 minutes',
       status: 'done', priority: 'high', assignee: ME,
-      labels: ['reliability', 'monitoring', 'checkout'], origin: MSG.incidentSaved, completedAt: back(7, 3),
-      description: 'Incident action item 1. Page on-call when checkout p95 latency stays above 2 s for 5 minutes.\n\n**Done:** alert live and tested with a synthetic slow checkout on staging.',
+      labels: ['reliability', 'monitoring', 'checkout'], origin: MSG.incidentTasks, completedAt: wd(5, 16, 0),
+      description: 'Incident follow-up 1. Page on-call when checkout p95 latency stays above 2 s for 5 minutes.\n\n**Done:** the alert is live and was tested with a synthetic slow checkout on staging.',
     },
     {
       id: TSK.carrierMap, projectId: PROJECT.atlas, title: 'Lazy-load the carrier map on the shipments page',
       status: 'backlog', priority: 'low', assignee: ME, milestoneId: MILESTONE.atlasPerf,
-      labels: ['performance', 'frontend'], createdAt: back(4, 1),
+      labels: ['performance', 'frontend'], createdAt: wd(3, 11, 30),
       description: "The carrier map is the next suspect for the shipments board's ~2.1 s p95 (weekly product sync). Profile first; if confirmed, lazy-load the map below the fold.",
     },
     {
-      id: TSK.rateLimits, projectId: PROJECT.atlas, title: 'Audit public API rate limits for v2 endpoints',
+      id: TSK.rateLimits, projectId: PROJECT.atlas, title: 'Audit public API rate limits for large nightly syncs',
       status: 'todo', priority: 'medium', assignee: ME, milestoneId: MILESTONE.atlasGa, dueAt: ahead(8, 'd'),
-      labels: ['api', 'reliability'], createdAt: back(13, 6),
-      description: 'Check every `/v2/*` endpoint against **Public API rate limits**: correct bucket, headers present, and a 429 body that matches the doc. Changing the default limits of a plan needs an ADR.',
+      labels: ['api', 'reliability'], createdAt: at.haldenRateLimitEmail + 55 * MINUTE,
+      description: "Halden's nightly sync hit 429s on `/v1/shipments` while paging about 40,000 shipments (SUP-417). Check that `updated_since` and `batchGet` cover their use case, add the guidance to **Public API rate limits**, and decide whether Growth needs a higher daily cap. Changing a plan's default limits needs an ADR.",
     },
     {
       id: TSK.scim, projectId: PROJECT.atlas, title: 'Spike: SCIM provisioning for enterprise SSO',
       status: 'backlog', priority: 'medium', assignee: ME,
-      labels: ['auth', 'sso', 'enterprise', 'spike'], createdAt: back(26, 5),
-      description: 'Follow-up from ADR-012. A three-day spike: what SCIM would take, how deprovisioning revokes refresh tokens, and which Enterprise customers are asking (Halden and Meridian so far).',
+      labels: ['auth', 'sso', 'enterprise', 'spike'], createdAt: day(26, 11, 0),
+      description: 'Follow-up from ADR-012. A three-day spike: what SCIM would take, how deprovisioning revokes refresh tokens, and which Enterprise customers are asking.',
     },
     {
       id: TSK.canvasCharts, projectId: PROJECT.atlas, title: 'Evaluate canvas rendering for dashboard charts',
       status: 'cancelled', priority: 'low', assignee: ME,
-      labels: ['performance', 'frontend'], createdAt: back(17, 2), updatedAt: back(3, 4),
-      description: '**Cancelled.** Lazy-loading charts in the bundle-size work brought the dashboard under budget, and canvas charts would cost accessibility (screen-reader tables, keyboard focus).',
+      labels: ['performance', 'frontend'], createdAt: wd(13, 15, 0), updatedAt: at.bundleMerged + 60 * MINUTE,
+      description: '**Cancelled.** Lazy-loading the chart in the bundle-size work brought the dashboard under budget, and canvas charts would cost accessibility (screen-reader tables, keyboard focus).',
     },
     {
-      id: TSK.reviewSla, projectId: PROJECT.atlas, title: 'Timebox PR reviews to one business day (trial)',
-      status: 'in_progress', priority: 'medium', assignee: ME, dueAt: ahead(8, 'd'),
-      labels: ['process', 'code-review'], origin: MSG.retroTasks, updatedAt: back(5, 2),
-      description: 'Trial from the Sprint 14 retro: a first response on every pull request within one business day, with a daily 30-minute review slot. Measure the median time to first review in Sprints 15 and 16, then keep or drop the rule at the Sprint 16 retro.',
+      id: TSK.prLimit, projectId: PROJECT.atlas, title: 'Make the PR review assistant ask for a split above 600 lines',
+      status: 'done', priority: 'medium', assignee: ME,
+      labels: ['process', 'code-review'], origin: MSG.retroTasks, completedAt: wd(9, 15, 0),
+      description: 'From the Sprint 14 retro: no PRs over 600 changed lines. The PR review assistant now asks for a split above that, and the code review handbook and README say so.',
+    },
+    {
+      id: TSK.sameDayTickets, projectId: PROJECT.atlas, title: 'Ticket every flaky test the same day',
+      status: 'done', priority: 'medium', assignee: ME,
+      labels: ['ci', 'testing', 'process'], origin: MSG.retroTasks, completedAt: flakyCreated + 10 * MINUTE,
+      description: 'From the Sprint 14 retro. Added a "flaky test" issue template and a CI hint that links to it from failed runs. First ticket: *Fix flaky checkout e2e test*.',
+    },
+    {
+      id: TSK.focusMornings, projectId: PROJECT.atlas, title: 'Trial one meeting-free morning a week',
+      status: 'in_progress', priority: 'low', assignee: ME, dueAt: ahead(4, 'd'),
+      labels: ['process', 'team'], origin: MSG.retroTasks, updatedAt: wd(3, 9, 0),
+      description: 'From the Sprint 14 retro: two sprints with no recurring meetings on one morning a week. Ask the team at the Sprint 16 retro whether to keep it.',
       subtasks: [
-        ['Add the expectation to the code review handbook', true],
-        ['Baseline: median time to first review in Sprint 14', true],
-        ['Review the numbers at the Sprint 16 retro', false],
+        ['Pick the morning and move recurring meetings', true],
+        ['Ask for feedback at the Sprint 16 retro', false],
       ],
-    },
-    {
-      id: TSK.flakyQuarantine, projectId: PROJECT.atlas, title: 'Quarantine lane for flaky tests in CI',
-      status: 'todo', priority: 'medium', assignee: ME, dueAt: ahead(6, 'd'),
-      labels: ['ci', 'testing', 'process'], origin: MSG.retroTasks,
-      description: `
-**Acceptance criteria**
-- [ ] A non-blocking CI job runs tests tagged \`@flaky\`
-- [ ] Every quarantined test has an owner and a 7-day expiry; expired tests fail the main build again
-- [ ] The checkout e2e test is the first entry
-- [ ] A weekly list of quarantined tests posted to #eng`,
     },
 
     // ------------------------------------------------------------ Q4 Competitive Landscape
     {
       id: TASK.competitorBrief, projectId: PROJECT.landscape, title: 'Competitor brief for board deck',
-      status: 'todo', priority: 'high', assignee: SCOUT, milestoneId: MILESTONE.landBrief, dueAt: ahead(5, 'd'),
-      labels: ['research', 'competitive', 'board'], createdAt: back(2, 6),
+      status: 'review', priority: 'high', assignee: SCOUT, milestoneId: MILESTONE.landBrief, dueAt: ahead(5, 'd'),
+      labels: ['research', 'competitive', 'board'], createdAt: wd(5, 9, 0), updatedAt: at.scoutBriefRevision + 15 * MINUTE,
       description: `
-A one-page brief on Portbase, Freightly and ShipLoom for the board deck.
+A one-page brief on Tidewell, Freightly and ShipLoom for the board deck.
 
-**For each competitor:** positioning in one line, where they beat us, where we beat them, threat level (low, medium, high) and our response.
+**For each competitor:** where they win, pricing and packaging side by side, moves in the last 90 days, where Atlas is exposed, and what we do next.
 
-**Sources:** the Portbase teardown, Freightly product notes, the Q3 win/loss notes and the churn interviews. Cite every claim, and mark anything that rests only on simulated web sources.`,
+**Sources:** the Tidewell teardown, Freightly product notes and the market sizing. Cite every claim, and mark anything that rests only on simulated web sources.
+
+**Status:** Scout drafted it, then revised it after your comments (ShipLoom added, history cut, the exposure section made blunter). Now about 410 words and waiting for your review.`,
     },
     {
-      id: TSK.battlecard, projectId: PROJECT.landscape, title: 'Write Portbase battlecard for sales',
+      id: TSK.battlecard, projectId: PROJECT.landscape, title: 'Write Tidewell battlecard for sales',
       status: 'in_progress', priority: 'high', assignee: ME, milestoneId: MILESTONE.landBrief, dueAt: ahead(1, 'd'),
       labels: ['competitive', 'sales-enablement'], origin: MSG.battlecardTask,
-      description: "Finish the battlecard drafted in *How does Portbase position against us?* with Ravi's team. Keep claims to what the teardown supports, and don't quote Portbase prices.",
+      description: "Finish the battlecard drafted in *How does Tidewell position against us?* with Ravi's team. Keep claims to what the teardown and the radar support, and don't quote Tidewell prices.",
       subtasks: [
         ['Draft from the teardown', true],
         ['Review with Ravi', false],
@@ -262,60 +267,60 @@ A one-page brief on Portbase, Freightly and ShipLoom for the board deck.
     {
       id: TSK.freightlyPricing, projectId: PROJECT.landscape, title: "Review Freightly's per-load pricing page",
       status: 'todo', priority: 'medium', assignee: ME, dueAt: ahead(3, 'd'),
-      labels: ['competitive', 'pricing'], createdAt: back(12, 5),
-      description: 'Follow-up from the Freightly product notes. Capture their tiers, spend caps and notification thresholds, and compare them with the Lumen bill-shock guardrails.',
+      labels: ['competitive', 'pricing'], createdAt: day(13, 10, 0),
+      description: 'Follow-up from the Freightly product notes. Capture their three tiers, spend caps and notification thresholds, and compare them with the Lumen bill-shock guardrails. Scout checks the page daily for changes.',
     },
     {
       id: TSK.shiploomInterviews, projectId: PROJECT.landscape, title: 'Interview three deals lost to ShipLoom',
       status: 'todo', priority: 'medium', assignee: ME, milestoneId: MILESTONE.landReview, dueAt: ahead(10, 'd'),
-      labels: ['win-loss', 'research'], createdAt: back(7, 2),
-      description: 'Larchfield Logistics from Q3, plus two earlier losses. Focus on price sensitivity versus missing features, and whether Lumen changes the conversation at the low end.',
+      labels: ['win-loss', 'research'], createdAt: at.scoutBriefRevision + 30 * MINUTE,
+      description: 'Larchfield Logistics from Q3, plus two earlier losses. Focus on price sensitivity versus missing features, and whether ShipLoom’s EDI marketplace or upcoming e-invoicing support came up.',
     },
     {
       id: TSK.radar, projectId: PROJECT.landscape, title: 'Set up the weekly competitor radar workflow',
       status: 'done', priority: 'medium', assignee: ME,
-      labels: ['automation', 'research'], createdAt: back(15, 2), completedAt: back(9, 4),
-      description: 'A weekly workflow: Scout searches for competitor news and changelog updates, writes a summary to Knowledge and notifies me.\n\n**Done:** the first run completed. Web results are simulated in this workspace.',
+      labels: ['automation', 'research'], createdAt: day(31, 10, 0), completedAt: day(29, 15, 0),
+      description: 'A weekly workflow: Scout searches for competitor news and pricing changes, updates the related notes in Knowledge and notifies me.\n\n**Done:** it runs every Monday morning. Web results are simulated in this workspace.',
     },
     {
       id: TSK.churnReview, projectId: PROJECT.landscape, title: 'Review churn research draft',
       status: 'todo', priority: 'high', assignee: ME, dueAt: ahead(5, 'h'),
-      labels: ['churn', 'research', 'review'], origin: ref('investigation', INVESTIGATION.churn), createdAt: back(2, 1),
+      labels: ['churn', 'research', 'review'], origin: ref('investigation', INVESTIGATION.churn), createdAt: at.churn1 + 30 * MINUTE,
       description: "Scout's draft report *Why do logistics customers churn?* is ready for review. Check the findings against the interview notes, decide what goes into the Q4 readout, and mark the investigation complete.",
     },
     {
       id: TSK.analystReport, projectId: PROJECT.landscape, title: 'Commission a paid analyst report on freight portals',
       status: 'cancelled', priority: 'low', assignee: ME,
-      labels: ['research', 'budget'], createdAt: back(20, 3), updatedAt: back(11, 2),
-      description: '**Cancelled.** Not worth the spend this quarter: the competitor radar, the Portbase teardown and our own win/loss interviews cover what the board brief needs.',
+      labels: ['research', 'budget'], createdAt: day(20, 10, 0), updatedAt: day(11, 16, 0),
+      description: '**Cancelled.** Not worth the spend this quarter: the competitor radar, the Tidewell teardown and our own win/loss notes cover what the board brief needs.',
     },
 
     // ------------------------------------------------------------ Lumen Launch
     {
       id: TASK.heroVideo, projectId: PROJECT.lumen, title: 'Storyboard the launch hero video',
       status: 'in_progress', priority: 'high', assignee: MUSE, milestoneId: MILESTONE.lumenAssets, dueAt: ahead(3, 'd'),
-      labels: ['launch', 'video', 'creative'], createdAt: back(5, 2), updatedAt: back(0, 0, 20),
+      labels: ['launch', 'video', 'creative'], createdAt: at.heroCopyPick + 40 * MINUTE, updatedAt: back(0, 0, 20),
       description: `
-A 45-second hero video for the landing page and the keynote opener.
+A 45-second hero video for the landing page and the keynote opener, ending on the tagline "From tracking to knowing."
 
 **Brief**
-- Story: night port → the Monday spreadsheet → Lumen → exceptions caught early → tagline
-- Follow the messaging house (pillars 1 and 2) and the brand voice guide
-- 8 shots with narration timing, plus a version without narration for social cutdowns
+- Follow the messaging house and the brand voice guide
+- Six beats with shot notes, then six storyboard frames
+- A version without narration for social
 - Deliver to the *Lumen launch visuals* board for Aisha's review
 
-**Status:** the v1 storyboard is on the board; v2 adds narration timing and the no-narration cut.`,
+**Status:** Muse's beat sheet is on the board; the six storyboard frames are being generated now.`,
       subtasks: [
-        ['Shot list and v1 storyboard', true],
-        ['Narration script and timing', true],
-        ["v2 storyboard with Aisha's notes", false],
+        ['Beat sheet with shot notes', true],
+        ['Narration draft', true],
+        ['Six storyboard frames', false],
         ['No-narration cut for social', false],
       ],
     },
     {
       id: TSK.pricingLock, projectId: PROJECT.lumen, title: 'Lock Lumen pricing & packaging',
       status: 'in_progress', priority: 'urgent', assignee: ME, milestoneId: MILESTONE.lumenPricing, dueAt: dates.pricingLock,
-      labels: ['pricing', 'decision', 'launch'], createdAt: back(18, 5), updatedAt: back(0, 0, 37),
+      labels: ['pricing', 'decision', 'launch'], createdAt: wd(13, 11, 5), updatedAt: back(0, 0, 37),
       description: `
 The final decision on Lumen tiers, overage, guardrails and the design-partner offer. See the **Pricing strategy memo (draft)**.
 
@@ -336,32 +341,32 @@ The final decision on Lumen tiers, overage, guardrails and the design-partner of
     {
       id: TSK.launchEmail, projectId: PROJECT.lumen, title: 'Draft launch email to existing customers',
       status: 'review', priority: 'high', assignee: ME, milestoneId: MILESTONE.lumenAssets, dueAt: ahead(2, 'd'),
-      labels: ['launch', 'email', 'copy'], createdAt: back(9, 2), updatedAt: back(1, 3),
-      description: 'The draft is in Studio (*Launch email — existing customers*). Aisha is reviewing the tone, and legal checks the "no surprise charges" line against the pricing guardrails.',
+      labels: ['launch', 'email', 'copy'], createdAt: wd(8, 11, 0), updatedAt: wd(1, 14, 5),
+      description: 'The draft is in Studio (*Launch email — existing customers*). Aisha finished her tone pass; legal checks the "no surprise charges" line against the pricing guardrails.',
     },
     {
       id: TSK.salesBrief, projectId: PROJECT.lumen, title: 'Brief sales team on Lumen pricing',
       status: 'todo', priority: 'high', assignee: ME, milestoneId: MILESTONE.lumenLaunch, dueAt: ahead(8, 'd'),
       labels: ['sales-enablement', 'pricing', 'launch'], origin: MSG.launchTasks,
-      description: "Blocked by the pricing lock. Cover the tiers, what not to quote yet, the design-partner offer and the Portbase talk tracks. 30 minutes with Ravi's team, recorded for later hires.",
+      description: "Blocked by the pricing lock. Cover the tiers, what not to quote yet, the design-partner offer and the Tidewell talk tracks. 30 minutes with Ravi's team, recorded for later hires.",
     },
     {
       id: TSK.heroCopy, projectId: PROJECT.lumen, title: 'Finalize hero copy for landing page',
       status: 'in_progress', priority: 'high', assignee: ME, milestoneId: MILESTONE.lumenAssets, dueAt: ahead(1, 'd'),
-      labels: ['copy', 'landing-page', 'launch'], createdAt: back(3, 2), updatedAt: back(0, 3, 8),
-      description: 'Variant 3b selected: "From spreadsheet Mondays to answers in minutes." Aisha reviews it next to the visuals, then it goes to the landing page build.',
+      labels: ['copy', 'landing-page', 'launch'], createdAt: wd(9, 14, 0), updatedAt: at.heroCopyPick + 2 * MINUTE,
+      description: '"From tracking to knowing." won the five-second test against "Fewer surprises at the dock." Aisha is tightening the subline, then it goes to the landing page build.',
       subtasks: [
-        ['Five directions', true],
-        ['Tighten options 2 and 3', true],
-        ['Aisha review', false],
+        ['Six options from Muse', true],
+        ['Test the top two with beta users', true],
+        ['Aisha tightens the subline', false],
         ['Hand off to the landing page build', false],
       ],
     },
     {
       id: TSK.meridianQuote, projectId: PROJECT.lumen, title: "Get Meridian's launch quote approved",
       status: 'todo', priority: 'medium', assignee: ME, milestoneId: MILESTONE.lumenAssets, dueAt: ahead(6, 'd'),
-      labels: ['customer', 'launch', 'proof'], createdAt: back(9, 2),
-      description: "Dana Whitfield agreed in principle on the customer call. Ravi sends the wording and Meridian's legal team approves it. Needed for the landing page, keynote slide 3 and the social quote card.",
+      labels: ['customer', 'launch', 'proof'], createdAt: dates.meridianCall + 70 * MINUTE,
+      description: "Dana Whitfield agreed in principle on the customer call. Ravi sends the wording and Meridian's legal team approves it. Needed for the landing page, keynote slide 3 and the quote cutdowns.",
     },
     {
       id: TSK.webinar, projectId: PROJECT.lumen, title: 'Schedule launch webinar',
@@ -372,37 +377,37 @@ The final decision on Lumen tiers, overage, guardrails and the design-partner of
     {
       id: TSK.betaFixes, projectId: PROJECT.lumen, title: 'Ship beta feedback fixes (alert thresholds)',
       status: 'done', priority: 'high', assignee: ME, milestoneId: MILESTONE.lumenBeta,
-      labels: ['beta', 'alerts'], createdAt: back(24, 3), completedAt: back(10, 5),
+      labels: ['beta', 'alerts'], createdAt: day(24, 10, 0), completedAt: wd(11, 16, 0),
       description: "Alerts now default to each account's 30-day baseline (feedback from Brightwater and Meridian). Added a dwell-time tooltip and glossary entry (Pinecrest).",
     },
     {
       id: TSK.keynoteReview, projectId: PROJECT.lumen, title: 'Review keynote deck v2',
       status: 'todo', priority: 'medium', assignee: ME, milestoneId: MILESTONE.lumenAssets, dueAt: ahead(5, 'd'),
-      labels: ['launch', 'keynote'], createdAt: back(4, 6),
+      labels: ['launch', 'keynote'], createdAt: wd(4, 10, 0),
       description: 'Studio: *Lumen launch keynote*. Check the story arc, the pricing slide (no prices until the lock) and the Meridian quote (pending approval).',
     },
     {
       id: TSK.helpCenter, projectId: PROJECT.lumen, title: 'Write five Lumen help-center articles',
       status: 'backlog', priority: 'medium', assignee: ME, milestoneId: MILESTONE.lumenLaunch,
-      labels: ['docs', 'support', 'launch'], createdAt: back(8, 5),
+      labels: ['docs', 'support', 'launch'], createdAt: wd(9, 11, 0),
       description: 'Getting started; reading carrier scorecards; setting alert thresholds; what counts as an active shipment; exporting data.',
     },
     {
-      id: TSK.socialCutdowns, projectId: PROJECT.lumen, title: 'Create social cutdowns from the hero video',
+      id: TSK.videoCutdowns, projectId: PROJECT.lumen, title: 'Cut 15-second versions of the hero video',
       status: 'backlog', priority: 'medium', assignee: MUSE, milestoneId: MILESTONE.lumenAssets,
-      labels: ['social', 'video', 'launch'], createdAt: back(4, 1),
-      description: 'Square and vertical cutdowns from the no-narration version of the hero video, for launch week. Starts once storyboard v2 is approved.',
+      labels: ['social', 'video', 'launch'], createdAt: wd(5, 12, 0),
+      description: 'Two 15-second cuts of the hero video (one per message) without narration, for launch week. Starts once the storyboard frames are approved.',
     },
     {
       id: TSK.launchDate, projectId: PROJECT.lumen, title: 'Confirm launch date with leadership',
       status: 'done', priority: 'high', assignee: ME,
-      labels: ['launch', 'planning'], createdAt: back(19, 4), completedAt: back(14, 2),
+      labels: ['launch', 'planning'], createdAt: day(19, 10, 0), completedAt: day(14, 16, 0),
       description: `Confirmed with Grace: public launch on ${dayLabel(dates.launch)}, customer preview two weeks earlier.`,
     },
     {
       id: TSK.revenueModel, projectId: PROJECT.lumen, title: 'Model Lumen revenue scenarios',
       status: 'todo', priority: 'high', assignee: LEDGER, milestoneId: MILESTONE.lumenPricing, dueAt: ahead(3, 'd'),
-      labels: ['pricing', 'finance', 'analysis'], origin: MSG.pricingScenarios, updatedAt: back(3, 3),
+      labels: ['pricing', 'finance', 'analysis'], origin: MSG.pricingScenarios, updatedAt: dates.sync + 4 * 60 * MINUTE,
       description: `
 Compare monthly recurring revenue under option A (the draft tiers) and option B (Core capped at 6,000 active shipments, overage $0.15) across all Growth and Enterprise accounts, using read-only queries.
 
@@ -411,76 +416,77 @@ Compare monthly recurring revenue under option A (the draft tiers) and option B 
     {
       id: TSK.betaUsage, projectId: PROJECT.lumen, title: 'Pull Lumen beta usage by account',
       status: 'done', priority: 'medium', assignee: LEDGER,
-      labels: ['beta', 'analysis'], createdAt: back(6, 4), completedAt: back(4, 9),
-      description: 'Weekly active users, dashboard views and feature usage for the eight design partners, exported as a CSV for the pricing discussion.',
+      labels: ['beta', 'analysis'], createdAt: dates.sync + 3 * 60 * MINUTE, completedAt: at.ledgerLumenUsage + 15 * MINUTE,
+      description: 'Tracked shipments per beta account over the last 30 days, for the pricing decision.\n\n**Result:** 23 beta accounts. Usage is highly concentrated: the top three accounts are 61% of volume, and the median account sits well inside the first tier.',
     },
 
     // ------------------------------------------------------------ Support Ops Automation
     {
       id: TASK.weeklyDigest, projectId: PROJECT.ops, title: 'Send weekly project digest',
       status: 'in_progress', priority: 'medium', assignee: HERALD, dueAt: ahead(3, 'h'),
-      labels: ['digest', 'comms', 'recurring'], createdAt: back(20, 2), updatedAt: back(0, 0, 45),
+      labels: ['digest', 'comms', 'recurring'], createdAt: day(20, 9, 0), updatedAt: back(0, 0, 45),
       description: `
-Every Monday, summarize the week across Atlas Portal v2, Lumen Launch and Support Ops Automation.
+Every Monday, summarize the week across Atlas Portal v2, Lumen Launch, Q4 Competitive Landscape and Support Ops Automation.
 
 - Shipped, slipped, decisions and risks, in under 250 words
 - No personal data
-- Post to #product-updates in Slack **after approval**`,
+- Post to #product in Slack **after approval**`,
     },
     {
       id: TASK.triageRubric, projectId: PROJECT.ops, title: 'Finalize triage rubric v2',
       status: 'review', priority: 'high', assignee: ME, milestoneId: MILESTONE.opsTriage, dueAt: ahead(4, 'h'),
-      labels: ['support', 'triage', 'rubric'], origin: MSG.triageTask, updatedAt: back(0, 6),
-      description: 'Add the billing urgency rule, review the remaining shadow-week misses with Theo, then switch Sentinel to v2. Doc: **Support triage rubric v2**.',
+      labels: ['support', 'triage', 'rubric'], origin: MSG.triageHandoff, updatedAt: wd(2, 11, 31),
+      description: "Sentinel drafted **Support triage rubric v2** from last month's tickets and moved this task to Review. Add the billing rule, review the remaining comparison-week misses with Theo, then approve v2.",
       subtasks: [
-        ['Shadow week with Sentinel (41 of 46 agreed)', true],
-        ['Add the billing urgency rule', true],
+        ["Sentinel's draft from last month's tickets", true],
+        ['Comparison week with Theo (41 of 46 agreed)', true],
+        ['Add the billing rule', true],
         ['Review the two remaining misses with Theo', false],
-        ['Switch Sentinel to v2', false],
+        ['Approve v2', false],
       ],
     },
     {
       id: TSK.tagTickets, projectId: PROJECT.ops, title: 'Tag last 30 days of tickets with rubric v2 categories',
       status: 'todo', priority: 'medium', assignee: SENTINEL, milestoneId: MILESTONE.opsTriage, dueAt: ahead(5, 'd'),
-      labels: ['support', 'data', 'triage'], createdAt: back(4, 3),
-      description: 'Backfill v2 categories and severities on the last 30 days of tickets so the SLA report can compare before and after. Labels only: no customer replies and no Slack alerts.',
+      labels: ['support', 'data', 'triage'], createdAt: wd(2, 12, 0),
+      description: 'Backfill v2 priorities and categories on the last 30 days of tickets so the SLA report can compare before and after. Labels only: no customer replies and no Slack alerts.',
     },
     {
       id: TSK.slaUpdate, projectId: PROJECT.ops, title: 'Update SLA policy for enterprise tier',
       status: 'todo', priority: 'high', assignee: ME, dueAt: ago(2, 'd'),
-      labels: ['support', 'sla', 'enterprise'], createdAt: back(15, 2), updatedAt: back(6, 1),
-      description: 'Enterprise renewals are asking for a 30-minute S1 first response, 24/7. Decide with Theo whether we can staff it, update the **Support SLA policy**, and align its severity definitions with rubric v2.',
+      labels: ['support', 'sla', 'enterprise'], createdAt: day(15, 10, 0), updatedAt: day(6, 11, 0),
+      description: 'Enterprise renewals are asking for a 30-minute S1 first response, 24/7. Decide with Theo whether we can staff it, update the **Support SLA policy**, and map its severities to the rubric v2 priorities.',
     },
     {
       id: TSK.incidentSummaries, projectId: PROJECT.ops, title: 'Auto-draft incident summaries from status-page updates',
       status: 'backlog', priority: 'medium', assignee: ME, milestoneId: MILESTONE.opsIncidents,
-      labels: ['automation', 'incidents'], createdAt: back(8, 3),
-      description: 'When a status-page incident is resolved, an agent drafts a summary in the incident report format (impact, timeline, root cause, actions) for a person to edit. It never posts on its own.',
+      labels: ['automation', 'incidents'], createdAt: wd(7, 15, 0),
+      description: 'When a status-page incident is resolved, an agent drafts a summary in the incident report format (impact, timeline, root cause, follow-ups) for a person to edit. It never posts on its own.',
     },
     {
       id: TSK.supportInbox, projectId: PROJECT.ops, title: 'Connect the support inbox to the triage workflow',
       status: 'done', priority: 'high', assignee: ME,
-      labels: ['automation', 'support', 'integration'], createdAt: back(30, 2), completedAt: back(26, 4),
-      description: 'The support inbox (simulated Gmail connection) now feeds the *Support triage* workflow, where Sentinel labels and routes every ticket.',
+      labels: ['automation', 'support', 'integration'], createdAt: day(32, 10, 0), completedAt: day(29, 12, 0),
+      description: 'The support inbox (simulated Gmail connection) now feeds the *Support triage* workflow, where Sentinel classifies every email and alerts or files a Linear issue.',
     },
     {
-      id: TSK.haldenFollowUp, projectId: PROJECT.ops, title: 'Follow up with Halden Logistics once the SSO fix ships',
+      id: TSK.customerFollowUp, projectId: PROJECT.ops, title: 'Follow up with Meridian and Halden once the SSO fix ships',
       status: 'todo', priority: 'high', assignee: ME, dueAt: ahead(2, 'd'),
-      labels: ['customer', 'escalation', 'sso'], createdAt: back(2, 2, 50),
-      description: "Ticket #4821. Once the fix is on staging, ask Halden's admin to verify it with IdP-initiated sign-in, then confirm the release date. Their renewal is in under four months.",
+      labels: ['customer', 'escalation', 'sso'], createdAt: at.chat.ssoBug + 30 * MINUTE,
+      description: "Once the fix is on staging, ask Meridian's and Halden's admins to verify it with their own session policies, then confirm the release date. Halden's renewal is in under four months.",
     },
     {
       id: TSK.postmortem, projectId: PROJECT.ops, title: 'Write postmortem for checkout latency incident',
       status: 'done', priority: 'high', assignee: ME,
-      labels: ['incident', 'postmortem'], createdAt: back(10, 8), completedAt: back(9, 7, 55),
-      description: 'Blameless postmortem drafted in chat, corrected, and saved to Knowledge with five action items.',
+      labels: ['incident', 'postmortem'], createdAt: wd(8, 17, 0), completedAt: at.chat.incident + 63 * MINUTE,
+      description: 'The incident report written that evening, turned into a blameless postmortem in chat the next morning, with five follow-ups and owners.',
     },
 
     // ------------------------------------------------------------ Field Notes
     {
       id: TSK.rustWeek1, projectId: PROJECT.fieldNotes, title: 'Rust week 1: ownership exercises',
       status: 'done', priority: 'low', assignee: ME, milestoneId: MILESTONE.notesRust,
-      labels: ['rust', 'learning'], origin: MSG.rustSaved, completedAt: back(12, 10),
+      labels: ['rust', 'learning'], origin: MSG.rustSaved, completedAt: day(12, 21, 0),
       subtasks: [
         ['Rewrite three small TypeScript utilities in Rust', true],
         ['Trigger E0502 on purpose and explain it', true],
@@ -490,7 +496,7 @@ Every Monday, summarize the week across Atlas Portal v2, Lumen Launch and Suppor
     {
       id: TSK.rustWeek3, projectId: PROJECT.fieldNotes, title: 'Rust week 3: build the CLI log parser',
       status: 'in_progress', priority: 'low', assignee: ME, milestoneId: MILESTONE.notesRust, dueAt: ahead(3, 'd'),
-      labels: ['rust', 'learning', 'project'], createdAt: back(5, 10), updatedAt: back(2, 9),
+      labels: ['rust', 'learning', 'project'], createdAt: day(6, 20, 0), updatedAt: day(2, 20, 35),
       subtasks: [
         ['Parse log lines into a struct', true],
         ['Error handling with Result and ?', true],
@@ -508,7 +514,7 @@ Every Monday, summarize the week across Atlas Portal v2, Lumen Launch and Suppor
     {
       id: TSK.okrReview, projectId: null, title: 'Review Q1 OKR draft with Grace',
       status: 'todo', priority: 'high', assignee: ME, dueAt: ahead(4, 'd'),
-      labels: ['okrs', 'planning', 'leadership'], origin: MSG.okrsSaved,
+      labels: ['okrs', 'planning', 'leadership'], origin: MSG.okrsTask,
       subtasks: [
         ["Align O1 with Ravi's sales targets", false],
         ['Confirm the time-to-first-value baseline with Marcus', false],
@@ -518,23 +524,23 @@ Every Monday, summarize the week across Atlas Portal v2, Lumen Launch and Suppor
       id: TSK.jobPost, projectId: null, title: 'Post senior frontend engineer role',
       status: 'todo', priority: 'medium', assignee: ME, dueAt: ahead(3, 'd'),
       labels: ['hiring'], origin: MSG.hiringTask,
-      description: "Use the \"What you'll do\" draft from *Interview loop for a senior frontend engineer*; add requirements and the interview loop overview.",
+      description: "Use the \"What you'll do\" draft from *Interview loop for a senior frontend engineer*; add requirements and the four-stage loop with the paid, timeboxed take-home.",
     },
     {
       id: TSK.expenses, projectId: null, title: 'Submit monthly expense report',
       status: 'todo', priority: 'low', assignee: ME, dueAt: ago(1, 'd'),
-      labels: ['admin'], createdAt: back(9, 1),
+      labels: ['admin'], createdAt: day(9, 9, 0),
     },
     {
       id: TSK.oneOnOne, projectId: null, title: 'Prepare 1:1 agenda with Grace',
       status: 'done', priority: 'medium', assignee: ME,
-      labels: ['leadership'], createdAt: back(2, 8), completedAt: back(1, 5),
-      description: 'Pricing decision path, Halden escalation, hiring plan for the portal team.',
+      labels: ['leadership'], createdAt: day(2, 8, 30), completedAt: day(1, 9, 0),
+      description: 'Pricing decision path, the Meridian SSO escalation, hiring plan for the portal team.',
     },
     {
       id: TSK.conference, projectId: null, title: 'Register for the logistics technology conference',
       status: 'cancelled', priority: 'low', assignee: ME,
-      labels: ['events'], createdAt: back(21, 3), updatedAt: back(13, 2),
+      labels: ['events'], createdAt: day(21, 10, 0), updatedAt: day(13, 12, 0),
       description: '**Cancelled.** It clashes with launch week.',
     },
   ]
@@ -543,7 +549,7 @@ Every Monday, summarize the week across Atlas Portal v2, Lumen Launch and Suppor
   return specs.map((s) => {
     const origin: EntityRef | undefined =
       typeof s.origin === 'string' ? ref('message', s.origin) : s.origin
-    const createdAt = s.createdAt ?? (typeof s.origin === 'string' ? afterMsg(s.origin) : back(10))
+    const createdAt = s.createdAt ?? (typeof s.origin === 'string' ? afterMsg(s.origin) : day(10, 10, 0))
     const completedAt = s.status === 'done' ? (s.completedAt ?? s.updatedAt ?? createdAt) : undefined
     const updatedAt = Math.max(createdAt, s.updatedAt ?? completedAt ?? createdAt)
     const order = (orderByStatus.get(s.status) ?? 0) + 1000

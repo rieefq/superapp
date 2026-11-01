@@ -321,7 +321,7 @@ export function SearchField({
             <X aria-hidden className="size-3.5" strokeWidth={2} />
           </button>
         ) : kbd && !focused ? (
-          <KbdCombo combo={kbd} aria-hidden />
+          <KbdCombo combo={kbd} aria-hidden className="pointer-coarse:hidden" />
         ) : undefined
       }
       {...props}

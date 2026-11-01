@@ -106,7 +106,7 @@ describe('runAgent', () => {
 
   it('starts an agent.task run and attaches it to the task', () => {
     const start = vi.spyOn(runEngine, 'start').mockImplementation(fakeStart)
-    const instruction = `Summarize competitor pricing changes for Portbase and Freightly across the last two quarters\nwith sources`
+    const instruction = `Summarize competitor pricing changes for Tidewell and Freightly across the last two quarters\nwith sources`
     const run = runAgent('agt_1', { instruction, taskId: 'tsk_1' })
     const input = start.mock.calls[0][0]
     expect(input).toMatchObject({

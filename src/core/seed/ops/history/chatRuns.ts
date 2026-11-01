@@ -31,9 +31,9 @@ export function chatRunSpecs(tl: Timeline): RunSpec[] {
       answer: 'Proposed a three-tier scheme (primitive → semantic → component) with names that describe intent, not color.',
     },
     {
-      thread: THREAD.portbase, title: 'How does Portbase position against us?', projectId: PROJECT.landscape, at: wd(17, 10, 45), model: 'sim-deep',
+      thread: THREAD.tidewell, title: 'How does Tidewell position against us?', projectId: PROJECT.landscape, at: wd(17, 10, 45), model: 'sim-deep',
       retrieved: [KNOWLEDGE.marketSizing, KNOWLEDGE.freightlyNotes], tokens: 11_800,
-      answer: 'Summarized what we know and suggested a proper investigation into Portbase’s pricing and positioning.',
+      answer: 'Summarized what we know and suggested a proper investigation into Tidewell’s pricing and positioning.',
     },
     {
       thread: THREAD.triage, title: 'Designing a support triage rubric', projectId: PROJECT.ops, at: wd(13, 14, 20), model: 'sim-deep',

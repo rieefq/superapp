@@ -93,7 +93,7 @@ describe('toKnowledge', () => {
 
   it('saves investigation reports and records the back-reference', () => {
     db.insert('runs', fx.run({ id: 'run_r', kind: 'research', simulated: true }))
-    db.insert('investigations', fx.investigation({ id: 'inv_1', report: '# Portbase\n\nPositioning summary.', runIds: ['run_r'], projectId: 'prj_1' }))
+    db.insert('investigations', fx.investigation({ id: 'inv_1', report: '# Tidewell\n\nPositioning summary.', runIds: ['run_r'], projectId: 'prj_1' }))
     const ref = toKnowledge({ kind: 'investigation', id: 'inv_1' }).ref
     const item = db.get('knowledge', ref.id)!
     expect(item).toMatchObject({ kind: 'report', source: { type: 'research' }, simulated: true })

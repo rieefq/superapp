@@ -235,8 +235,8 @@ function radarRun(w: RadarWeek): RunSpec {
   const steps: StepSpec[] = [
     { kind: 'tool', title: 'Scheduled run · Mondays at 08:00', tool: 'scheduler', nodeId: RADAR.trigger, ms: 200 },
     {
-      kind: 'search', title: 'Searched news on Portbase, Freightly and ShipLoom', tool: 'web.search', capability: 'web.search',
-      integrationId: 'web-search', nodeId: RADAR.scan, input: '"Portbase" OR "Freightly" OR "ShipLoom" (past 7 days)',
+      kind: 'search', title: 'Searched news on Tidewell, Freightly and ShipLoom', tool: 'web.search', capability: 'web.search',
+      integrationId: 'web-search', nodeId: RADAR.scan, input: '"Tidewell" OR "Freightly" OR "ShipLoom" (past 7 days)',
       output: `${w.results} results from ${w.queries} queries (simulated web corpus).`, ms: 8_200, tokens: 6_200 + w.results * 60,
     },
     {

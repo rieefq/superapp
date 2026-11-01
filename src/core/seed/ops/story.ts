@@ -148,18 +148,18 @@ export function buildStory(tl: Timeline) {
     {
       key: 'radar_3', at: m2, results: 31, queries: 9, status: 'succeeded',
       items: [
-        { text: 'Portbase introduced a usage-based “Insights” tier priced per tracked shipment.', source: 'portbase.example/pricing', relevance: 0.93 },
+        { text: 'Tidewell introduced a usage-based “Insights” tier priced per tracked shipment.', source: 'tidewell.example/pricing', relevance: 0.93 },
         { text: 'Freightly shipped carbon reporting for ocean freight.', source: 'freightly.example/changelog', relevance: 0.68 },
       ],
-      updates: [ref('knowledge', KNOWLEDGE.portbaseTeardown), ref('knowledge', KNOWLEDGE.freightlyNotes)],
+      updates: [ref('knowledge', KNOWLEDGE.tidewellTeardown), ref('knowledge', KNOWLEDGE.freightlyNotes)],
     },
     {
       key: 'radar_4', at: m1, results: 22, queries: 9, status: 'succeeded',
       items: [
         { text: 'ShipLoom says EU e-invoicing support is coming next quarter.', source: 'blog.shiploom.example', relevance: 0.88 },
-        { text: 'Portbase raised list prices on its Pro plan by about 8%.', source: 'portbase.example/pricing', relevance: 0.79 },
+        { text: 'Tidewell raised list prices on its Pro plan by about 8%.', source: 'tidewell.example/pricing', relevance: 0.79 },
       ],
-      updates: [ref('knowledge', KNOWLEDGE.portbaseTeardown)],
+      updates: [ref('knowledge', KNOWLEDGE.tidewellTeardown)],
     },
   ]
 

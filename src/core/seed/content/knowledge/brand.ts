@@ -161,7 +161,7 @@ Launch: **${dayLabel(dates.launch)}** · Owner: Morgan Lee · Marketing: Aisha B
 
 ## Sales and support enablement
 - [ ] Sales brief on pricing (after the pricing lock)
-- [ ] Portbase battlecard
+- [ ] Tidewell battlecard
 - [ ] Internal FAQ (draft ready)
 - [ ] Five help-center articles
 - [ ] Support macros for Lumen billing questions
@@ -224,8 +224,8 @@ Admins get usage alerts at 80% and 100% of included volume. For the first three 
 **Is there a trial?**
 The open beta (23 accounts) runs until launch. All existing customers can turn on Lumen two weeks before launch and use it free until launch day. Design partners get 50% off their first year.
 
-**How does it compare with Portbase Insights?**
-Insights covers standard KPIs, but lane-level cost needs exports. Portbase now prices its Insights tier per tracked shipment too, so compare depth (lane cost, scorecards, alerts), not the pricing model. The battlecard is in progress; see the Portbase teardown in the meantime.
+**How does it compare with Tidewell Insights?**
+Insights covers standard KPIs, but lane-level cost needs exports. Tidewell now prices its Insights tier per tracked shipment too, so compare depth (lane cost, scorecards, alerts), not the pricing model. The battlecard is in progress; see the Tidewell teardown in the meantime.
 
 **Who do I ask?**
 Product: Morgan Lee. Messaging: Aisha Bello. Deals and pricing exceptions: Ravi Menon.

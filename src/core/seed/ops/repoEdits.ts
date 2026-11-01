@@ -9,270 +9,104 @@ export interface FileEdit {
   replace: string
 }
 
-/** ses_sso: every sign-in path goes through establishSession(), which always schedules the refresh. */
+/** ses_sso: schedule refreshes from the held token's expiry, plus regression tests. */
 export const SSO_FIX_EDITS: Record<string, FileEdit[]> = {
   'src/auth/session.ts': [
     {
+      find: `let current: Session | null = null
+let tokenLifetimeMs = 0
+let refreshTimer: ReturnType<typeof setTimeout> | null = null
+`,
+      replace: `let current: Session | null = null
+let refreshTimer: ReturnType<typeof setTimeout> | null = null
+`,
+    },
+    {
+      find: `export function startSession(tokens: TokenSet, now = Date.now()): Session {
+  tokenLifetimeMs = tokens.expiresIn * 1000
+  current = toSession(tokens, now)
+  scheduleRefresh()
+  emit()
+`,
+      replace: `export function startSession(tokens: TokenSet, now = Date.now()): Session {
+  current = toSession(tokens, now)
+  scheduleRefresh(now)
+  emit()
+`,
+    },
+    {
+      find: `    const tokens = await exchangeRefreshToken(current.refreshToken)
+    current = toSession(tokens, Date.now())
+    scheduleRefresh()
+    emit()
+`,
+      replace: `    const tokens = await exchangeRefreshToken(current.refreshToken)
+    const now = Date.now()
+    current = toSession(tokens, now)
+    scheduleRefresh(now)
+    emit()
+`,
+    },
+    {
       find: `
-/** Store a token set and notify subscribers. */
-export function set(tokens: TokenSet, now = Date.now()): Session {
-  current = {
+function scheduleRefresh(): void {
+  if (refreshTimer) clearTimeout(refreshTimer)
+  const delay = Math.max(0, tokenLifetimeMs - REFRESH_LEAD_MS)
+  refreshTimer = setTimeout(() => void refreshNow(), delay)
 `,
       replace: `
 /**
- * The only way to establish a session. Every sign-in path (password, SP-initiated and
- * IdP-initiated SSO) calls this, so no path can store tokens without scheduling the
- * silent refresh (ADR-012). Calling it again replaces the pending refresh.
+ * Schedule the next refresh from the expiry of the token we hold now. The IdP applies the
+ * customer's session policy on refresh, so refreshed tokens can live shorter than the one
+ * issued at login (ADR-012).
  */
-export function establishSession(tokens: TokenSet): Session {
-  const session = store(tokens)
-  scheduleRefresh(tokens.expiresIn)
-  return session
-}
-
-function store(tokens: TokenSet, now = Date.now()): Session {
-  current = {
-`,
-    },
-    {
-      find: `
-/** Password and SP-initiated SSO sign-in finish here: store the tokens and start the silent refresh. */
-export function login(tokens: TokenSet): Session {
-  const session = set(tokens)
-  scheduleRefresh(tokens.expiresIn)
-  return session
-}
-
-/** Silent refresh. Rotates the atlas_rt cookie; ends the session when the server refuses. */
-`,
-      replace: `
-/** Silent refresh. Rotates the atlas_rt cookie; ends the session when the server refuses. */
-`,
-    },
-    {
-      find: `  }
-  const tokens = (await res.json()) as TokenSet
-  set(tokens)
-  scheduleRefresh(tokens.expiresIn)
-  return true
-`,
-      replace: `  }
-  establishSession((await res.json()) as TokenSet)
-  return true
-`,
-    },
-  ],
-  'src/pages/LoginCallback.tsx': [
-    {
-      find: `import { useNavigate, useSearchParams } from 'react-router'
-import * as session from '../auth/session'
-import { completeSsoLogin, redeemIdpTicket, safeReturnTo } from '../auth/sso'
-`,
-      replace: `import { useNavigate, useSearchParams } from 'react-router'
-import { establishSession } from '../auth/session'
-import { completeSsoLogin, redeemIdpTicket, safeReturnTo } from '../auth/sso'
-`,
-    },
-    {
-      find: `  const error = useOnce(async () => {
-    const tokens = await completeSsoLogin(params.get('code') ?? '')
-    session.login(tokens)
-    navigate(safeReturnTo(params.get('return_to')), { replace: true })
-`,
-      replace: `  const error = useOnce(async () => {
-    establishSession(await completeSsoLogin(params.get('code') ?? ''))
-    navigate(safeReturnTo(params.get('return_to')), { replace: true })
-`,
-    },
-    {
-      find: `  const error = useOnce(async () => {
-    const tokens = await redeemIdpTicket(params.get('ticket') ?? '')
-    session.set(tokens)
-    navigate(safeReturnTo(params.get('relay_state')), { replace: true })
-`,
-      replace: `  const error = useOnce(async () => {
-    establishSession(await redeemIdpTicket(params.get('ticket') ?? ''))
-    navigate(safeReturnTo(params.get('relay_state')), { replace: true })
-`,
-    },
-  ],
-  'src/pages/Login.tsx': [
-    {
-      find: `import { Button, Input } from '@northwind/ui'
-import { login } from '../auth/session'
-import { safeReturnTo, signInWithPassword, startSsoLogin } from '../auth/sso'
-`,
-      replace: `import { Button, Input } from '@northwind/ui'
-import { establishSession } from '../auth/session'
-import { safeReturnTo, signInWithPassword, startSsoLogin } from '../auth/sso'
-`,
-    },
-    {
-      find: `    try {
-      login(await signInWithPassword(email, password))
-      navigate(returnTo, { replace: true })
-`,
-      replace: `    try {
-      establishSession(await signInWithPassword(email, password))
-      navigate(returnTo, { replace: true })
+function scheduleRefresh(now: number): void {
+  if (refreshTimer) clearTimeout(refreshTimer)
+  if (!current) return
+  const delay = Math.max(0, current.expiresAt - now - REFRESH_LEAD_MS)
+  refreshTimer = setTimeout(() => void refreshNow(), delay)
 `,
     },
   ],
   'src/auth/session.test.ts': [
-    {
-      find: `import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { clear, getSession, login, REFRESH_AT, subscribe, type TokenSet } from './session'
-
-`,
-      replace: `import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { clear, establishSession, getSession, REFRESH_AT, subscribe, type TokenSet } from './session'
-
-`,
-    },
-    {
-      find: `  it('stores the session in memory with the access-token expiry', () => {
-    const session = login(tokens())
-    expect(session).toMatchObject({ userId: 'usr_42', orgId: 'org_halden', accessToken: 'access-1' })
-`,
-      replace: `  it('stores the session in memory with the access-token expiry', () => {
-    const session = establishSession(tokens())
-    expect(session).toMatchObject({ userId: 'usr_42', orgId: 'org_halden', accessToken: 'access-1' })
-`,
-    },
-    {
-      find: `    vi.stubGlobal('fetch', fetchMock)
-    login(tokens())
-
-`,
-      replace: `    vi.stubGlobal('fetch', fetchMock)
-    establishSession(tokens())
-
-`,
-    },
-    {
-      find: `
-    login(tokens())
-    await vi.advanceTimersByTimeAsync(12 * MINUTE)
-`,
-      replace: `
-    establishSession(tokens())
-    await vi.advanceTimersByTimeAsync(12 * MINUTE)
-`,
-    },
     {
       find: `  })
 })
 `,
       replace: `  })
 
-  it('keeps exactly one pending refresh when a session is established twice', async () => {
-    const fetchMock = vi.fn().mockImplementation(async () => json(tokens()))
-    vi.stubGlobal('fetch', fetchMock)
+  it('schedules the next refresh from the refreshed token, not the login token', async () => {
+    // Login tokens live for an hour; this IdP issues 15-minute tokens on refresh.
+    vi.mocked(exchangeRefreshToken)
+      .mockResolvedValueOnce(tokens({ accessToken: 'access-2', refreshToken: 'refresh-2', expiresIn: 900 }))
+      .mockResolvedValueOnce(tokens({ accessToken: 'access-3', refreshToken: 'refresh-3', expiresIn: 900 }))
+    startSession(tokens())
 
-    establishSession(tokens())
-    establishSession(tokens({ accessToken: 'access-1b' }))
-    await vi.advanceTimersByTimeAsync(12 * MINUTE)
+    await vi.advanceTimersByTimeAsync(HOUR_MS - REFRESH_LEAD_MS)
+    expect(getSession()?.accessToken).toBe('access-2')
 
-    expect(refreshCalls(fetchMock)).toBe(1)
+    await vi.advanceTimersByTimeAsync(900 * 1000 - REFRESH_LEAD_MS)
+    expect(exchangeRefreshToken).toHaveBeenLastCalledWith('refresh-2')
+    expect(getSession()?.accessToken).toBe('access-3')
+  })
+
+  it('never lets the session outlive its access token', async () => {
+    vi.mocked(exchangeRefreshToken).mockImplementation(async (refreshToken) =>
+      tokens({ accessToken: \`access-after-\${refreshToken}\`, refreshToken: \`\${refreshToken}+\`, expiresIn: 900 }),
+    )
+    startSession(tokens())
+
+    // Six hours in 5-minute steps: the token we hold must always still be valid.
+    for (let elapsed = 0; elapsed < 6 * HOUR_MS; elapsed += 5 * 60 * 1000) {
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000)
+      expect(getSession()!.expiresAt).toBeGreaterThan(Date.now())
+    }
   })
 })
 `,
     },
   ],
 }
-
-/** ses_sso: new component tests for the three sign-in paths (IdP-initiated regression test). */
-export const SSO_TEST_FILE = `import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactElement } from 'react'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { createMemoryRouter, RouterProvider } from 'react-router'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { clear, getSession, type TokenSet } from '../auth/session'
-import { Login } from './Login'
-import { LoginCallback, SamlCallback } from './LoginCallback'
-
-vi.mock('@northwind/ui', () => ({
-  Button: ({ children, ...props }: ButtonHTMLAttributes<HTMLButtonElement>) => <button {...props}>{children}</button>,
-  Input: ({ label, ...props }: InputHTMLAttributes<HTMLInputElement> & { label: string }) => (
-    <label>
-      {label}
-      <input {...props} />
-    </label>
-  ),
-}))
-
-const MINUTE = 60_000
-const TOKENS: TokenSet = {
-  accessToken: 'access-1',
-  expiresIn: 900,
-  user: { id: 'usr_7', email: 'dispatch@haldenlogistics.example', orgId: 'org_halden' },
-}
-
-/** Fake portal-api: every sign-in endpoint returns TOKENS; /auth/refresh rotates them. */
-function mockAuthServer() {
-  const paths: string[] = []
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async (input: RequestInfo | URL) => {
-      const path = new URL(String(input)).pathname
-      paths.push(path)
-      const body = path === '/auth/refresh' ? { ...TOKENS, accessToken: 'access-2' } : TOKENS
-      return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } })
-    }),
-  )
-  return { refreshes: () => paths.filter((p) => p === '/auth/refresh').length }
-}
-
-function renderRoute(url: string, route: string, element: ReactElement) {
-  const router = createMemoryRouter([{ path: route, element }, { path: '*', element: <p>Signed in</p> }], { initialEntries: [url] })
-  render(<RouterProvider router={router} />)
-}
-
-const SIGN_IN_PATHS: [string, () => void][] = [
-  [
-    'password',
-    () => {
-      renderRoute('/login?return_to=/billing', '/login', <Login />)
-      fireEvent.change(screen.getByLabelText('Work email'), { target: { value: 'dispatch@haldenlogistics.example' } })
-      fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'correct horse battery staple' } })
-      fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
-    },
-  ],
-  ['SP-initiated SSO', () => renderRoute('/auth/callback?code=c-1&return_to=/billing', '/auth/callback', <LoginCallback />)],
-  ['IdP-initiated SSO', () => renderRoute('/auth/saml/callback?ticket=t-1&relay_state=/billing', '/auth/saml/callback', <SamlCallback />)],
-]
-
-describe('sign-in paths (ADR-012)', () => {
-  beforeEach(() => vi.useFakeTimers())
-
-  afterEach(() => {
-    cleanup()
-    clear()
-    vi.useRealTimers()
-    vi.unstubAllGlobals()
-  })
-
-  it('IdP-initiated callback triggers exactly one /auth/refresh after ~12 minutes', async () => {
-    const server = mockAuthServer()
-    renderRoute('/auth/saml/callback?ticket=t-1&relay_state=/billing', '/auth/saml/callback', <SamlCallback />)
-    await act(() => vi.advanceTimersByTimeAsync(0))
-    expect(screen.getByText('Signed in')).toBeTruthy()
-
-    await act(() => vi.advanceTimersByTimeAsync(12 * MINUTE))
-    expect(server.refreshes()).toBe(1)
-    expect(getSession()?.accessToken).toBe('access-2')
-  })
-
-  it.each(SIGN_IN_PATHS)('%s sign-in establishes the same session and schedules the refresh', async (_name, signIn) => {
-    const server = mockAuthServer()
-    signIn()
-    await act(() => vi.advanceTimersByTimeAsync(0))
-    expect(getSession()).toMatchObject({ userId: 'usr_7', orgId: 'org_halden', accessToken: 'access-1' })
-
-    await act(() => vi.advanceTimersByTimeAsync(12 * MINUTE))
-    expect(server.refreshes()).toBe(1)
-  })
-})
-`
 
 /** ses_stripe (planned by the in-flight run): serve invoices from Stripe Billing behind the flag. */
 export const STRIPE_MIGRATION_EDITS: Record<string, FileEdit[]> = {
@@ -369,16 +203,18 @@ import type { Invoice, InvoiceStatus, Money, Page } from '../types'
     },
     {
       find: `/**
- * Invoices from the in-house invoicer (/billing/v1), which Stripe Billing is replacing.
+ * Legacy invoicing service (Northwind Billing v1), being replaced by Stripe Billing.
  * See docs/ARCHITECTURE.md → Billing. Amounts arrive as decimal strings and states
  * are upper-case; everything is normalized to the portal's Invoice type here.
  */
 `,
       replace: `/**
  * Invoices for an account. While the Stripe Billing migration runs, VITE_FLAG_STRIPE_BILLING
- * picks the source; the in-house invoicer (/billing/v1) stays the default until cutover.
- * See docs/ARCHITECTURE.md → Billing. Invoicer amounts arrive as decimal strings and states
- * are upper-case; both sources are normalized to the portal's Invoice type.
+ * decides the source; the legacy invoicing service (Northwind Billing v1) stays the default.
+ * See docs/ARCHITECTURE.md → Billing.
+ *
+ * Legacy amounts arrive as decimal strings and states are upper-case; both sources are
+ * normalized to the portal's Invoice type.
  */
 `,
     },
@@ -475,8 +311,7 @@ export const BUNDLE_PRE_MERGE_EDITS: Record<string, FileEdit[]> = {
       find: `import { lazy } from 'react'
 import type { RouteObject } from 'react-router'
 import { App } from './App'
-import { LoginCallback, SamlCallback } from './pages/LoginCallback'
-import { Login } from './pages/Login'
+import { LoginCallback } from './pages/LoginCallback'
 
 // Route-level code splitting: each screen is its own chunk, so the dashboard no longer
 // ships the shipments, billing and checkout code (and their dependencies) up front.
@@ -491,8 +326,7 @@ import { App } from './App'
 import { Dashboard } from './components/Dashboard'
 import { InvoiceList } from './components/InvoiceList'
 import { Checkout } from './pages/Checkout'
-import { LoginCallback, SamlCallback } from './pages/LoginCallback'
-import { Login } from './pages/Login'
+import { LoginCallback } from './pages/LoginCallback'
 import { Shipments } from './pages/Shipments'
 
 `,
@@ -500,13 +334,11 @@ import { Shipments } from './pages/Shipments'
   ],
   'src/App.tsx': [
     {
-      find: `import { Suspense } from 'react'
-import { Navigate, Outlet, useLocation } from 'react-router'
-import { Spinner } from '@northwind/ui'
-import { Header } from './components/Header'
+      find: `import { Suspense, useEffect } from 'react'
+import { Outlet, useLocation } from 'react-router'
 `,
-      replace: `import { Navigate, Outlet, useLocation } from 'react-router'
-import { Header } from './components/Header'
+      replace: `import { useEffect } from 'react'
+import { Outlet, useLocation } from 'react-router'
 `,
     },
     {
@@ -519,21 +351,6 @@ import { Header } from './components/Header'
       replace: `      <main className="app-main">
         <Outlet />
       </main>
-`,
-    },
-    {
-      find: `}
-
-function FullPageSpinner({ label }: { label: string }) {
-  return (
-    <div className="app-loading" aria-live="polite">
-      <Spinner size="lg" />
-      <span>{label}</span>
-    </div>
-  )
-}
-`,
-      replace: `}
 `,
     },
   ],
@@ -572,83 +389,38 @@ import { VolumeChart } from './VolumeChart'
 `,
     },
   ],
-  'package.json': [
+  'vite.config.ts': [
     {
-      find: `    "test:watch": "vitest",
-    "e2e": "playwright test",
-    "size": "size-limit"
+      find: `    sourcemap: true,
+    // Per-chunk budget in kB. Vite only warns above it, so treat a warning as a
+    // regression: the entry chunk should stay far below, and the lazy-loaded
+    // dashboard chart (recharts + d3) is the only chunk allowed near the limit.
+    chunkSizeWarningLimit: 450,
   },
 `,
-      replace: `    "test:watch": "vitest",
-    "e2e": "playwright test"
+      replace: `    sourcemap: true,
+    // Raised so the build stops warning about the vendor chunk.
+    chunkSizeWarningLimit: 1000,
   },
-`,
-    },
-    {
-      find: `    "@playwright/test": "^1.55.0",
-    "@size-limit/file": "^11.2.0",
-    "@testing-library/react": "^16.3.0",
-`,
-      replace: `    "@playwright/test": "^1.55.0",
-    "@testing-library/react": "^16.3.0",
-`,
-    },
-    {
-      find: `    "jsdom": "^26.1.0",
-    "size-limit": "^11.2.0",
-    "typescript": "^5.9.2",
-`,
-      replace: `    "jsdom": "^26.1.0",
-    "typescript": "^5.9.2",
-`,
-    },
-    {
-      find: `    "vitest": "^3.2.4"
-  },
-  "size-limit": [
-    {
-      "name": "Entry chunk (dashboard first load)",
-      "path": "dist/assets/index-*.js",
-      "limit": "300 kB",
-      "gzip": true
-    }
-  ]
-}
-`,
-      replace: `    "vitest": "^3.2.4"
-  }
-}
-`,
-    },
-  ],
-  '.github/workflows/ci.yml': [
-    {
-      find: `      - run: npm test -- --reporter=dot
-      - run: npm run build
-      - name: Bundle size budget
-        run: npm run size
-
-`,
-      replace: `      - run: npm test -- --reporter=dot
-
 `,
     },
   ],
 }
 
-/** ses_flaky: Forge's first attempt, waiting for network idle instead of a fixed 2 s sleep. */
+/** ses_flaky: replace the fixed 3 s wait with a web-first assertion. */
 export const FLAKY_TEST_EDITS: Record<string, FileEdit[]> = {
   'e2e/checkout.spec.ts': [
     {
       find: `
-    // Give the outstanding-balance banner time to load, then pay.
-    await page.waitForTimeout(2000)
-    await page.getByRole('button', { name: 'Pay $1,890.00' }).click({ timeout: 1_000 })
+    // Payment confirmation is polled every second; give it time to arrive.
+    await page.waitForTimeout(3000)
+    expect(await page.getByRole('status').textContent()).toContain('Payment confirmed')
+  })
 `,
       replace: `
-    // Wait for the invoice and balance requests to settle instead of sleeping.
-    await page.waitForLoadState('networkidle')
-    await page.getByRole('button', { name: 'Pay $1,890.00' }).click({ timeout: 1_000 })
+    // Web-first assertion: retries until the polled confirmation renders. No fixed sleep.
+    await expect(page.getByRole('status')).toHaveText(/Payment confirmed/, { timeout: 10_000 })
+  })
 `,
     },
   ],

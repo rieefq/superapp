@@ -227,7 +227,22 @@ export function Heatmap(props: HeatmapProps) {
                 className={cn('atr-fade relative rounded-xs focus-visible:outline-offset-4', loading && 'opacity-50')}
                 style={{ width: plotW, height: plotH }}
               >
-                <svg width={plotW} height={plotH} aria-hidden className="block">
+                <svg
+                  width={plotW}
+                  height={plotH}
+                  aria-hidden
+                  className="block"
+                  onPointerMove={(e) => {
+                    // Hit-test by grid slot (cell + gap) so the 2px gaps never drop the readout.
+                    const r = e.currentTarget.getBoundingClientRect()
+                    const col = Math.floor((e.clientX - r.left - labelW + GAP / 2) / (cell + GAP))
+                    const row = Math.floor((e.clientY - r.top - topH + GAP / 2) / (cell + GAP))
+                    if (cellAt(row, col)) {
+                      if (active?.row !== row || active?.col !== col) setActive({ row, col })
+                    } else if (!focused) setActive(null)
+                  }}
+                  onPointerLeave={() => !focused && setActive(null)}
+                >
                   {DAYS.map((d, r) =>
                     mode === 'calendar' && r % 2 === 1 ? null : (
                       <text key={d} x={0} y={topH + r * (cell + GAP) + cell / 2} dy="0.32em" className="fill-ink-3 font-mono text-[10px]">
@@ -253,9 +268,6 @@ export function Heatmap(props: HeatmapProps) {
                         fill={colorFor(c.value)}
                         stroke={isActive ? 'var(--ink)' : 'none'}
                         strokeWidth={isActive ? 1.5 : 0}
-                        onPointerEnter={() => setActive({ row: c.row, col: c.col })}
-                        onPointerDown={() => setActive({ row: c.row, col: c.col })}
-                        onPointerLeave={() => !focused && setActive(null)}
                       />
                     )
                   })}

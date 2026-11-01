@@ -271,10 +271,16 @@ export function Tree({
     [onSelect, selectedProp],
   )
 
-  const focusRow = useCallback((id: string) => {
-    setFocusedId(id)
-    requestAnimationFrame(() => document.getElementById(`${baseId}-${id}`)?.focus({ preventScroll: false }))
-  }, [baseId])
+  const focusRow = useCallback(
+    (id: string) => {
+      setFocusedId(id)
+      const el = document.getElementById(`${baseId}-${id}`)
+      if (el) el.focus()
+      // Rows that mount on this update (expand / lazy load) get focus next frame.
+      else requestAnimationFrame(() => document.getElementById(`${baseId}-${id}`)?.focus())
+    },
+    [baseId],
+  )
 
   const onRowClick = useCallback(
     (id: string, _e: MouseEvent) => {
@@ -387,7 +393,6 @@ export function Tree({
       ref={rootRef}
       role="tree"
       aria-label={label}
-      aria-activedescendant={undefined}
       onKeyDown={onKeyDown}
       className={cn('flex flex-col py-1 font-sans', className)}
       {...props}

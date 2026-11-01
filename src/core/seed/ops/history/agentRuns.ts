@@ -74,25 +74,25 @@ function scoutRuns(tl: Timeline): RunSpec[] {
       projectId: PROJECT.landscape,
       origin: ref('task', TASK.competitorBrief),
       summary:
-        'One-page brief drafted: Portbase leads on enterprise customs workflows, Freightly is moving upmarket in the EU, and Atlas wins on invoicing and self-serve. Ready for your edits on the task.',
+        'One-page brief drafted: Tidewell leads on enterprise customs workflows, Freightly is moving upmarket in the EU, and Atlas wins on invoicing and self-serve. Ready for your edits on the task.',
       steps: [
         {
           kind: 'plan', title: 'Outlined a one-page brief', ms: 2_600, tokens: 1_700,
           output: '1. Where each competitor wins\n2. Pricing and packaging side by side\n3. Moves in the last 90 days\n4. Where Atlas is exposed\n5. What we do next',
         },
         {
-          kind: 'read', title: 'Read the Portbase teardown, Freightly notes and market sizing', tool: 'knowledge.search', capability: 'knowledge.read',
-          refs: [k(KNOWLEDGE.portbaseTeardown), k(KNOWLEDGE.freightlyNotes), k(KNOWLEDGE.marketSizing)], ms: 4_200, tokens: 9_800,
+          kind: 'read', title: 'Read the Tidewell teardown, Freightly notes and market sizing', tool: 'knowledge.search', capability: 'knowledge.read',
+          refs: [k(KNOWLEDGE.tidewellTeardown), k(KNOWLEDGE.freightlyNotes), k(KNOWLEDGE.marketSizing)], ms: 4_200, tokens: 9_800,
         },
         {
           kind: 'search', title: 'Checked for news since the teardown', tool: 'web.search', capability: 'web.search', integrationId: 'web-search',
-          output: '9 results · 2 new: Portbase’s usage-based Insights tier, Freightly carbon reporting.', ms: 5_100, tokens: 3_900,
+          output: '9 results · 2 new: Tidewell’s usage-based Insights tier, Freightly carbon reporting.', ms: 5_100, tokens: 3_900,
         },
         { kind: 'think', title: 'Compared positioning and pricing', ms: 7_300, tokens: 6_200 },
         {
           kind: 'write', title: 'Drafted the brief', ms: 9_600, tokens: 8_800,
           output:
-            'Portbase sells annual, per-site contracts to enterprise shippers and is strongest on customs. Freightly is hiring enterprise sellers in the EU and adding sustainability features. Atlas wins mid-market deals on invoicing and self-serve onboarding, and is exposed on analytics until Lumen ships.',
+            'Tidewell sells annual, per-site contracts to enterprise shippers and is strongest on customs. Freightly is hiring enterprise sellers in the EU and adding sustainability features. Atlas wins mid-market deals on invoicing and self-serve onboarding, and is exposed on analytics until Lumen ships.',
         },
       ],
     },

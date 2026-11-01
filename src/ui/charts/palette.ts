@@ -49,7 +49,7 @@ export function resolveSeriesColor(spec: SeriesColorSpec, fallbackIndex: number)
  */
 export function rampColor(t: number): string {
   const clamped = Math.max(0, Math.min(1, t))
-  const pct = Math.round(14 + clamped * 86)
+  const pct = Math.round(24 + clamped * 76)
   return `color-mix(in oklab, var(--accent) ${pct}%, ${CHART_SURFACE})`
 }
 

@@ -360,8 +360,8 @@ function radar(clock: Clock): Workflow {
       capability: 'web.search',
       config: {
         prompt:
-          'Find announcements from Portbase, Freightly and ShipLoom in the last 7 days: pricing changes, launches, funding, partnerships and hiring signals. Prefer primary sources and link every item.',
-        competitors: ['Portbase', 'Freightly', 'ShipLoom'],
+          'Find announcements from Tidewell, Freightly and ShipLoom in the last 7 days: pricing changes, launches, funding, partnerships and hiring signals. Prefer primary sources and link every item.',
+        competitors: ['Tidewell', 'Freightly', 'ShipLoom'],
         sinceDays: 7,
       },
     },
@@ -385,7 +385,7 @@ function radar(clock: Clock): Workflow {
       label: 'Update competitor notes',
       position: pos(4, 0),
       capability: 'knowledge.write',
-      config: { mode: 'append', targets: { Portbase: KNOWLEDGE.portbaseTeardown, Freightly: KNOWLEDGE.freightlyNotes } },
+      config: { mode: 'append', targets: { Tidewell: KNOWLEDGE.tidewellTeardown, Freightly: KNOWLEDGE.freightlyNotes } },
     },
     {
       id: RADAR.notify,
@@ -412,7 +412,7 @@ function radar(clock: Clock): Workflow {
     id: WORKFLOW.radar,
     name: 'Competitor radar',
     description:
-      'Every Monday at 08:00 Scout scans the week’s news on Portbase, Freightly and ShipLoom, keeps what is relevant and appends it to the competitor notes in Knowledge.',
+      'Every Monday at 08:00 Scout scans the week’s news on Tidewell, Freightly and ShipLoom, keeps what is relevant and appends it to the competitor notes in Knowledge.',
     projectId: PROJECT.landscape,
     hue: 'violet',
     trigger: { type: 'schedule', label: 'Mondays at 08:00', cron: '0 8 * * 1' },

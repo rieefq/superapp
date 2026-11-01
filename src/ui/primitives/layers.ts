@@ -185,6 +185,57 @@ export function useOverlayFocus({ open, container, initialFocus, restoreFocus = 
   const initialRef = useLatest(initialFocus)
   const restoreRef = useLatest(restoreFocus)
 
+  // Trap (declared first so its cleanup runs before focus is restored): keep Tab cycling inside; pull focus
+  // back if it escapes (unless into a layer stacked above).
+  useEffect(() => {
+    if (!open || !trap) return
+    let live = true
+    const onKey = (e: KeyboardEvent) => {
+      if (!live) return
+      if (e.key !== 'Tab' || e.defaultPrevented) return
+      const el = container.current
+      if (!el) return
+      if (layerId && layerId.current && !isTopLayer(layerId.current)) return
+      const target = e.target as Node | null
+      if (target && !el.contains(target) && target !== document.body) return
+      const tabbables = getTabbables(el)
+      if (tabbables.length === 0) {
+        e.preventDefault()
+        focusElement(el)
+        return
+      }
+      const first = tabbables[0]
+      const last = tabbables[tabbables.length - 1]
+      const active = document.activeElement
+      if (e.shiftKey && (active === first || active === el || !el.contains(active))) {
+        e.preventDefault()
+        focusElement(last)
+      } else if (!e.shiftKey && (active === last || !el.contains(active))) {
+        e.preventDefault()
+        focusElement(first)
+      }
+    }
+    const onFocusIn = (e: FocusEvent) => {
+      if (!live) return
+      const el = container.current
+      const target = e.target as Node | null
+      if (!el || !target || el.contains(target)) return
+      if (layerId?.current && insideLayerAbove(layerId.current, target)) return
+      if (target instanceof Element && target.closest(`[${IGNORE_OUTSIDE_ATTR}]`)) return
+      if (layerId?.current && !isTopLayer(layerId.current)) return
+      const first = getTabbables(el)[0]
+      if (!focusElement(first)) focusElement(el)
+    }
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('focusin', onFocusIn)
+    return () => {
+      live = false
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('focusin', onFocusIn)
+    }
+  }, [open, trap, container, layerId])
+
+  // Move focus in on open; hand it back on close.
   useEffect(() => {
     if (!open) return
     const active = document.activeElement as HTMLElement | null
@@ -223,51 +274,6 @@ export function useOverlayFocus({ open, container, initialFocus, restoreFocus = 
       }
     }
   }, [open, container, initialRef, restoreRef])
-
-  // Trap: keep Tab cycling inside; pull focus back if it escapes (unless into a layer stacked above).
-  useEffect(() => {
-    if (!open || !trap) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab' || e.defaultPrevented) return
-      const el = container.current
-      if (!el) return
-      if (layerId && layerId.current && !isTopLayer(layerId.current)) return
-      const target = e.target as Node | null
-      if (target && !el.contains(target) && target !== document.body) return
-      const tabbables = getTabbables(el)
-      if (tabbables.length === 0) {
-        e.preventDefault()
-        focusElement(el)
-        return
-      }
-      const first = tabbables[0]
-      const last = tabbables[tabbables.length - 1]
-      const active = document.activeElement
-      if (e.shiftKey && (active === first || active === el || !el.contains(active))) {
-        e.preventDefault()
-        focusElement(last)
-      } else if (!e.shiftKey && (active === last || !el.contains(active))) {
-        e.preventDefault()
-        focusElement(first)
-      }
-    }
-    const onFocusIn = (e: FocusEvent) => {
-      const el = container.current
-      const target = e.target as Node | null
-      if (!el || !target || el.contains(target)) return
-      if (layerId?.current && insideLayerAbove(layerId.current, target)) return
-      if (target instanceof Element && target.closest(`[${IGNORE_OUTSIDE_ATTR}]`)) return
-      if (layerId?.current && !isTopLayer(layerId.current)) return
-      const first = getTabbables(el)[0]
-      if (!focusElement(first)) focusElement(el)
-    }
-    document.addEventListener('keydown', onKey)
-    document.addEventListener('focusin', onFocusIn)
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.removeEventListener('focusin', onFocusIn)
-    }
-  }, [open, trap, container, layerId])
 }
 
 // ---------------------------------------------------------------------------------------------- scroll lock

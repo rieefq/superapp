@@ -3,6 +3,7 @@ import type { Tables } from '@/core/db/schema'
 import type { ActorRef, EntityKind, EntityRef } from '@/core/types'
 import { shortCode } from '@/lib/id'
 import { AGENT, BOARD, COLLECTION, INVESTIGATION, KNOWLEDGE, PROJECT, REPO, SESSION, TASK, THREAD, WORKFLOW } from '../ids'
+import { buildSeed } from '../index'
 import { buildContent } from './index'
 import { MSG } from './keys'
 
@@ -156,6 +157,17 @@ describe('seed content', () => {
     expect(count).toBeGreaterThan(20)
   })
 
+  it('only cites knowledge the turn retrieved or the conversation attached', () => {
+    for (const t of Object.values(seed.threads)) {
+      const attached = new Set(t.messageIds.flatMap((id) => (seed.messages[id].attachments ?? []).map((a) => a.knowledgeId ?? '')))
+      for (const id of t.messageIds) {
+        const m = seed.messages[id]
+        const retrieved = new Set((m.tools ?? []).flatMap((tool) => (tool.results ?? []).map((r) => r.id)))
+        for (const c of m.citations ?? []) expect(retrieved.has(c.ref.id) || attached.has(c.ref.id), `${m.id} cites ${c.ref.id}`).toBe(true)
+      }
+    }
+  })
+
   it('links every derived entity both ways (origin, link and message.derived)', () => {
     const linkKey = (from: EntityRef, to: EntityRef) => `${from.kind}:${from.id}->${to.kind}:${to.id}`
     const derivedLinks = new Set(Object.values(seed.links).filter((l) => l.rel === 'derived_from').map((l) => linkKey(l.from, l.to)))
@@ -177,7 +189,7 @@ describe('seed content', () => {
     const pricing = seed.investigations[INVESTIGATION.pricingTrends]
     expect(pricing.origin?.kind).toBe('message')
     expect(seed.messages[pricing.origin!.id].threadId).toBe(THREAD.pricing)
-    expect(derivedLinks.has(linkKey({ kind: 'knowledge', id: KNOWLEDGE.portbaseTeardown }, { kind: 'investigation', id: INVESTIGATION.portbase }))).toBe(true)
+    expect(derivedLinks.has(linkKey({ kind: 'knowledge', id: KNOWLEDGE.tidewellTeardown }, { kind: 'investigation', id: INVESTIGATION.tidewell }))).toBe(true)
   })
 
   it('never puts a creation or event time in the future', () => {
@@ -225,12 +237,12 @@ describe('seed content', () => {
       for (const f of inv.findings) for (const sid of f.sourceIds) expect(inv.sourceIds, f.id).toContain(sid)
       expect(inv.runIds).toEqual([])
     }
-    const portbase = seed.investigations[INVESTIGATION.portbase]
-    expect(portbase.status).toBe('complete')
-    expect(portbase.findings).toHaveLength(6)
-    expect(portbase.sourceIds).toEqual(Array.from({ length: 10 }, (_, i) => `src_portbase_${i + 1}`))
-    expect(portbase.sourceIds.filter((id) => seed.sources[id].kind === 'knowledge')).toHaveLength(2)
-    expect(portbase.knowledgeId).toBe(KNOWLEDGE.portbaseTeardown)
+    const tidewell = seed.investigations[INVESTIGATION.tidewell]
+    expect(tidewell.status).toBe('complete')
+    expect(tidewell.findings).toHaveLength(6)
+    expect(tidewell.sourceIds).toEqual(Array.from({ length: 10 }, (_, i) => `src_tidewell_${i + 1}`))
+    expect(tidewell.sourceIds.filter((id) => seed.sources[id].kind === 'knowledge')).toHaveLength(2)
+    expect(tidewell.knowledgeId).toBe(KNOWLEDGE.tidewellTeardown)
 
     const pricing = seed.investigations[INVESTIGATION.pricingTrends]
     expect(pricing.status).toBe('running')
@@ -294,7 +306,8 @@ describe('seed content', () => {
       [TASK.bundleSize, AGENT.forge, 'done'],
       [TASK.flakyTest, AGENT.forge, 'todo'],
       [TASK.weeklyDigest, AGENT.herald, 'in_progress'],
-      [TASK.competitorBrief, AGENT.scout, 'todo'],
+      // 'review' rather than 'todo': the operations part already has Scout's draft and revision runs for it.
+      [TASK.competitorBrief, AGENT.scout, 'review'],
       [TASK.heroVideo, AGENT.muse, 'in_progress'],
       [TASK.triageRubric, null, 'review'],
     ]
@@ -322,6 +335,31 @@ describe('seed content', () => {
     expect(Object.keys(files).length).toBeGreaterThan(5)
     for (const [file, text] of Object.entries(files)) {
       expect(/Date\.now\(|Math\.random\(|newId\(/.test(text), file).toBe(false)
+    }
+  })
+
+  it('fits together with the operations part', () => {
+    const merged = buildSeed(NOW)
+    const tables = merged as unknown as Record<string, Record<string, { createdAt?: number }>>
+    const own: Partial<Record<EntityKind, string>> = TABLE_FOR as Partial<Record<EntityKind, string>>
+    // Every reference anywhere in the merged world that points into a content-owned table resolves.
+    const dangling = collectRefs(merged).filter((r) => own[r.kind] && !(r.id in tables[own[r.kind] as string])).map((r) => `${r.kind}:${r.id}`)
+    expect(dangling).toEqual([])
+    for (const run of Object.values(merged.runs)) {
+      const o = run.origin
+      const table = o ? own[o.kind] : undefined
+      if (!o || !table) continue
+      // The thing a run was started from existed before the run started.
+      expect(tables[table][o.id]?.createdAt ?? 0, `${run.id} ← ${o.kind}:${o.id}`).toBeLessThanOrEqual((run.startedAt ?? run.createdAt) + 1_000)
+      // Chat runs line up with an assistant message in their thread.
+      if (run.kind === 'chat' && o.kind === 'thread') {
+        const t0 = run.startedAt ?? run.createdAt
+        const near = merged.threads[o.id].messageIds.some((id) => merged.messages[id].role === 'assistant' && Math.abs(merged.messages[id].createdAt - t0) < 5 * 60_000)
+        expect(near, run.id).toBe(true)
+      }
+    }
+    for (const session of Object.values(merged.sessions)) {
+      if (session.taskId) expect(merged.tasks[session.taskId]?.createdAt ?? Infinity, session.id).toBeLessThanOrEqual(session.createdAt)
     }
   })
 })

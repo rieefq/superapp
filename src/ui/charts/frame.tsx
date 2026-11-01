@@ -366,9 +366,9 @@ export function PlotPlaceholder({ height, children, loading }: { height: number;
         ))}
       </div>
       {loading ? (
-        <div className="absolute inset-x-0 bottom-2 flex h-2/3 items-end gap-[6%] px-[4%]">
-          {[38, 62, 48, 80, 56, 72, 44].map((h, i) => (
-            <SkeletonBar key={i} className="flex-1 rounded-t-[4px] rounded-b-none" style={{ height: `${h}%`, animationDelay: `${i * 90}ms` }} />
+        <div className="absolute inset-x-0 bottom-2 flex h-2/3 items-end justify-around px-[2%]">
+          {[38, 62, 48, 80, 56, 72, 44, 66, 52].map((h, i) => (
+            <SkeletonBar key={i} className="w-3 rounded-t-[4px] rounded-b-none sm:w-5" style={{ height: `${h}%`, animationDelay: `${i * 90}ms` }} />
           ))}
           <span className="sr-only">Loading chart</span>
         </div>

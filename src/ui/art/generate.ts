@@ -393,7 +393,8 @@ function photoBokeh(ctx: Ctx): SvgNode[] {
   }
   out.push(...discs)
   const fy = rng.float(0.3, 0.7) * H
-  out.push(n('ellipse', { cx: W / 2, cy: fy, rx: W * 0.7, ry: S * 0.004, fill: hex(mix(pal.light, WHITE, 0.4)), opacity: 0.55, filter: blur(ctx, 3), blend: 'screen' }))
+  const streak = radial(ctx, [[0, mix(pal.light, WHITE, 0.5), 0.9], [0.5, mix(pal.light, WHITE, 0.3), 0.35], [1, pal.light, 0]])
+  out.push(n('ellipse', { cx: W * rng.float(0.35, 0.65), cy: fy, rx: W * 0.42, ry: S * 0.006, fill: streak, opacity: 0.7, filter: blur(ctx, 2), blend: 'screen' }))
   out.push(n('ellipse', { cx: W / 2, cy: fy, rx: W * 0.4, ry: S * 0.03, fill: hex(mix(pal.accent, WHITE, 0.4)), opacity: 0.25, filter: blur(ctx, S * 0.03), blend: 'screen' }))
   return out
 }

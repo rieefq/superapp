@@ -4,7 +4,7 @@ import { kref, type SeedCtx } from './helpers'
 import { KNO, MILESTONE } from './keys'
 
 export function buildProjects({ clock, dates }: SeedCtx): Project[] {
-  const { back, ago, ahead } = clock
+  const { back, ago, ahead, day, wd } = clock
   return [
     {
       id: PROJECT.atlas,
@@ -14,7 +14,7 @@ export function buildProjects({ clock, dates }: SeedCtx): Project[] {
       instructions: [
         'You are working on Atlas Portal v2 (repository northwind/atlas-portal).',
         '- TypeScript strict, React 19 and vitest. Never use `any`.',
-        '- Conventional commits (feat:, fix:, chore:); keep pull requests under ~400 changed lines.',
+        '- Conventional commits (feat:, fix:, chore:); keep pull requests under ~600 changed lines.',
         '- Never change the public API without an ADR, and link the ADR in the pull request.',
         '- Bug fixes start with a failing test. Auth and billing changes need two human approvals.',
         '- Put risky changes behind a feature flag and check new queries against production-sized data.',
@@ -25,22 +25,22 @@ export function buildProjects({ clock, dates }: SeedCtx): Project[] {
       starred: true,
       milestones: [
         { id: MILESTONE.atlasAuth, title: 'Auth revamp beta', description: 'SAML/OIDC sign-in and the ADR-012 session model live for beta tenants.', dueAt: ago(12, 'd'), status: 'done' },
-        { id: MILESTONE.atlasBilling, title: 'Stripe Billing cutover', description: 'All invoicing on Stripe Billing after one cycle of dual-run reconciliation.', dueAt: dates.cutover, status: 'active' },
+        { id: MILESTONE.atlasBilling, title: 'Stripe Billing cutover', description: 'First customer cohort on Stripe Billing; the rest follow once two billing cycles reconcile.', dueAt: dates.cutover, status: 'active' },
         { id: MILESTONE.atlasPerf, title: 'Performance budget met', description: 'p95 page load under 1.5 s on the shipments board and the dashboard.', dueAt: ahead(16, 'd'), status: 'active' },
         { id: MILESTONE.atlasGa, title: 'Portal v2 GA', description: 'Every customer on Portal v2; the legacy portal is switched off.', dueAt: dates.ga, status: 'upcoming' },
       ],
       pinnedRefs: [kref(KNOWLEDGE.adrSessions), kref(KNOWLEDGE.stripePlan), kref(KNOWLEDGE.codeReview), kref(KNOWLEDGE.rateLimits)],
       repoIds: [REPO.atlas],
-      createdAt: back(70),
+      createdAt: day(70, 10, 0),
       updatedAt: back(0, 1, 30),
     },
     {
       id: PROJECT.landscape,
       name: 'Q4 Competitive Landscape',
-      description: 'Competitor and pricing research for Q4: teardowns of Portbase, Freightly and ShipLoom, win/loss and churn analysis, and outside evidence on usage-based pricing. Feeds the board deck and the Lumen pricing decision.',
-      goal: 'A sourced view of where Portbase, Freightly and ShipLoom beat us, ready for the board deck and the Lumen pricing decision.',
+      description: 'Competitor and pricing research for Q4: teardowns of Tidewell, Freightly and ShipLoom, win/loss and churn analysis, and outside evidence on usage-based pricing. Feeds the board deck and the Lumen pricing decision.',
+      goal: 'A sourced view of where Tidewell, Freightly and ShipLoom beat us, ready for the board deck and the Lumen pricing decision.',
       instructions: [
-        'Competitor and pricing research for Q4. Competitors: Portbase, Freightly, ShipLoom. Our product: Atlas, plus the Lumen add-on.',
+        'Competitor and pricing research for Q4. Competitors: Tidewell, Freightly, ShipLoom. Our product: Atlas, plus the Lumen add-on.',
         '- Cite every claim, and label simulated web sources explicitly.',
         '- Separate facts, inferences and opinions.',
         '- Prefer qualitative statements over numbers you cannot source.',
@@ -50,14 +50,14 @@ export function buildProjects({ clock, dates }: SeedCtx): Project[] {
       icon: 'Telescope',
       status: 'active',
       milestones: [
-        { id: MILESTONE.landTeardowns, title: 'Competitor teardowns', description: 'Teardowns of Portbase, Freightly and ShipLoom in Knowledge.', dueAt: ago(8, 'd'), status: 'done' },
+        { id: MILESTONE.landTeardowns, title: 'Competitor teardowns', description: 'Teardowns of Tidewell, Freightly and ShipLoom in Knowledge.', dueAt: ago(8, 'd'), status: 'done' },
         { id: MILESTONE.landBrief, title: 'Board competitive brief', description: 'One-page competitor brief ready for the board deck.', dueAt: ahead(6, 'd'), status: 'active' },
         { id: MILESTONE.landReview, title: 'Q4 landscape readout', description: 'Readout to leadership covering competitors, churn and pricing research.', dueAt: ahead(27, 'd'), status: 'upcoming' },
       ],
-      pinnedRefs: [kref(KNOWLEDGE.portbaseTeardown), kref(KNO.winloss), kref(KNOWLEDGE.freightlyNotes), kref(KNOWLEDGE.marketSizing)],
+      pinnedRefs: [kref(KNOWLEDGE.tidewellTeardown), kref(KNO.winloss), kref(KNOWLEDGE.freightlyNotes), kref(KNOWLEDGE.marketSizing)],
       repoIds: [],
-      createdAt: back(29, 3),
-      updatedAt: back(1, 4, 38),
+      createdAt: day(33, 9, 30),
+      updatedAt: wd(1, 10, 52),
     },
     {
       id: PROJECT.lumen,
@@ -84,13 +84,13 @@ export function buildProjects({ clock, dates }: SeedCtx): Project[] {
       ],
       pinnedRefs: [kref(KNOWLEDGE.lumenPrd), kref(KNOWLEDGE.pricingMemo), kref(KNOWLEDGE.messagingHouse), kref(KNOWLEDGE.launchChecklist)],
       repoIds: [],
-      createdAt: back(55),
+      createdAt: day(55, 11, 0),
       updatedAt: back(0, 0, 37),
     },
     {
       id: PROJECT.ops,
       name: 'Support Ops Automation',
-      description: 'Automating the support desk with agents and workflows: Sentinel triages the inbox with rubric v2, Herald writes the weekly digest, and incident summaries are drafted automatically. People approve anything customer-facing.',
+      description: 'Automating the support desk with agents and workflows: Sentinel triages the inbox with the rubric v2 draft, Herald writes the weekly digest, and incident summaries are next. People approve anything customer-facing.',
       goal: 'Every support ticket triaged within 5 minutes, and every urgent one in front of a person within 15.',
       instructions: [
         'Support Ops Automation: triage, digests and incident summaries.',
@@ -110,7 +110,7 @@ export function buildProjects({ clock, dates }: SeedCtx): Project[] {
       ],
       pinnedRefs: [kref(KNOWLEDGE.triageRubric), kref(KNOWLEDGE.slaPolicy), kref(KNOWLEDGE.incidentLatency)],
       repoIds: [],
-      createdAt: back(45),
+      createdAt: day(45, 14, 0),
       updatedAt: back(0, 1),
     },
     {
@@ -133,8 +133,8 @@ export function buildProjects({ clock, dates }: SeedCtx): Project[] {
       ],
       pinnedRefs: [kref(KNOWLEDGE.agentPatterns), kref(KNOWLEDGE.rustPlan)],
       repoIds: [],
-      createdAt: back(90),
-      updatedAt: back(2, 9),
+      createdAt: day(90, 20, 0),
+      updatedAt: day(2, 20, 30),
     },
   ]
 }
