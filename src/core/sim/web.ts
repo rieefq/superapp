@@ -1,6 +1,7 @@
 import type { SourceKind } from '@/core/types'
 import type { Rng } from '@/lib/rng'
-import { capitalize, detectComparison, fill, keyTerms, slugify, topicPhrase, type Comparison } from './text'
+import { subjectPhrase } from './research'
+import { capitalize, detectComparison, fill, keyTerms, slugify, type Comparison } from './text'
 import { ACTIONS, detectCategories, facetsFor, type TopicCategory } from './topics'
 
 /**
@@ -184,7 +185,7 @@ export function searchSimulatedWeb(input: WebSearchInput): WebResultSpec[] {
   const categories = detectCategories(`${question} ${angle}`)
   const terms = keyTerms(question, 4)
   const angleTerms = keyTerms(angle, 3, ANGLE_STOP)
-  const topic = topicPhrase(question, 5)
+  const topic = subjectPhrase(question, 6)
   const facets = facetsFor(`${question} ${angle}`, 6)
   const pubs = candidatePublications(categories, rng, usedDomains)
   const results: WebResultSpec[] = []

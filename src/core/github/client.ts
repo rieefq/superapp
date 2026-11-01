@@ -64,6 +64,17 @@ export interface GithubFile {
   source: 'raw' | 'api' | 'cache'
 }
 
+/** GitHub's REST quota as last observed (response headers) or read from `/rate_limit`. */
+export interface GithubRateLimit {
+  /** Requests allowed per window (60/h without a token, 5,000/h with one). */
+  limit: number
+  remaining: number
+  /** Epoch ms when the window resets. */
+  resetAt: number
+  /** Epoch ms when this was observed. */
+  observedAt: number
+}
+
 /** Friendly error for rejected `connectGithubRepo` / `getRepoFile` promises. */
 export class GithubRequestError extends Error {
   readonly kind: GithubErrorKind
@@ -161,6 +172,48 @@ export function clearGithubCache(): void {
   fileCache.clear()
 }
 
+// ---------------------------------------------------------------- rate limit
+
+let lastRateLimit: GithubRateLimit | null = null
+const rateLimitListeners = new Set<() => void>()
+
+/** The REST quota last seen on an api.github.com response (null until a request was made). */
+export function getLastRateLimit(): GithubRateLimit | null {
+  return lastRateLimit
+}
+
+/** Called whenever a new quota reading arrives. Returns an unsubscribe function. */
+export function subscribeRateLimit(listener: () => void): () => void {
+  rateLimitListeners.add(listener)
+  return () => {
+    rateLimitListeners.delete(listener)
+  }
+}
+
+function setRateLimit(next: GithubRateLimit): void {
+  const prev = lastRateLimit
+  if (prev && prev.limit === next.limit && prev.remaining === next.remaining && prev.resetAt === next.resetAt) return
+  lastRateLimit = next
+  for (const l of rateLimitListeners) l()
+}
+
+/** Record the core REST quota from a response's `x-ratelimit-*` headers (other resources are ignored). */
+function observeRateLimit(res: Response): void {
+  const resource = res.headers.get('x-ratelimit-resource')
+  if (resource && resource !== 'core') return
+  const limit = Number(res.headers.get('x-ratelimit-limit'))
+  const remaining = Number(res.headers.get('x-ratelimit-remaining'))
+  const reset = Number(res.headers.get('x-ratelimit-reset'))
+  if (!res.headers.has('x-ratelimit-remaining') || !Number.isFinite(limit) || !Number.isFinite(remaining) || limit <= 0) return
+  setRateLimit({ limit, remaining, resetAt: Number.isFinite(reset) && reset > 0 ? reset * 1000 : Date.now() + 3_600_000, observedAt: Date.now() })
+}
+
+/** Forget the observed quota (tests; after a token change). */
+export function resetRateLimit(): void {
+  lastRateLimit = null
+  for (const l of rateLimitListeners) l()
+}
+
 // ---------------------------------------------------------------- transport
 
 function authHeaders(): Record<string, string> {
@@ -227,6 +280,7 @@ async function request(url: string, headers: Record<string, string>, signal?: Ab
 async function apiJson<T>(path: string, context: ErrorContext, signal?: AbortSignal, filePath?: string): Promise<GithubResult<T>> {
   const res = await request(`${GITHUB_API}${path}`, { Accept: 'application/vnd.github+json', ...authHeaders() }, signal)
   if (!res) return { ok: false, error: NETWORK_ERROR }
+  observeRateLimit(res)
   if (!res.ok) return { ok: false, error: httpError(res, context, filePath) }
   try {
     return { ok: true, data: (await res.json()) as T }
@@ -271,6 +325,27 @@ export async function getRepo(owner: string, name: string, opts: { signal?: Abor
       private: !!r.private,
     },
   }
+}
+
+interface RateLimitResponse {
+  resources?: { core?: { limit: number; remaining: number; reset: number } }
+  rate?: { limit: number; remaining: number; reset: number }
+}
+
+/**
+ * The current core REST quota. `/rate_limit` itself does not count against the quota, so this is safe
+ * to call when a connect dialog opens. Also updates `getLastRateLimit()`.
+ */
+export async function getRateLimit(opts: { signal?: AbortSignal } = {}): Promise<GithubResult<GithubRateLimit>> {
+  const res = await apiJson<RateLimitResponse>('/rate_limit', 'repo', opts.signal)
+  if (!res.ok) return res
+  const core = res.data.resources?.core ?? res.data.rate
+  if (!core || !Number.isFinite(core.limit) || !Number.isFinite(core.remaining)) {
+    return { ok: false, error: { kind: 'http', message: 'GitHub sent a rate limit that could not be read.' } }
+  }
+  const data: GithubRateLimit = { limit: core.limit, remaining: core.remaining, resetAt: core.reset > 0 ? core.reset * 1000 : Date.now() + 3_600_000, observedAt: Date.now() }
+  setRateLimit(data)
+  return { ok: true, data }
 }
 
 interface TreeResponse {

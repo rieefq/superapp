@@ -4,29 +4,36 @@ import {
   RESEARCH_FACTORY, RESEARCH_FOLLOW_UP_FACTORY, appendSourceIds, generatedFindingId, markCited,
 } from '@/core/services/research'
 import { logActivity } from '@/core/services/activity'
+import { KIND_META, resolveEntity } from '@/core/services/entities'
 import { stableId } from '@/core/sim/ids'
 import { paramString } from '@/core/sim/params'
 import {
-  DEPTH_BUDGET, buildFollowUpSection, buildReport, deriveAngles, formatPlanOutput, synthesizeFindings, type DraftFinding, type NumberedSource,
+  DEPTH_BUDGET, STEP_PROFILE, buildFollowUpSection, buildReport, deriveAngles, formatPlanOutput, synthesizeFindings,
+  type DraftFinding, type NumberedSource, type ResearchStepName,
 } from '@/core/sim/research'
 import { excerpt, shorten } from '@/core/sim/text'
 import { buildSearchQuery, formatSearchOutput, searchSimulatedWeb, type WebResultSpec } from '@/core/sim/web'
-import type { ActorRef, EntityRef, Finding, ID, Investigation, Run, Source } from '@/core/types'
+import type { ActorRef, EntityKind, EntityRef, Finding, ID, Investigation, Run, Source } from '@/core/types'
 import { createRng, type Rng } from '@/lib/rng'
 import { TIME } from '@/lib/format'
 import { registerRunFactory } from '../registry'
 import { updateStep } from '../service'
-import type { RunPlan, StepPlan } from '../types'
+import type { RunPlan, StepContext, StepPlan } from '../types'
 
 /**
  * Research simulation scripts.
  *
- * 'research.investigate' — plan → search the user's knowledge (real retrieval) → simulated
- * web searches per angle → read → synthesize findings → draft the report. Sources and
- * findings are written progressively by step side effects (idempotent: stable ids, checked
- * before inserting), so the investigation fills in live and survives reloads.
+ * 'research.investigate' — plan → read the context you attached → search the user's knowledge (real
+ * retrieval) → simulated web searches per angle → read → synthesize findings → draft the report.
+ * Sources and findings are written progressively by step side effects (idempotent: stable ids,
+ * checked before inserting), so the investigation fills in live and survives reloads. Search and
+ * read steps record the sources they produced as refs, so the timeline shows them and the run's
+ * Saw list is complete.
  *
  * 'research.follow_up' — a shorter run that appends a "Follow-up" section and findings.
+ *
+ * Params: `investigationId`, optional `context` (entity refs from the composer's Context Line —
+ * knowledge items among them become sources) and `memory` (project memory rode along).
  */
 
 interface SearchPlan {
@@ -46,12 +53,33 @@ interface KnowledgeHit {
 /** Plan-time metadata of the sources a run creates, keyed by source id. */
 type SourceMeta = Map<ID, { angleIndex?: number; contrarian?: boolean; mentions?: string[]; passage?: string; publication?: string }>
 
+/** A step's simulated duration and tokens, drawn from the shared profile (src/core/sim/research.ts). */
+function timing(rng: Rng, name: ResearchStepName): { durationMs: number; tokens: number } {
+  const p = STEP_PROFILE[name]
+  return { durationMs: rng.int(p.ms[0], p.ms[1]), tokens: rng.int(p.tokens[0], p.tokens[1]) }
+}
+
 function failedPlan(message: string): RunPlan {
   return { steps: [{ kind: 'think', title: 'Check the investigation', durationMs: 400, failChance: 1, failMessage: message }] }
 }
 
 const knowledgeSourceId = (investigationId: ID, knowledgeId: ID) => stableId('src', investigationId, 'kno', knowledgeId)
 const webSourceId = (runId: ID, key: string) => stableId('src', runId, 'web', key)
+const sourceRef = (id: ID): EntityRef => ({ kind: 'source', id })
+
+/** Entity refs from a run param (the composer's context), deduped, existing kinds only. */
+function paramRefs(params: Record<string, unknown>, key: string): EntityRef[] {
+  const raw = params[key]
+  if (!Array.isArray(raw)) return []
+  const out: EntityRef[] = []
+  for (const r of raw) {
+    if (!r || typeof r !== 'object') continue
+    const { kind, id } = r as { kind?: unknown; id?: unknown }
+    if (typeof kind !== 'string' || typeof id !== 'string' || !(kind in KIND_META)) continue
+    if (!out.some((x) => x.kind === kind && x.id === id)) out.push({ kind: kind as EntityKind, id })
+  }
+  return out
+}
 
 function retrieve(inv: Investigation, query: string, limit: number): KnowledgeHit[] {
   let passages: RetrievedPassage[] = []
@@ -66,6 +94,36 @@ function retrieve(inv: Investigation, query: string, limit: number): KnowledgeHi
     .map((p) => ({ knowledgeId: p.item.id, title: p.item.title, passage: p.passage }))
 }
 
+/**
+ * The context that rode along (held, attached, likely and project-memory items): every ref is read
+ * (it is listed in the step's refs, so it lands in the Saw list); knowledge items also become
+ * sources. Items set to "Available to AI: Never" are skipped — they never reach a model.
+ */
+function contextPlan(inv: Investigation, refs: readonly EntityRef[]): { read: EntityRef[]; hits: KnowledgeHit[] } {
+  const read: EntityRef[] = []
+  const hits: KnowledgeHit[] = []
+  for (const ref of refs) {
+    if (ref.kind === 'investigation' && ref.id === inv.id) continue
+    if (ref.kind === 'knowledge') {
+      const item = db.get('knowledge', ref.id)
+      if (!item || item.aiAvailability === 'never' || item.id === inv.knowledgeId) continue
+      read.push(ref)
+      hits.push({ knowledgeId: item.id, title: item.title, passage: excerpt(item.summary ? `${item.summary}\n\n${item.content}` : item.content, 600) })
+      continue
+    }
+    if (resolveEntity(ref).exists) read.push(ref)
+  }
+  return { read, hits }
+}
+
+function contextOutput(read: readonly EntityRef[], memoryOf: string | null): string {
+  const lines: string[] = []
+  if (memoryOf) lines.push(`Project memory of ${memoryOf}: goal and instructions`)
+  for (const ref of read) lines.push(`${KIND_META[ref.kind].label} “${shorten(resolveEntity(ref).title, 80)}”`)
+  lines.push('', `${read.length} item${read.length === 1 ? '' : 's'} from your context (read locally, not simulated).`)
+  return lines.join('\n')
+}
+
 function knowledgeOutput(hits: readonly KnowledgeHit[]): string {
   if (!hits.length) return 'No matching items in your knowledge base.'
   return [
@@ -73,6 +131,13 @@ function knowledgeOutput(hits: readonly KnowledgeHit[]): string {
     '',
     `${hits.length} item${hits.length === 1 ? '' : 's'} from your knowledge base (local search, not simulated).`,
   ].join('\n')
+}
+
+/** Knowledge hits from the context first, then retrieval, without duplicates. */
+function mergeHits(first: readonly KnowledgeHit[], then: readonly KnowledgeHit[]): KnowledgeHit[] {
+  const out = [...first]
+  for (const h of then) if (!out.some((x) => x.knowledgeId === h.knowledgeId)) out.push(h)
+  return out
 }
 
 // ---------------------------------------------------------------- side effects (idempotent)
@@ -140,6 +205,12 @@ function markRead(investigationId: ID, runId: ID, results: readonly WebResultSpe
   }
 }
 
+/** Record the sources a step produced or read as its refs (timeline chips and the run's Saw list). */
+function recordSourceRefs(ctx: StepContext, ids: readonly ID[]): void {
+  const refs = ids.filter((id) => db.get('sources', id)).map(sourceRef)
+  if (refs.length) updateStep(ctx.run.id, ctx.step.id, { refs })
+}
+
 /** The investigation's sources numbered in `sourceIds` order, with plan metadata attached. */
 function numberedSources(inv: Investigation, meta: SourceMeta): NumberedSource[] {
   const out: NumberedSource[] = []
@@ -191,6 +262,26 @@ function researchActor(run: Run): ActorRef {
   return run.agentId ? { type: 'agent', id: run.agentId } : { type: 'system', id: 'system' }
 }
 
+/** The "Read your context" step, when anything rode along. */
+function contextStep(inv: Investigation, read: readonly EntityRef[], hits: readonly KnowledgeHit[], memory: boolean, rng: Rng): StepPlan | null {
+  const project = memory && inv.projectId ? db.get('projects', inv.projectId) : undefined
+  const memoryOf = project && (project.goal || project.instructions) ? project.name : null
+  if (!read.length && !memoryOf) return null
+  const t = timing(rng, 'context')
+  return {
+    kind: 'read',
+    title: read.length ? `Read ${read.length} item${read.length === 1 ? '' : 's'} from your context` : 'Read the project memory',
+    detail: 'Held, attached and likely items from the Context Line',
+    tool: 'context',
+    capability: 'knowledge.read',
+    output: contextOutput(read, memoryOf),
+    refs: [...read],
+    durationMs: t.durationMs,
+    tokens: t.tokens + hits.reduce((a, h) => a + Math.ceil(h.passage.length / 4), 0),
+    onComplete: () => ensureKnowledgeSources(inv.id, hits),
+  }
+}
+
 // ---------------------------------------------------------------- research.investigate
 
 export function planInvestigation(params: Record<string, unknown>, rng: Rng): RunPlan {
@@ -202,7 +293,10 @@ export function planInvestigation(params: Record<string, unknown>, rng: Rng): Ru
   const angles = inv.angles.length ? inv.angles : deriveAngles(inv.question, inv.depth === 'quick' ? 3 : 4)
   const useKnowledge = inv.sources?.knowledge !== false
   const useWeb = inv.sources?.web !== false
-  const hits = useKnowledge ? retrieve(inv, inv.question, budget.knowledgeLimit) : []
+  const context = contextPlan(inv, paramRefs(params, 'context'))
+  const retrieved = useKnowledge ? retrieve(inv, inv.question, budget.knowledgeLimit) : []
+  const retrievedOnly = retrieved.filter((h) => !context.hits.some((c) => c.knowledgeId === h.knowledgeId))
+  const hits = mergeHits(context.hits, retrieved)
 
   // Web searches: one per angle (quick: one combined search; deep: plus a skeptical one).
   const usedDomains = new Set<string>()
@@ -274,30 +368,31 @@ export function planInvestigation(params: Record<string, unknown>, rng: Rng): Ru
     if (stepId) updateStep(runId, stepId, { output: report.split('\n').slice(0, 18).join('\n') })
   }
 
+  const ctxStep = contextStep(inv, context.read, context.hits, params.memory === true, rng)
   const steps: StepPlan[] = [
     {
       kind: 'plan',
       title: 'Plan the investigation',
       detail: `${angles.length} angles · ${inv.depth} depth`,
       output: formatPlanOutput(inv.question, angles, inv.depth),
-      durationMs: rng.int(1400, 2600),
-      tokens: rng.int(450, 900),
+      ...timing(rng, 'plan'),
     },
+    ...(ctxStep ? [ctxStep] : []),
     ...(useKnowledge ? [{
       kind: 'search',
       title: 'Search your knowledge base',
-      detail: hits.length ? `${hits.length} relevant item${hits.length === 1 ? '' : 's'}` : 'Nothing relevant yet',
+      detail: retrievedOnly.length ? `${retrievedOnly.length} relevant item${retrievedOnly.length === 1 ? '' : 's'}` : 'Nothing new beyond your context',
       tool: 'knowledge.search',
       capability: 'knowledge.read',
       input: inv.question,
-      output: knowledgeOutput(hits),
-      refs: hits.map((h): EntityRef => ({ kind: 'knowledge', id: h.knowledgeId })),
-      durationMs: rng.int(900, 1700),
-      tokens: rng.int(300, 700) + hits.reduce((a, h) => a + Math.ceil(h.passage.length / 4), 0),
-      onComplete: () => ensureKnowledgeSources(id, hits),
+      output: knowledgeOutput(retrievedOnly),
+      refs: retrievedOnly.map((h): EntityRef => ({ kind: 'knowledge', id: h.knowledgeId })),
+      ...timing(rng, 'knowledge'),
+      onComplete: () => ensureKnowledgeSources(id, retrievedOnly),
     } satisfies StepPlan] : []),
-    ...searches.map(
-      (s): StepPlan => ({
+    ...searches.map((s): StepPlan => {
+      const t = timing(rng, 'search')
+      return {
         kind: 'search',
         title: s.contrarian ? 'Search for skeptical views' : budget.combinedSearch ? 'Search the web' : `Search the web: ${shorten(s.angle, 64)}`,
         detail: 'Simulated results from a local corpus of fictional publications',
@@ -306,30 +401,32 @@ export function planInvestigation(params: Record<string, unknown>, rng: Rng): Ru
         capability: 'web.search',
         input: s.query,
         output: formatSearchOutput(s.query, s.results),
-        durationMs: rng.int(1600, 3200),
-        tokens: rng.int(400, 900),
-        onComplete: (ctx) => ensureWebSources(id, ctx.run.id, s.results),
-      }),
-    ),
+        ...t,
+        onComplete: (ctx) => {
+          ensureWebSources(id, ctx.run.id, s.results)
+          recordSourceRefs(ctx, s.results.map((r) => webSourceId(ctx.run.id, r.key)))
+        },
+      }
+    }),
     ...batches
       .filter((b) => b.length)
-      .map(
-        (batch): StepPlan => ({
-          kind: 'browse',
-          title: `Read ${batch.length} source${batch.length === 1 ? '' : 's'}`,
-          detail: 'Simulated pages — summaries are generated, no page is fetched',
-          tool: 'web.browse',
-          integrationId: 'web-search',
-          capability: 'web.browse',
-          input: batch.map((r) => r.url).join('\n'),
-          output: batch.map((r) => `• ${r.title} (${r.domain}) — credibility ${Math.round(r.credibility * 100)}%`).join('\n'),
-          durationMs: rng.int(2200, 4200),
-          tokens: rng.int(1600, 3800),
-          onComplete: (ctx) => markRead(id, ctx.run.id, batch),
-        }),
-      ),
+      .map((batch): StepPlan => ({
+        kind: 'browse',
+        title: `Read ${batch.length} source${batch.length === 1 ? '' : 's'}`,
+        detail: 'Simulated pages — summaries are generated, no page is fetched',
+        tool: 'web.browse',
+        integrationId: 'web-search',
+        capability: 'web.browse',
+        input: batch.map((r) => r.url).join('\n'),
+        output: batch.map((r) => `• ${r.title} (${r.domain}) — credibility ${Math.round(r.credibility * 100)}%`).join('\n'),
+        ...timing(rng, 'browse'),
+        onComplete: (ctx) => {
+          markRead(id, ctx.run.id, batch)
+          recordSourceRefs(ctx, batch.map((r) => webSourceId(ctx.run.id, r.key)))
+        },
+      })),
   ]
-  if (budget.contrarian) {
+  if (useWeb && budget.contrarian) {
     const weak = web.filter((r) => r.credibility < 0.55)
     steps.push({
       kind: 'think',
@@ -339,8 +436,7 @@ export function planInvestigation(params: Record<string, unknown>, rng: Rng): Ru
         weak.length ? `Treating ${weak.length} lower-credibility source${weak.length === 1 ? '' : 's'} as weak evidence: ${weak.map((w) => w.publication).join(', ')}.` : 'No source falls below the credibility threshold.',
         'None of the simulated sources provides verifiable data; findings will be framed as considerations.',
       ].join('\n'),
-      durationMs: rng.int(1800, 3000),
-      tokens: rng.int(900, 1600),
+      ...timing(rng, 'crossCheck'),
     })
   }
   if (budget.mergedSynthesis) {
@@ -348,8 +444,7 @@ export function planInvestigation(params: Record<string, unknown>, rng: Rng): Ru
       kind: 'write',
       title: 'Synthesize findings and draft the report',
       output: `Synthesizing ${findingCount} findings and drafting the report…`,
-      durationMs: rng.int(3000, 5200),
-      tokens: rng.int(2400, 4200),
+      ...timing(rng, 'merged'),
       onComplete: (ctx) => {
         synthesize(ctx.run.id, ctx.step.id)
         draftReport(ctx.run.id, ctx.step.id)
@@ -361,24 +456,26 @@ export function planInvestigation(params: Record<string, unknown>, rng: Rng): Ru
         kind: 'think',
         title: 'Synthesize findings',
         output: `Synthesizing ${findingCount} findings with citations…`,
-        durationMs: rng.int(2400, 4200),
-        tokens: rng.int(1800, 3200),
+        ...timing(rng, 'synthesize'),
         onComplete: (ctx) => synthesize(ctx.run.id, ctx.step.id),
       },
       {
         kind: 'write',
         title: 'Draft the report',
         output: 'Drafting the report…',
-        durationMs: rng.int(2600, 4800),
-        tokens: rng.int(2400, 4600),
+        ...timing(rng, 'draft'),
         onComplete: (ctx) => draftReport(ctx.run.id, ctx.step.id),
       },
     )
   }
 
+  const sourceWords = [
+    hits.length ? `${hits.length} knowledge item${hits.length === 1 ? '' : 's'}` : null,
+    useWeb ? `${web.length} simulated web source${web.length === 1 ? '' : 's'}` : null,
+  ].filter(Boolean)
   return {
     steps,
-    summary: `Drafted a report on “${shorten(inv.title, 80)}” from ${hits.length} knowledge item${hits.length === 1 ? '' : 's'} and ${web.length} simulated web sources.`,
+    summary: `Drafted a report on “${shorten(inv.title, 80)}” from ${sourceWords.length ? sourceWords.join(' and ') : 'no sources'}.`,
     onSuccess: (ctx) => {
       const cur = db.get('investigations', id)
       if (!cur) return
@@ -411,9 +508,14 @@ export function planFollowUp(params: Record<string, unknown>, rng: Rng): RunPlan
   const inv = investigationId ? db.get('investigations', investigationId) : undefined
   if (!inv || !question) return failedPlan('This investigation or follow-up question no longer exists.')
   const id = inv.id
-  const hits = retrieve(inv, question, 2)
+  const useKnowledge = inv.sources?.knowledge !== false
+  const useWeb = inv.sources?.web !== false
+  const context = contextPlan(inv, paramRefs(params, 'context'))
+  const retrieved = useKnowledge ? retrieve(inv, question, 2) : []
+  const retrievedOnly = retrieved.filter((h) => !context.hits.some((c) => c.knowledgeId === h.knowledgeId))
+  const hits = mergeHits(context.hits, retrieved)
   const usedDomains = new Set(db.filter('sources', (s) => s.investigationId === id && !!s.domain).map((s) => s.domain as string))
-  const results = searchSimulatedWeb({ question, angle: question, angleIndex: 0, count: rng.int(2, 3), rng, keyPrefix: 'f', usedDomains })
+  const results = useWeb ? searchSimulatedWeb({ question, angle: question, angleIndex: 0, count: rng.int(2, 3), rng, keyPrefix: 'f', usedDomains }) : []
   const query = buildSearchQuery(question, '')
   const count = rng.int(2, 3)
 
@@ -439,21 +541,31 @@ export function planFollowUp(params: Record<string, unknown>, rng: Rng): RunPlan
     if (stepId) updateStep(runId, stepId, { output: section })
   }
 
-  return {
-    steps: [
-      { kind: 'plan', title: 'Plan the follow-up', output: `Follow-up: ${question}\n\n1. Check your knowledge base\n2. Search for new material\n3. Add findings and a “Follow-up” section to the report`, durationMs: rng.int(900, 1600), tokens: rng.int(300, 600) },
-      {
-        kind: 'search',
-        title: 'Search your knowledge base',
-        tool: 'knowledge.search',
-        capability: 'knowledge.read',
-        input: question,
-        output: knowledgeOutput(hits),
-        refs: hits.map((h): EntityRef => ({ kind: 'knowledge', id: h.knowledgeId })),
-        durationMs: rng.int(800, 1500),
-        tokens: rng.int(300, 700),
-        onComplete: () => ensureKnowledgeSources(id, hits),
-      },
+  const ctxStep = contextStep(inv, context.read, context.hits, params.memory === true, rng)
+  const steps: StepPlan[] = [
+    {
+      kind: 'plan',
+      title: 'Plan the follow-up',
+      output: `Follow-up: ${question}\n\n1. Check your knowledge base\n2. ${useWeb ? 'Search for new material' : 'Skip the web (switched off for this investigation)'}\n3. Add findings and a “Follow-up” section to the report`,
+      ...timing(rng, 'plan'),
+    },
+    ...(ctxStep ? [ctxStep] : []),
+  ]
+  if (useKnowledge) {
+    steps.push({
+      kind: 'search',
+      title: 'Search your knowledge base',
+      tool: 'knowledge.search',
+      capability: 'knowledge.read',
+      input: question,
+      output: knowledgeOutput(retrievedOnly),
+      refs: retrievedOnly.map((h): EntityRef => ({ kind: 'knowledge', id: h.knowledgeId })),
+      ...timing(rng, 'knowledge'),
+      onComplete: () => ensureKnowledgeSources(id, retrievedOnly),
+    })
+  }
+  if (useWeb) {
+    steps.push(
       {
         kind: 'search',
         title: 'Search the web',
@@ -463,9 +575,11 @@ export function planFollowUp(params: Record<string, unknown>, rng: Rng): RunPlan
         capability: 'web.search',
         input: query,
         output: formatSearchOutput(query, results),
-        durationMs: rng.int(1500, 2800),
-        tokens: rng.int(400, 800),
-        onComplete: (ctx) => ensureWebSources(id, ctx.run.id, results),
+        ...timing(rng, 'search'),
+        onComplete: (ctx) => {
+          ensureWebSources(id, ctx.run.id, results)
+          recordSourceRefs(ctx, results.map((r) => webSourceId(ctx.run.id, r.key)))
+        },
       },
       {
         kind: 'browse',
@@ -476,12 +590,18 @@ export function planFollowUp(params: Record<string, unknown>, rng: Rng): RunPlan
         capability: 'web.browse',
         input: results.map((r) => r.url).join('\n'),
         output: results.map((r) => `• ${r.title} (${r.domain}) — credibility ${Math.round(r.credibility * 100)}%`).join('\n'),
-        durationMs: rng.int(2000, 3600),
-        tokens: rng.int(1200, 2600),
-        onComplete: (ctx) => markRead(id, ctx.run.id, results),
+        ...timing(rng, 'browse'),
+        onComplete: (ctx) => {
+          markRead(id, ctx.run.id, results)
+          recordSourceRefs(ctx, results.map((r) => webSourceId(ctx.run.id, r.key)))
+        },
       },
-      { kind: 'write', title: 'Update the report', output: 'Writing the follow-up section…', durationMs: rng.int(2200, 3800), tokens: rng.int(1400, 2600), onComplete: (ctx) => appendSection(ctx.run.id, ctx.step.id) },
-    ],
+    )
+  }
+  steps.push({ kind: 'write', title: 'Update the report', output: 'Writing the follow-up section…', ...timing(rng, 'draft'), onComplete: (ctx) => appendSection(ctx.run.id, ctx.step.id) })
+
+  return {
+    steps,
     summary: `Answered the follow-up “${shorten(question, 80)}” and updated the report.`,
     onSuccess: (ctx) => {
       const cur = db.get('investigations', id)
@@ -490,6 +610,7 @@ export function planFollowUp(params: Record<string, unknown>, rng: Rng): RunPlan
       const latest = db.get('investigations', id)
       if (!latest) return
       markCited(sourcesCitedBy(latest))
+      // The report changed: it goes back to review.
       db.update('investigations', id, { status: 'review', updatedAt: Date.now() })
     },
     onFailure: () => {

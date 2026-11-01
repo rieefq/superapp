@@ -341,6 +341,11 @@ describe('budget', () => {
       // …but not to the account-wide budget.
       monthlyUsd: 50, spentThisMonthUsd: 10, liveSpentUsd: 4, simulatedSpentUsd: 6, estimated: true, projectedUsd: 30,
       usedRatio: 0.2, projectedRatio: 0.6, monthStart: at('2026-06-01T00:00:00Z'), monthEnd: at('2026-07-01T00:00:00Z'),
+      // Simulated estimates count toward the budget only when the setting says so (§8.4).
+      countsSimulated: false, countedUsd: 4, countedRatio: 0.08,
+    })
+    expect(insights({ runs, now, monthlyBudgetUsd: 50, countSimulatedSpend: true }).budget).toMatchObject({
+      countsSimulated: true, countedUsd: 10, countedRatio: 0.2,
     })
   })
 

@@ -6,6 +6,8 @@ import {
   ME,
   isRunActive,
   sameRef,
+  type ActorRef,
+  type Approval,
   type Asset,
   type CodeSession,
   type EntityRef,
@@ -17,6 +19,7 @@ import {
   type Project,
   type ProjectStatus,
   type Run,
+  type Task,
   type Thread,
   type Workflow,
 } from '@/core/types'
@@ -167,7 +170,34 @@ export function deleteProject(id: ID, opts: { deleteTasks?: boolean } = {}): voi
   })
 }
 
+/**
+ * Archive a project. The scope never stays on an archived project, so it returns to All work.
+ * Returns the previous status (for Undo), or undefined when nothing changed.
+ */
+export function archiveProject(id: ID): { previous: ProjectStatus; wasScope: boolean } | undefined {
+  const cur = db.get('projects', id)
+  if (!cur || cur.status === 'archived') return undefined
+  const ctx = getContext()
+  const wasScope = ctx.scopeProjectId === id
+  if (wasScope) ctx.setScope(null)
+  setProjectStatus(id, 'archived')
+  return { previous: cur.status, wasScope }
+}
+
 // ---------------------------------------------------------------- milestones
+
+/** Milestones by due date (undated last), keeping the stored order for ties. */
+export function milestonesByDue(project: Pick<Project, 'milestones'>): Milestone[] {
+  return project.milestones
+    .map((m, i) => ({ m, i }))
+    .sort((a, b) => (a.m.dueAt ?? Infinity) - (b.m.dueAt ?? Infinity) || a.i - b.i)
+    .map((x) => x.m)
+}
+
+/** The next milestone that is not done, by due date. */
+export function nextMilestone(project: Pick<Project, 'milestones'>): Milestone | undefined {
+  return milestonesByDue(project).find((m) => m.status !== 'done')
+}
 
 export interface MilestoneInput {
   title: string
@@ -355,6 +385,172 @@ export function computeProjectStats(s: Tables, projectId: ID, now = Date.now()):
     lastActivityAt,
     progress: tasks.total ? tasks.done / tasks.total : 0,
   }
+}
+
+// ---------------------------------------------------------------- live signals (pure + memoized)
+
+export interface ProjectSignal {
+  /** Runs queued or running in the project. */
+  running: number
+  /** Runs waiting on an approval. */
+  waiting: number
+  /** What needs a decision from you: pending approvals + sessions in review + agent work in review (§3.8). */
+  needsYou: number
+}
+
+const NO_SIGNAL: ProjectSignal = { running: 0, waiting: 0, needsYou: 0 }
+
+/** One-entry memo keyed on several tables' identities (tables are replaced on every write). */
+function memoOnTables<R>(cache: { keys: readonly object[]; value: R } | null, keys: readonly object[], compute: () => R): { keys: readonly object[]; value: R } {
+  if (cache && cache.keys.length === keys.length && cache.keys.every((k, i) => k === keys[i])) return cache
+  return { keys, value: compute() }
+}
+
+let signalCache: { keys: readonly object[]; value: Map<ID, ProjectSignal> } | null = null
+
+/** Per-project live signals for every project, computed once per relevant table change. */
+export function computeProjectSignals(s: Pick<Tables, 'runs' | 'approvals' | 'sessions' | 'tasks'>): Map<ID, ProjectSignal> {
+  signalCache = memoOnTables(signalCache, [s.runs, s.approvals, s.sessions, s.tasks], () => {
+    const out = new Map<ID, ProjectSignal>()
+    const get = (id: ID) => {
+      let v = out.get(id)
+      if (!v) out.set(id, (v = { running: 0, waiting: 0, needsYou: 0 }))
+      return v
+    }
+    for (const r of Object.values(s.runs)) {
+      if (!r.projectId) continue
+      if (r.status === 'running' || r.status === 'queued') get(r.projectId).running++
+      else if (r.status === 'waiting') get(r.projectId).waiting++
+    }
+    for (const a of Object.values(s.approvals)) {
+      const pid = a.status === 'pending' ? s.runs[a.runId]?.projectId : null
+      if (pid) get(pid).needsYou++
+    }
+    const reviewedBySession = new Set<ID>()
+    for (const ses of Object.values(s.sessions)) {
+      if (ses.status !== 'needs_review') continue
+      if (ses.taskId) reviewedBySession.add(ses.taskId)
+      if (ses.projectId) get(ses.projectId).needsYou++
+    }
+    for (const t of Object.values(s.tasks)) {
+      if (t.status !== 'review' || !t.projectId || reviewedBySession.has(t.id)) continue
+      const last = t.runIds.length ? s.runs[t.runIds[t.runIds.length - 1]] : undefined
+      if (last?.agentId) get(t.projectId).needsYou++
+    }
+    return out
+  })
+  return signalCache.value
+}
+
+export function computeProjectSignal(s: Pick<Tables, 'runs' | 'approvals' | 'sessions' | 'tasks'>, projectId: ID): ProjectSignal {
+  return computeProjectSignals(s).get(projectId) ?? NO_SIGNAL
+}
+
+/** Live signals of one project; re-renders only when one of its numbers changes. */
+export function useProjectSignal(projectId: ID): ProjectSignal {
+  return useDB(useShallow((s: Tables) => computeProjectSignal(s, projectId)))
+}
+
+export interface ProjectNeedsYou {
+  approvals: Approval[]
+  sessions: CodeSession[]
+  /** Tasks in Review whose last run was an agent's (sessions in review already cover their tasks). */
+  tasks: Task[]
+}
+
+/** The decisions waiting on you in one project, in the Needs-you order (risk high → low, then oldest). */
+export function computeProjectNeedsYou(s: Tables, projectId: ID): ProjectNeedsYou {
+  const risk = { high: 0, medium: 1, low: 2 } as const
+  const approvals = Object.values(s.approvals)
+    .filter((a) => a.status === 'pending' && s.runs[a.runId]?.projectId === projectId)
+    .sort((a, b) => risk[a.risk] - risk[b.risk] || a.createdAt - b.createdAt)
+  const sessions = Object.values(s.sessions)
+    .filter((x) => x.status === 'needs_review' && x.projectId === projectId)
+    .sort((a, b) => a.updatedAt - b.updatedAt)
+  const covered = new Set(sessions.map((x) => x.taskId).filter(Boolean))
+  const tasks = Object.values(s.tasks)
+    .filter((t) => {
+      if (t.status !== 'review' || t.projectId !== projectId || covered.has(t.id)) return false
+      const last = t.runIds.length ? s.runs[t.runIds[t.runIds.length - 1]] : undefined
+      return !!last?.agentId
+    })
+    .sort((a, b) => a.updatedAt - b.updatedAt)
+  return { approvals, sessions, tasks }
+}
+
+// ---------------------------------------------------------------- members and spend
+
+export interface ProjectMember {
+  actor: ActorRef
+  /** Open tasks assigned to this member in the project. */
+  openTasks: number
+  /** Runs of this member in the project that are active right now. */
+  activeRuns: number
+}
+
+/**
+ * Who works in a project: you, then every agent with tasks or runs in it (most open tasks first).
+ * Members are derived from the work; there is no separate membership list.
+ */
+export function computeProjectMembers(s: Pick<Tables, 'tasks' | 'runs' | 'agents'>, projectId: ID, now = Date.now()): ProjectMember[] {
+  const agents = new Map<ID, ProjectMember>()
+  const me: ProjectMember = { actor: ME, openTasks: 0, activeRuns: 0 }
+  const agent = (id: ID) => {
+    if (!s.agents[id] || s.agents[id].status === 'archived') return undefined
+    let m = agents.get(id)
+    if (!m) agents.set(id, (m = { actor: { type: 'agent', id }, openTasks: 0, activeRuns: 0 }))
+    return m
+  }
+  for (const t of Object.values(s.tasks)) {
+    if (t.projectId !== projectId || t.status === 'cancelled') continue
+    const open = t.status !== 'done'
+    if (t.assignee?.type === 'agent') {
+      const m = agent(t.assignee.id)
+      if (m && open) m.openTasks++
+    } else if (open && (t.assignee === null || t.assignee.type === 'user')) {
+      me.openTasks++
+    }
+  }
+  const since = now - 30 * 24 * 60 * 60 * 1000
+  for (const r of Object.values(s.runs)) {
+    if (r.projectId !== projectId || !r.agentId || r.createdAt < since) continue
+    const m = agent(r.agentId)
+    if (m && isRunActive(r.status)) m.activeRuns++
+  }
+  const list = [...agents.values()].sort(
+    (a, b) => b.activeRuns - a.activeRuns || b.openTasks - a.openTasks || (s.agents[a.actor.id]?.name ?? '').localeCompare(s.agents[b.actor.id]?.name ?? ''),
+  )
+  return [me, ...list]
+}
+
+export interface ProjectSpend {
+  /** Live (real API) spend this calendar month, USD. */
+  liveUsd: number
+  /** Simulated runs' estimated cost this month (reference pricing; no money was spent). */
+  estimatedUsd: number
+  /** Runs counted this month. */
+  runs: number
+}
+
+/** Month-to-date spend of a project, split into live spend and the simulated estimate. */
+export function computeProjectSpend(runs: Tables['runs'], projectId: ID, now = Date.now()): ProjectSpend {
+  const d = new Date(now)
+  const monthStart = new Date(d.getFullYear(), d.getMonth(), 1).getTime()
+  let liveUsd = 0
+  let estimatedUsd = 0
+  let count = 0
+  for (const r of Object.values(runs)) {
+    if (r.projectId !== projectId || r.createdAt < monthStart) continue
+    count++
+    if (r.simulated) estimatedUsd += r.usage.costUsd
+    else liveUsd += r.usage.costUsd
+  }
+  return { liveUsd, estimatedUsd, runs: count }
+}
+
+/** Month-to-date spend, re-read at most once a minute while runs stream. */
+export function useProjectSpend(projectId: ID): ProjectSpend {
+  return useDB(useShallow((s: Tables) => memoOnTable(s.runs, `spend:${projectId}:${timeBucket(60_000)}`, () => computeProjectSpend(s.runs, projectId))))
 }
 
 // ---------------------------------------------------------------- hooks

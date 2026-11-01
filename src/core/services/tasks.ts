@@ -1,4 +1,4 @@
-import { db, ID_PREFIX, useRow, useRows } from '@/core/db'
+import { db, ID_PREFIX, useDB, useRow, useRows, useRowsByIds } from '@/core/db'
 import { getSettings } from '@/core/settings'
 import {
   ME,
@@ -326,6 +326,67 @@ export function deleteTask(id: ID): void {
   })
 }
 
+// ---------------------------------------------------------------- review
+
+/** Kanban columns, in order. Cancelled tasks live outside the board (list view only). */
+export const BOARD_STATUSES: readonly TaskStatus[] = ['backlog', 'todo', 'in_progress', 'review', 'done']
+
+/** The most recent run attached to a task (runIds are kept most recent last). */
+export function latestTaskRun(task: Pick<Task, 'runIds'>): Run | undefined {
+  for (let i = task.runIds.length - 1; i >= 0; i--) {
+    const run = db.get('runs', task.runIds[i])
+    if (run) return run
+  }
+  return undefined
+}
+
+/**
+ * Approve the work under review (§6.9): an agent's task never moves straight to Done — you approve
+ * the review to complete it. No-op unless the task is in Review.
+ */
+export function approveTaskReview(id: ID): Task | undefined {
+  const cur = db.get('tasks', id)
+  if (!cur || cur.status !== 'review') return cur
+  const by = latestTaskRun(cur)?.agentId
+  const agentName = by ? db.get('agents', by)?.name : undefined
+  return updateTask(
+    id,
+    { status: 'done' },
+    {
+      verb: 'approved',
+      summary: agentName ? `Approved ${agentName}’s work on “${cur.title}” — done` : `Approved the review of “${cur.title}” — done`,
+    },
+  )
+}
+
+/**
+ * Send a task in Review back with a note. When an agent did the work it gets a new run with the
+ * note (the task returns to In progress while it works); otherwise the task simply goes back to
+ * In progress. Throws the agent service's friendly error when the agent cannot take work.
+ */
+export function requestTaskChanges(id: ID, note: string): { task: Task; run?: Run } | undefined {
+  const cur = db.get('tasks', id)
+  if (!cur) return undefined
+  const clean = note.trim()
+  const agentId = cur.assignee?.type === 'agent' ? cur.assignee.id : undefined
+  if (agentId) assertAgentCanRun(agentId)
+  logActivity({
+    actor: ME,
+    verb: 'requested_changes',
+    target: taskRef(id),
+    summary: clean ? `Requested changes on “${cur.title}”: “${clipLine(clean, 140)}”` : `Requested changes on “${cur.title}”`,
+    projectId: cur.projectId,
+    meta: clean ? { note: clean } : undefined,
+  })
+  if (agentId) {
+    const instruction = [taskInstruction(cur), clean ? `Changes requested in review:\n${clean}` : 'Changes were requested in review.'].join('\n\n')
+    const run = runAgent(agentId, { instruction, taskId: id, projectId: cur.projectId, origin: taskRef(id) })
+    return { task: db.get('tasks', id) ?? cur, run }
+  }
+  const task = cur.status === 'in_progress' ? cur : (updateTask(id, { status: 'in_progress' }) ?? cur)
+  return { task }
+}
+
 // ---------------------------------------------------------------- subtasks
 
 export function addSubtask(taskId: ID, title: string): Subtask | undefined {
@@ -416,4 +477,25 @@ export function useMyTasks(): Task[] {
 
 export function useTask(id: ID | null | undefined): Task | undefined {
   return useRow('tasks', id)
+}
+
+/** A task's runs (its own runs, then coding-session turns linked to it), most recent last. */
+export function useTaskRuns(task: Pick<Task, 'runIds'> | null | undefined): Run[] {
+  return useRowsByIds('runs', task?.runIds)
+}
+
+/**
+ * The run working on a task right now (queued, running, waiting or paused), if any — the live tape
+ * on cards and rows. Selects one id, so callers re-render only when the active run changes.
+ */
+export function useActiveTaskRunId(task: Pick<Task, 'runIds'> | null | undefined): ID | undefined {
+  const ids = task?.runIds
+  return useDB((s) => {
+    if (!ids) return undefined
+    for (let i = ids.length - 1; i >= 0; i--) {
+      const run = s.runs[ids[i]]
+      if (run && isRunActive(run.status)) return run.id
+    }
+    return undefined
+  })
 }

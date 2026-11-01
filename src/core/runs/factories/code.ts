@@ -1,9 +1,9 @@
-import { db } from '@/core/db'
+import { db, useDB, type Tables } from '@/core/db'
 import { getFile } from '@/core/github'
 import { DEMO_REPO } from '@/core/seed/demoRepo'
 import { logActivity } from '@/core/services/activity'
-import { CODE_FACTORY, PR_FACTORY, mergeFileChanges } from '@/core/services/code'
-import { notify } from '@/core/services/notifications'
+import { CODE_FACTORY, PR_CONFIRM_NOTE, PR_FACTORY, buildPatch, followSessionTask, mergeFileChanges } from '@/core/services/code'
+import { markRead, notify } from '@/core/services/notifications'
 import {
   editStepTitle, installCommandFor, installOutputFor, pathsToRealize, realizeTurn, structureTurn, type RealizedTurn, type TurnStructure,
 } from '@/core/sim/code/design'
@@ -15,6 +15,7 @@ import { diffStat } from '@/core/sim/terminal'
 import { shorten } from '@/core/sim/text'
 import type { ActorRef, CheckResult, CodeSession, EntityRef, FileChange, ID, Repo, Run } from '@/core/types'
 import type { Rng } from '@/lib/rng'
+import { runEngine } from '../engine'
 import { registerRunFactory } from '../registry'
 import { updateStep } from '../service'
 import type { RunPlan, StepContext, StepPlan } from '../types'
@@ -36,7 +37,29 @@ import type { RunPlan, StepContext, StepPlan } from '../types'
  */
 
 const CHECK_ORDER = ['Typecheck', 'Lint', 'Unit tests'] as const
-type CheckName = (typeof CHECK_ORDER)[number]
+
+/** Display order of every check a session can carry (seeded sessions also report e2e and build). */
+const CHECK_KEY_ORDER = ['typecheck', 'lint', 'unit', 'e2e', 'build'] as const
+
+/**
+ * One key per check, whatever it was named: 'Typecheck' / 'typecheck', 'Unit tests' / 'unit',
+ * 'E2E tests' / 'e2e'. A new turn's result replaces the earlier one of the same key.
+ */
+export function checkKey(name: string): string {
+  const n = name.trim().toLowerCase()
+  if (n === 'unit' || n === 'unit tests' || n === 'tests' || n === 'test') return 'unit'
+  if (n === 'e2e' || n === 'e2e tests' || n === 'end-to-end tests') return 'e2e'
+  if (n === 'types' || n.startsWith('typecheck') || n === 'type check') return 'typecheck'
+  return n
+}
+
+function checkRank(name: string): number {
+  const i = (CHECK_KEY_ORDER as readonly string[]).indexOf(checkKey(name))
+  return i < 0 ? CHECK_KEY_ORDER.length : i
+}
+
+/** What a check from an earlier turn reads once the code changed under it. */
+export const STALE_CHECK_NOTE = 'Not re-run after the latest changes. Each turn runs typecheck, lint and unit tests in the simulated sandbox.'
 
 function failedPlan(message: string): RunPlan {
   return { steps: [{ kind: 'think', title: 'Check the session', durationMs: 400, failChance: 1, failMessage: message }] }
@@ -72,20 +95,53 @@ function mergeIntoSession(sessionId: ID, changes: readonly FileChange[]): void {
 
 function upsertCheck(sessionId: ID, check: Omit<CheckResult, 'id'>): void {
   const id = stableId('chk', sessionId, check.name)
+  const key = checkKey(check.name)
   db.update('sessions', sessionId, (s) => {
-    const others = s.checks.filter((c) => c.id !== id)
-    const rank = (name: string) => {
-      const i = CHECK_ORDER.indexOf(name as CheckName)
-      return i < 0 ? CHECK_ORDER.length : i
-    }
-    const checks = [...others, { ...check, id }].sort((a, b) => rank(a.name) - rank(b.name))
+    const others = s.checks.filter((c) => c.id !== id && checkKey(c.name) !== key)
+    const checks = [...others, { ...check, id }].sort((a, b) => checkRank(a.name) - checkRank(b.name))
     return { ...s, checks, updatedAt: Date.now() }
   })
 }
 
-/** At the start of a turn every check goes back to pending. */
+/**
+ * At the start of a turn the checks it runs go back to pending; checks it does not run (e2e, build
+ * from earlier turns) are marked skipped, so no stale "passed" outlives the code it checked.
+ */
 function resetChecks(sessionId: ID): void {
+  const turnKeys = new Set(CHECK_ORDER.map(checkKey))
+  db.update('sessions', sessionId, (s) => {
+    const stale = s.checks.filter((c) => !turnKeys.has(checkKey(c.name)) && c.status !== 'skipped')
+    if (!stale.length) return s
+    return { ...s, checks: s.checks.map((c) => (stale.includes(c) ? { ...c, status: 'skipped' as const, durationMs: undefined, output: STALE_CHECK_NOTE } : c)) }
+  })
   for (const name of CHECK_ORDER) upsertCheck(sessionId, { name, status: 'pending' })
+}
+
+function readRefs(raw: unknown): EntityRef[] {
+  if (!Array.isArray(raw)) return []
+  return raw.filter((r): r is EntityRef => !!r && typeof r === 'object' && typeof (r as EntityRef).kind === 'string' && typeof (r as EntityRef).id === 'string')
+}
+
+/** "Edit src/a.ts", "Edit src/a.ts and 2 more files". */
+function editApprovalTitle(changes: readonly FileChange[] | undefined, fallbackPath: string): string {
+  const paths = changes?.length ? changes.map((c) => c.path) : [fallbackPath]
+  const more = paths.length - 1
+  return `Edit ${paths[0]}${more > 0 ? ` and ${more} more file${more === 1 ? '' : 's'}` : ''}`
+}
+
+/**
+ * The gate on edit steps. Low risk, so only the Supervised policy asks (§6.3: file edits raise
+ * separate repo.write approvals only when the session policy is Supervised).
+ */
+function editApproval(branch: string, changes: readonly FileChange[] | undefined, fallbackPath: string): NonNullable<StepPlan['approval']> {
+  return {
+    title: editApprovalTitle(changes, fallbackPath),
+    description: `Writes to the session branch ${branch}. You review every file in Changes before anything is merged.`,
+    risk: 'low',
+    preview: changes?.length
+      ? { kind: 'diff', content: buildPatch(changes), label: branch }
+      : { kind: 'text', content: `The change to ${fallbackPath} is computed from the file read from GitHub; review it in Changes.`, label: branch },
+  }
 }
 
 function isLatestTurn(session: CodeSession, turnId: ID): boolean {
@@ -178,6 +234,7 @@ export function planCodeSession(params: Record<string, unknown>, rng: Rng): RunP
     : null
   const integrationId = isLive ? 'github' : undefined
   const repoRefs: EntityRef[] = [{ kind: 'repo', id: repo.id }]
+  const contextRefs = readRefs(params.context)
   const id = session.id
   const sandbox = { tool: 'terminal', capability: 'shell.execute' as const, integrationId: 'sandbox' }
 
@@ -186,6 +243,7 @@ export function planCodeSession(params: Record<string, unknown>, rng: Rng): RunP
       kind: 'plan',
       title: 'Plan the change',
       output: s.planText,
+      ...(contextRefs.length ? { refs: contextRefs } : {}),
       durationMs: rng.int(1500, 2800),
       tokens: rng.int(600, 1200),
       onComplete: () => resetChecks(id),
@@ -225,6 +283,7 @@ export function planCodeSession(params: Record<string, unknown>, rng: Rng): RunP
       capability: 'repo.write',
       fileChanges: realized ? realized.editChanges : undefined,
       output: realized ? diffStat(realized.editChanges) : 'Preparing the change…',
+      approval: editApproval(session.branch, realized?.editChanges, primary),
       durationMs: rng.int(2200, 4200),
       tokens: rng.int(1400, 3200),
       onComplete: realized
@@ -305,6 +364,7 @@ export function planCodeSession(params: Record<string, unknown>, rng: Rng): RunP
         capability: 'repo.write',
         fileChanges: [fix],
         output: diffStat([fix]),
+        approval: editApproval(session.branch, [fix], fix.path),
         durationMs: rng.int(1600, 3000),
         tokens: rng.int(700, 1500),
         onComplete: () => mergeIntoSession(id, [fix]),
@@ -375,6 +435,7 @@ export function planCodeSession(params: Record<string, unknown>, rng: Rng): RunP
       summary: n ? `Proposed ${n} change${n === 1 ? '' : 's'} on ${cur.branch} — ready for review` : `Finished a turn on ${cur.branch} without changes`,
       projectId: cur.projectId,
     })
+    followSessionTask(id)
   }
 
   return {
@@ -468,11 +529,58 @@ export function planPullRequest(params: Record<string, unknown>, rng: Rng): RunP
       db.update('sessions', id, { pr: { number, title, status: 'open', simulated: true }, status: cur.status === 'needs_review' ? 'approved' : cur.status, updatedAt: Date.now() })
       logActivity({ actor: actorOf(ctx.run), verb: 'opened', target: { kind: 'session', id }, summary: `Opened pull request #${number} “${shorten(title, 80)}” (simulated)`, projectId: cur.projectId })
       notify({ kind: 'run.completed', title: `Pull request #${number} opened (simulated)`, body: `${repo.fullName} · ${session.branch} → ${session.baseBranch}`, ref: { kind: 'session', id }, tone: 'success' })
+      followSessionTask(id)
     },
   }
+}
+
+// ---------------------------------------------------------------- "Approve & open PR" is one decision
+
+const confirming = new Set<ID>()
+
+/** Pending approvals of pull-request runs started with `confirmed: true` (the human confirmed in review). */
+export function confirmedPullRequestApprovals(s: Pick<Tables, 'approvals' | 'runs'>): ID[] {
+  const out: ID[] = []
+  for (const a of Object.values(s.approvals)) {
+    if (a.status !== 'pending') continue
+    const script = s.runs[a.runId]?.script
+    if (script?.factory === PR_FACTORY && script.params.confirmed === true) out.push(a.id)
+  }
+  return out
+}
+
+/**
+ * Resolve the approval of a confirmed pull-request run as approved by you, "Confirmed in review"
+ * (§6.3: you never see a second card). Deferred to a microtask: the engine is still finishing the
+ * request when the approval row appears. Its approval notification is marked read.
+ */
+function confirmPending(s: Pick<Tables, 'approvals' | 'runs'>): void {
+  for (const approvalId of confirmedPullRequestApprovals(s)) {
+    if (confirming.has(approvalId)) continue
+    confirming.add(approvalId)
+    queueMicrotask(() => {
+      confirming.delete(approvalId)
+      if (db.get('approvals', approvalId)?.status !== 'pending') return
+      runEngine.resolveApproval(approvalId, 'approved', PR_CONFIRM_NOTE)
+      for (const n of db.filter('notifications', (x) => x.ref?.kind === 'approval' && x.ref.id === approvalId && !x.readAt)) markRead(n.id)
+    })
+  }
+}
+
+let unwatchConfirmed: (() => void) | null = null
+
+/** Watch for confirmed pull-request approvals (installed once with the factories; survives reloads). */
+function watchConfirmedPullRequests(): void {
+  if (unwatchConfirmed) return
+  unwatchConfirmed = useDB.subscribe((state, prev) => {
+    if (state.approvals !== prev.approvals) confirmPending(state)
+  })
+  // Approvals that were already waiting when the app loaded.
+  queueMicrotask(() => confirmPending(useDB.getState()))
 }
 
 export function registerCodeFactories(): void {
   registerRunFactory(CODE_FACTORY, planCodeSession)
   registerRunFactory(PR_FACTORY, planPullRequest)
+  watchConfirmedPullRequests()
 }

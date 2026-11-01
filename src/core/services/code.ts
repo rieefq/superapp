@@ -1,3 +1,5 @@
+import { createTwoFilesPatch, FILE_HEADERS_ONLY } from 'diff'
+import { useContextStore } from '@/core/context'
 import { db, ID_PREFIX, useRow, useRows } from '@/core/db'
 import { GithubRequestError, getFile, getRepo, getTree, invalidateRepoCache, parseRepoInput } from '@/core/github'
 import { runEngine } from '@/core/runs/engine'
@@ -8,11 +10,14 @@ import { slugify, titleFromText } from '@/core/sim/text'
 import { createRng } from '@/lib/rng'
 import {
   ME, isRunActive,
-  type Autonomy, type CodeSession, type CodeTurn, type EntityRef, type FileChange, type ID, type Repo, type RepoFile, type Run, type SessionStatus,
+  type ActorRef, type Autonomy, type CodeSession, type CodeTurn, type EntityRef, type FileChange, type ID, type KnowledgeItem, type Repo,
+  type RepoFile, type Run, type SessionStatus, type TaskStatus,
 } from '@/core/types'
 import { newId } from '@/lib/id'
 import { logActivity } from './activity'
+import { createKnowledge, updateKnowledge } from './knowledge'
 import { forgetRef, markDerived } from './serviceHelpers'
+import { updateTask } from './tasks'
 
 /**
  * Code service: repositories (live GitHub reads or the bundled demo repo) and coding
@@ -29,6 +34,11 @@ export const CODE_AGENT_ID = 'agt_forge'
 export const DEMO_REPO_ID = 'rep_atlas'
 /** Stored trees are capped so very large repositories do not fill local storage. */
 export const MAX_TREE_ENTRIES = 4000
+/**
+ * The note on a pull-request approval resolved by "Approve & open PR" in review (§6.3): the human
+ * decision was made there, so the run's own approval is resolved with this note instead of asking twice.
+ */
+export const PR_CONFIRM_NOTE = 'Confirmed in review'
 
 const sessionRef = (id: ID): EntityRef => ({ kind: 'session', id })
 const repoRef = (id: ID): EntityRef => ({ kind: 'repo', id })
@@ -261,6 +271,40 @@ export function sessionBase(session: CodeSession): Record<string, string> {
   return base
 }
 
+/** A git-style unified diff for one file change (`diff --git` header, /dev/null for added and deleted files). */
+export function fileChangePatch(change: FileChange): string {
+  const oldPath = change.changeType === 'renamed' && change.oldPath ? change.oldPath : change.path
+  const added = change.changeType === 'added'
+  const deleted = change.changeType === 'deleted'
+  const header = [`diff --git a/${oldPath} b/${change.path}`]
+  if (added) header.push('new file mode 100644')
+  if (deleted) header.push('deleted file mode 100644')
+  if (change.changeType === 'renamed' && change.oldPath && change.oldPath !== change.path) header.push(`rename from ${change.oldPath}`, `rename to ${change.path}`)
+  const before = added ? '' : (change.before ?? '')
+  const after = deleted ? '' : (change.after ?? '')
+  if (before === after) return `${header.join('\n')}\n`
+  const body = createTwoFilesPatch(added ? '/dev/null' : `a/${oldPath}`, deleted ? '/dev/null' : `b/${change.path}`, before, after, undefined, undefined, {
+    headerOptions: FILE_HEADERS_ONLY,
+  })
+  return `${header.join('\n')}\n${body}`
+}
+
+/** One patch for several file changes, in order (what "Export .patch" and "Copy diff" produce). */
+export function buildPatch(changes: readonly FileChange[]): string {
+  return changes.map(fileChangePatch).join('')
+}
+
+/**
+ * The session's change set as a patch: accepted changes (default, what a pull request would carry),
+ * every non-rejected change, or everything.
+ */
+export function sessionPatch(sessionId: ID, which: 'accepted' | 'proposed' | 'all' = 'accepted'): string {
+  const session = db.get('sessions', sessionId)
+  if (!session) return ''
+  const changes = session.changes.filter((c) => (which === 'all' ? true : which === 'proposed' ? c.review !== 'rejected' : c.review === 'accepted'))
+  return buildPatch(changes)
+}
+
 // ---------------------------------------------------------------- sessions
 
 export interface CreateSessionInput {
@@ -277,6 +321,16 @@ export interface CreateSessionInput {
   branch?: string
   /** Base branch (default: the repository's default branch). */
   baseBranch?: string
+  /**
+   * What the composer's Context Line showed (held, attached, project memory items). The turn's plan step
+   * records them as refs, so the run's Saw list matches what was offered.
+   */
+  contextRefs?: EntityRef[]
+}
+
+export interface ContinueSessionOptions {
+  /** As `CreateSessionInput.contextRefs`, for this turn. */
+  contextRefs?: EntityRef[]
 }
 
 function codingAgentId(explicit?: ID): ID | undefined {
@@ -292,10 +346,27 @@ function uniqueBranch(repoId: ID, title: string, exact = false): string {
   for (let n = 2; ; n++) if (!taken.has(`${base}-${n}`)) return `${base}-${n}`
 }
 
-function startTurn(session: CodeSession, turn: CodeTurn): Run {
+/** Serializable, deduplicated context refs for run params (the plan step lists them). */
+function contextParam(refs: readonly EntityRef[] | undefined): EntityRef[] | undefined {
+  if (!refs?.length) return undefined
+  const seen = new Set<string>()
+  const out: EntityRef[] = []
+  for (const r of refs) {
+    if (!r || typeof r.kind !== 'string' || typeof r.id !== 'string') continue
+    const key = `${r.kind}:${r.id}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({ kind: r.kind, id: r.id })
+  }
+  return out.length ? out.slice(0, 24) : undefined
+}
+
+function startTurn(session: CodeSession, turn: CodeTurn, contextRefs?: readonly EntityRef[]): Run {
   const params: Record<string, unknown> = { sessionId: session.id, turnId: turn.id, prompt: turn.prompt }
   const base = sessionBase(session)
   if (Object.keys(base).length) params.base = base
+  const context = contextParam(contextRefs)
+  if (context) params.context = context
   const run = runEngine.start({
     kind: 'code',
     title: session.turns.length > 1 ? `${session.title} — ${titleFromText(turn.prompt, 60)}` : session.title,
@@ -308,8 +379,34 @@ function startTurn(session: CodeSession, turn: CodeTurn): Run {
   touchSession(session.id, (s) => ({ ...s, turns: s.turns.map((t) => (t.id === turn.id ? { ...t, runId: run.id } : t)) }))
   if (session.taskId) {
     db.update('tasks', session.taskId, (t) => (t.runIds.includes(run.id) ? t : { ...t, runIds: [...t.runIds, run.id], updatedAt: Date.now() }))
+    followSessionTask(session.id)
   }
   return run
+}
+
+// ---------------------------------------------------------------- the linked task follows the session
+
+const TASK_FOR_SESSION: Partial<Record<SessionStatus, TaskStatus>> = {
+  working: 'in_progress',
+  needs_review: 'review',
+  approved: 'done',
+  merged: 'done',
+}
+
+/**
+ * The linked task follows the session (§6.3 Connections, §7.3 journey 3): a working turn moves it to
+ * In progress, a turn ready for review to Review, approved or merged changes to Done. Done and
+ * cancelled tasks are never reopened by the session. Idempotent.
+ */
+export function followSessionTask(sessionId: ID): void {
+  const session = db.get('sessions', sessionId)
+  if (!session?.taskId) return
+  const target = TASK_FOR_SESSION[session.status]
+  const task = db.get('tasks', session.taskId)
+  if (!target || !task || task.status === target || task.status === 'done' || task.status === 'cancelled') return
+  const agent: ActorRef | undefined = session.agentId ? { type: 'agent', id: session.agentId } : undefined
+  const actor = target === 'done' ? ME : (agent ?? ME)
+  updateTask(task.id, { status: target }, { actor })
 }
 
 /** Warm the GitHub file cache for the files a turn is likely to read (fire-and-forget). */
@@ -358,7 +455,7 @@ export function createSession(input: CreateSessionInput): CodeSession {
   logActivity({ actor: ME, verb: 'started', target: sessionRef(session.id), summary: `Started coding session ${quoted(title)} on ${repo.fullName}`, projectId: session.projectId })
   prefetchTurn(session, prompt)
   try {
-    startTurn(session, turn)
+    startTurn(session, turn, input.contextRefs)
   } catch (error) {
     touchSession(session.id, { status: 'failed' })
     throw error
@@ -366,21 +463,41 @@ export function createSession(input: CreateSessionInput): CodeSession {
   return db.get('sessions', session.id) ?? session
 }
 
-/** Give the agent another instruction: a new turn and run on the same branch. */
-export function continueSession(sessionId: ID, prompt: string): Run | undefined {
-  const session = db.get('sessions', sessionId)
-  const text = prompt.trim()
-  if (!session || !text) return undefined
+/** The run of the session's turn that is still active (queued, running, waiting or paused), if any. */
+export function activeSessionRun(session: CodeSession): Run | undefined {
   for (const t of session.turns) {
     const run = t.runId ? db.get('runs', t.runId) : undefined
     if (run && isRunActive(run.status)) return run
   }
+  return undefined
+}
+
+/**
+ * Give the agent another instruction: a new turn and run on the same branch. While a turn is still
+ * active nothing is started and that turn's run is returned (callers queue the message instead).
+ */
+export function continueSession(sessionId: ID, prompt: string, opts: ContinueSessionOptions = {}): Run | undefined {
+  const session = db.get('sessions', sessionId)
+  const text = prompt.trim()
+  if (!session || !text || session.status === 'archived') return undefined
+  const active = activeSessionRun(session)
+  if (active) return active
   const turn: CodeTurn = { id: newId('trn'), prompt: text, createdAt: Date.now() }
   const next = touchSession(sessionId, (s) => ({ ...s, status: 'working', turns: [...s.turns, turn] }))
   if (!next) return undefined
   logActivity({ actor: ME, verb: 'instructed', target: sessionRef(sessionId), summary: `Asked for a follow-up in ${quoted(session.title)}: ${quoted(text)}`, projectId: session.projectId })
   prefetchTurn(next, text)
-  return startTurn(next, turn)
+  return startTurn(next, turn, opts.contextRefs)
+}
+
+/** Rename a session (the stage header's inline rename). */
+export function renameSession(sessionId: ID, title: string): CodeSession | undefined {
+  const session = db.get('sessions', sessionId)
+  const next = title.replace(/\s+/g, ' ').trim()
+  if (!session || !next || next === session.title) return session
+  const updated = touchSession(sessionId, { title: next })
+  logActivity({ actor: ME, verb: 'renamed', target: sessionRef(sessionId), summary: `Renamed coding session ${quoted(session.title)} to ${quoted(next)}`, projectId: session.projectId })
+  return updated
 }
 
 export function reviewChange(sessionId: ID, path: string, review: NonNullable<FileChange['review']>): CodeSession | undefined {
@@ -423,32 +540,50 @@ export function applyChanges(sessionId: ID): CodeSession {
     actor: ME,
     verb: 'applied',
     target: sessionRef(sessionId),
-    summary: `Applied ${accepted.length} change${accepted.length === 1 ? '' : 's'} to ${session.branch}`,
+    summary: `Applied ${accepted.length} change${accepted.length === 1 ? '' : 's'} to ${session.branch} (simulated)`,
     projectId: session.projectId,
     meta: { paths: accepted.map((c) => c.path) },
   })
+  followSessionTask(sessionId)
   return next
+}
+
+export interface OpenPullRequestOptions {
+  /**
+   * The human already confirmed in review ("Approve & open PR" → "Confirm: open PR"). The run still asks
+   * through the approval model, and its approval is resolved at once as approved by you with
+   * `PR_CONFIRM_NOTE`, so no second card appears (§6.3, §9 "Don't raise a second approval").
+   */
+  confirmed?: boolean
 }
 
 /**
  * Open a pull request for the accepted changes: a short run whose approval step
  * (repo.pull_request, high risk) previews the PR. Pull requests are simulated in this build.
  */
-export function openPullRequest(sessionId: ID): Run {
+export function openPullRequest(sessionId: ID, opts: OpenPullRequestOptions = {}): Run {
   const session = db.get('sessions', sessionId)
   if (!session) throw new Error('Session not found.')
+  if (session.status === 'archived') throw new Error('This session is archived. Restore it first.')
   if (!session.changes.some((c) => c.review === 'accepted')) throw new Error('Accept at least one change before opening a pull request.')
   if (session.pr && session.pr.status !== 'closed') throw new Error(`Pull request #${session.pr.number} is already ${session.pr.status}.`)
-  if (session.status === 'needs_review') applyChanges(sessionId)
+  const running = activePullRequestRun(sessionId)
+  if (running) return running
+  if (session.status === 'needs_review' || session.status === 'idle') applyChanges(sessionId)
   return runEngine.start({
     kind: 'code',
     title: `Open pull request: ${session.title}`,
     factory: PR_FACTORY,
-    params: { sessionId },
+    params: opts.confirmed ? { sessionId, confirmed: true } : { sessionId },
     projectId: session.projectId,
     agentId: session.agentId,
     origin: sessionRef(sessionId),
   })
+}
+
+/** The pull-request run of a session that is still in flight, if any. */
+export function activePullRequestRun(sessionId: ID): Run | undefined {
+  return db.find('runs', (r) => r.origin?.kind === 'session' && r.origin.id === sessionId && r.script?.factory === PR_FACTORY && isRunActive(r.status))
 }
 
 /** Merge the (simulated) pull request. */
@@ -458,6 +593,7 @@ export function mergePullRequest(sessionId: ID): CodeSession | undefined {
   const pr = session.pr
   const next = touchSession(sessionId, { status: 'merged', pr: { ...pr, status: 'merged' } })
   logActivity({ actor: ME, verb: 'merged', target: sessionRef(sessionId), summary: `Merged pull request #${pr.number} ${quoted(pr.title)} (simulated)`, projectId: session.projectId })
+  followSessionTask(sessionId)
   return next
 }
 
@@ -479,6 +615,24 @@ export function archiveSession(sessionId: ID): CodeSession | undefined {
   return next
 }
 
+/** The status an archived session returns to: its PR decides, then whether changes wait for review. */
+export function restoredStatus(session: Pick<CodeSession, 'pr' | 'changes'>): SessionStatus {
+  if (session.pr?.status === 'merged') return 'merged'
+  if (session.pr?.status === 'open') return 'approved'
+  if (session.changes.some((c) => c.review === 'pending')) return 'needs_review'
+  if (session.changes.length && session.changes.every((c) => c.review === 'accepted')) return 'approved'
+  return 'idle'
+}
+
+/** Undo an archive (the archive toast's Undo, or Restore on an archived session). */
+export function restoreSession(sessionId: ID): CodeSession | undefined {
+  const session = db.get('sessions', sessionId)
+  if (!session || session.status !== 'archived') return session
+  const next = touchSession(sessionId, { status: restoredStatus(session) })
+  logActivity({ actor: ME, verb: 'restored', target: sessionRef(sessionId), summary: `Restored coding session ${quoted(session.title)}`, projectId: session.projectId })
+  return next
+}
+
 export function deleteSession(sessionId: ID): void {
   const session = db.get('sessions', sessionId)
   if (!session) return
@@ -486,6 +640,49 @@ export function deleteSession(sessionId: ID): void {
   forgetRef(sessionRef(sessionId))
   db.remove('sessions', sessionId)
   logActivity({ actor: ME, verb: 'deleted', target: sessionRef(sessionId), summary: `Deleted coding session ${quoted(session.title)}`, projectId: session.projectId })
+}
+
+// ---------------------------------------------------------------- hold a repository file
+
+function knowledgeCopyOf(repoId: ID, path: string): KnowledgeItem | undefined {
+  return db.find('knowledge', (k) => k.source.type === 'code' && k.source.ref?.kind === 'repo' && k.source.ref.id === repoId && k.file?.name === path)
+}
+
+/**
+ * Hold a repository file (§6.3 Files › Hold file). Held items are entities, so the file is kept as a
+ * Knowledge copy (source: code → the repository, read live for GitHub repositories) and that copy is
+ * held: it rides along in every new AI action and is retrievable later. An existing copy of the same
+ * path is reused (refreshed when the file changed). Binary and oversized files cannot be held.
+ */
+export async function holdRepoFile(repoId: ID, path: string): Promise<KnowledgeItem> {
+  const repo = db.get('repos', repoId)
+  if (!repo) throw new Error('Repository not found.')
+  const file = await getRepoFile(repoId, path)
+  if (file.skipped) throw new Error(file.skipped === 'binary' ? 'Binary files can’t be held.' : 'This file is above the 1 MB preview limit and can’t be held.')
+  const language = file.language ?? ''
+  const prose = /\.(md|mdx|txt|rst)$/i.test(path)
+  const content = prose ? file.content : `\`\`\`${language}\n${file.content.replace(/\n$/, '')}\n\`\`\``
+  const lines = file.content.split('\n').length
+  const summary = `${path} from ${repo.fullName}${repo.provider === 'github' ? ` (${repo.defaultBranch}, read from GitHub)` : ' (demo repository)'} · ${lines} lines.`
+  let item = knowledgeCopyOf(repoId, path)
+  if (item && item.content !== content) item = updateKnowledge(item.id, { content, summary }) ?? item
+  if (!item) {
+    item = createKnowledge(
+      {
+        kind: prose ? 'doc' : 'snippet',
+        title: path,
+        content,
+        summary,
+        tags: ['code'],
+        projectIds: repo.projectId ? [repo.projectId] : [],
+        source: { type: 'code', ref: repoRef(repoId), ...(repo.url ? { url: `${repo.url}/blob/${repo.defaultBranch}/${path}` } : {}) },
+        file: { name: path, mime: 'text/plain', size: file.size },
+      },
+      { verb: 'saved', summary: `Kept ${path} from ${repo.fullName} in Knowledge to hold it` },
+    )
+  }
+  useContextStore.getState().pin({ kind: 'knowledge', id: item.id })
+  return item
 }
 
 // ---------------------------------------------------------------- hooks

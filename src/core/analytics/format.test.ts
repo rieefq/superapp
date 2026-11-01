@@ -77,7 +77,7 @@ describe('chart adapters', () => {
   it('maps daily buckets to time points', () => {
     const day = (d: number, costUsd: number): InsightsDay => ({
       day: d, partial: false, byKind: { chat: 0, code: 0, agent: 0, research: 0, workflow: 0, studio: 0 },
-      runs: 0, succeeded: 0, failed: 0, costUsd, tokens: 0,
+      runs: 0, succeeded: 0, failed: 0, cancelled: 0, active: 0, costUsd, liveCostUsd: 0, simulatedCostUsd: costUsd, tokens: 0,
     })
     expect(dailyPoints([day(1, 0.5), day(2, 1.25)], (d) => d.costUsd)).toEqual([{ t: 1, v: 0.5 }, { t: 2, v: 1.25 }])
   })

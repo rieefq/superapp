@@ -76,14 +76,35 @@ export function absoluteDelta(
   return signed(diff > 0 ? 'up' : 'down', format(Math.abs(diff)))
 }
 
-/** "Last 7 days". */
-export function rangeLabel(rangeDays: number): string {
-  return `Last ${pluralize(rangeDays, 'day')}`
+/** The span a range covers: "24 hours" for one day, otherwise "7 days". */
+function rangeSpan(rangeDays: number): string {
+  return rangeDays === 1 ? '24 hours' : pluralize(rangeDays, 'day')
 }
 
-/** "vs previous 7 days" — the period a delta compares against. */
+/** "Last 7 days", "Last 24 hours". */
+export function rangeLabel(rangeDays: number): string {
+  return `Last ${rangeSpan(rangeDays)}`
+}
+
+/** "vs previous 7 days" — the period a delta compares against ("vs previous 24 hours" for one day). */
 export function comparisonLabel(rangeDays: number): string {
-  return `vs previous ${pluralize(rangeDays, 'day')}`
+  return `vs previous ${rangeSpan(rangeDays)}`
+}
+
+/** Short range token for controls and URLs: "24h", "7d", "30d", "90d". */
+export function rangeToken(rangeDays: number): string {
+  return rangeDays === 1 ? '24h' : `${rangeDays}d`
+}
+
+/** Parse "24h" / "7d" / "30" into days; null when unrecognized. */
+export function parseRangeToken(token: string | null | undefined): number | null {
+  if (!token) return null
+  const m = /^(\d+)\s*(h|d)?$/i.exec(token.trim())
+  if (!m) return null
+  const n = Number(m[1])
+  if (!Number.isFinite(n) || n <= 0) return null
+  if (m[2]?.toLowerCase() === 'h') return n === 24 ? 1 : null
+  return n
 }
 
 /** A 0..1 rate as a percentage ("87%", "99.5%", "4.2%"), or an em dash when there is no rate. */

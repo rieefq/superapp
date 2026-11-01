@@ -6,6 +6,8 @@ export {
   clearGithubCache,
   formatResetTime,
   getFile,
+  getLastRateLimit,
+  getRateLimit,
   getRepo,
   getTree,
   invalidateRepoCache,
@@ -13,6 +15,8 @@ export {
   looksBinary,
   parseRepoInput,
   peekFile,
+  resetRateLimit,
+  subscribeRateLimit,
 } from './client'
-export type { GithubError, GithubErrorKind, GithubFile, GithubRepoInfo, GithubResult, GithubTree, RepoCoords } from './client'
+export type { GithubError, GithubErrorKind, GithubFile, GithubRateLimit, GithubRepoInfo, GithubResult, GithubTree, RepoCoords } from './client'
 export { LruCache } from './cache'

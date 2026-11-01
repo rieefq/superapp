@@ -6,8 +6,9 @@ import { getSettings, useSettings } from '@/core/settings'
 import type { ID, Run, RunKind, RunStep } from '@/core/types'
 import { TIME } from '@/lib/format'
 import { runFailureMessage } from './failures'
+import { runRecord, type RunRecord } from './history'
 import { computeHomeSummary, type HomeSummary } from './home'
-import { computeInsights, type Insights, type InsightsRun, type RangeDays } from './insights'
+import { computeInsights, type Insights, type InsightsRun, type ProviderFilter, type RangeDays } from './insights'
 import { minuteCeil, minuteFloor } from './time'
 
 /**
@@ -74,10 +75,16 @@ function factsOf(run: Run): InsightsRun {
     createdAt: run.createdAt,
     startedAt: run.startedAt,
     endedAt: run.endedAt,
-    // Steps only matter for a failed run's message: resolve it once, drop the steps.
+    // Steps only matter for a failed run (its message and the node it failed on): resolve the
+    // message once and keep just the failed steps. A failed run no longer changes.
     error: run.status === 'failed' ? runFailureMessage(run) : undefined,
-    steps: NO_STEPS,
+    steps: run.status === 'failed' ? failedSteps(run.steps) : NO_STEPS,
   }
+}
+
+function failedSteps(steps: readonly RunStep[]): RunStep[] {
+  const out = steps.filter((st) => st.status === 'failed')
+  return out.length ? out : NO_STEPS
 }
 
 function sameFacts(a: InsightsRun, b: InsightsRun): boolean {
@@ -129,6 +136,8 @@ export interface UseInsightsOptions {
   projectId?: ID | null
   /** Run kinds to include; undefined/empty = all. Inline arrays are fine (compared by value). */
   kinds?: readonly RunKind[]
+  /** Live or simulated runs only; undefined/'all' = both. */
+  provider?: ProviderFilter
 }
 
 /** Model labels from the registry, which also resolves custom-endpoint (`oai:`) models. */
@@ -143,16 +152,18 @@ const kindsFromKey = (key: string) => (key ? (key.split(',') as RunKind[]) : und
  * usage, model, owner…), approvals, tasks, agents or workflows change, when the minute turns
  * over, or when the options or the monthly budget setting change — not on step/progress churn.
  */
-export function useInsights({ rangeDays, projectId, kinds }: UseInsightsOptions): Insights {
+export function useInsights({ rangeDays, projectId, kinds, provider }: UseInsightsOptions): Insights {
   const runs = useRunFacts()
   const approvals = useTable('approvals')
   const tasks = useTable('tasks')
   const agents = useTable('agents')
   const workflows = useTable('workflows')
   const monthlyBudgetUsd = useSettings((s) => s.safety.monthlyBudgetUsd)
+  const countSimulatedSpend = useSettings((s) => s.safety.countSimulatedSpend)
   const now = minuteCeil(useMinuteNow())
   const scope = projectId || null
   const kindsKey = kindsKeyOf(kinds)
+  const providerKey = provider ?? 'all'
   return useMemo(
     () =>
       computeInsights({
@@ -165,10 +176,12 @@ export function useInsights({ rangeDays, projectId, kinds }: UseInsightsOptions)
         rangeDays,
         projectId: scope,
         kinds: kindsFromKey(kindsKey),
+        provider: providerKey,
         monthlyBudgetUsd,
+        countSimulatedSpend,
         modelLabel: registryModelLabel,
       }),
-    [runs, approvals, tasks, agents, workflows, now, rangeDays, scope, kindsKey, monthlyBudgetUsd],
+    [runs, approvals, tasks, agents, workflows, now, rangeDays, scope, kindsKey, providerKey, monthlyBudgetUsd, countSimulatedSpend],
   )
 }
 
@@ -184,9 +197,60 @@ export function readInsights(opts: UseInsightsOptions & { now?: number }): Insig
     rangeDays: opts.rangeDays,
     projectId: opts.projectId,
     kinds: opts.kinds,
+    provider: opts.provider,
     monthlyBudgetUsd: getSettings().safety.monthlyBudgetUsd,
+    countSimulatedSpend: getSettings().safety.countSimulatedSpend,
     modelLabel: registryModelLabel,
   })
+}
+
+// ---------------------------------------------------------------- run history
+
+/*
+ * History records: the run fields the execution history shows (title, status, owner, model,
+ * usage, times, origin). Like facts, each run's record is reused while those fields are
+ * unchanged, so step and progress churn never re-renders the history.
+ */
+
+function sameRecord(a: RunRecord, b: RunRecord): boolean {
+  return (
+    a.title === b.title && a.kind === b.kind && a.status === b.status && a.projectId === b.projectId && a.agentId === b.agentId &&
+    a.workflowId === b.workflowId && a.modelId === b.modelId && a.simulated === b.simulated && a.createdAt === b.createdAt &&
+    a.startedAt === b.startedAt && a.endedAt === b.endedAt && a.error === b.error && a.retryable === b.retryable &&
+    a.origin?.kind === b.origin?.kind && a.origin?.id === b.origin?.id &&
+    a.usage?.inputTokens === b.usage?.inputTokens && a.usage?.outputTokens === b.usage?.outputTokens &&
+    a.usage?.costUsd === b.usage?.costUsd
+  )
+}
+
+const recordByRun = new WeakMap<Run, RunRecord>()
+const recordsByTable = new WeakMap<Tables['runs'], RunRecord[]>()
+let latestRecords = new Map<ID, RunRecord>()
+
+function selectRunRecords(runs: Tables['runs']): RunRecord[] {
+  const cached = recordsByTable.get(runs)
+  if (cached) return cached
+  const next = new Map<ID, RunRecord>()
+  const list: RunRecord[] = []
+  for (const run of Object.values(runs)) {
+    let record = recordByRun.get(run)
+    if (!record) {
+      const fresh = runRecord(run, run.status === 'failed' ? runFailureMessage(run) : undefined)
+      const previous = latestRecords.get(run.id)
+      record = previous && sameRecord(previous, fresh) ? previous : fresh
+      recordByRun.set(run, record)
+    }
+    next.set(run.id, record)
+    list.push(record)
+  }
+  latestRecords = next
+  recordsByTable.set(runs, list)
+  return list
+}
+
+/** Every run as a history record; a new array only when a shown field of some run changes. */
+export function useRunRecords(): RunRecord[] {
+  return useDB(useShallow((s: Tables) => selectRunRecords(s.runs)))
 }
 
 // ---------------------------------------------------------------- home summary

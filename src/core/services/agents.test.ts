@@ -109,10 +109,12 @@ describe('runAgent', () => {
     const instruction = `Summarize competitor pricing changes for Tidewell and Freightly across the last two quarters\nwith sources`
     const run = runAgent('agt_1', { instruction, taskId: 'tsk_1' })
     const input = start.mock.calls[0][0]
+    // Agent runs are simulated: the run executes on the simulator and records the configured live model separately,
+    // so receipts never label a simulated run with a live model.
     expect(input).toMatchObject({
-      kind: 'agent', factory: 'agent.task', agentId: 'agt_1', projectId: 'prj_1', modelId: 'claude-sonnet-5-5',
+      kind: 'agent', factory: 'agent.task', agentId: 'agt_1', projectId: 'prj_1', modelId: 'sim-deep',
       origin: { kind: 'task', id: 'tsk_1' }, initiator: ME,
-      params: { agentId: 'agt_1', instruction, taskId: 'tsk_1', projectId: 'prj_1' },
+      params: { agentId: 'agt_1', instruction, taskId: 'tsk_1', projectId: 'prj_1', configuredModelId: 'claude-sonnet-5-5' },
     })
     expect(input.title.length).toBeLessThanOrEqual(60)
     expect(input.title.startsWith('Summarize competitor pricing')).toBe(true)

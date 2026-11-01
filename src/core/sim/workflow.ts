@@ -84,6 +84,217 @@ export function reachableFrom(startId: string, edges: readonly EdgeLike[]): Set<
   return seen
 }
 
+// ---------------------------------------------------------------- layout
+
+/** Canvas grid (docs/DESIGN.md §6.6): 240×72 nodes, flow top to bottom. Rows 128px, columns 288px. */
+export const FLOW_GRID = { nodeWidth: 240, nodeHeight: 72, column: 288, row: 128 } as const
+
+type LayoutNode = Pick<WorkflowNode, 'id' | 'type' | 'position'>
+type LayoutEdge = Pick<WorkflowEdge, 'source' | 'target' | 'sourceHandle'>
+
+/**
+ * Layered top-to-bottom layout: each step sits one row below its deepest predecessor; within a row,
+ * steps sit under the average of their predecessors (a condition's "Yes" branch left of its "No"
+ * branch) and are pushed apart to one column. Steps on a loop are placed after the rest.
+ * Returns positions keyed by node id; the first trigger stays in the center column (x = 0).
+ */
+export function layoutGraph(nodes: readonly LayoutNode[], edges: readonly LayoutEdge[], grid: { column: number; row: number } = FLOW_GRID): Record<string, { x: number; y: number }> {
+  const ids = new Set(nodes.map((n) => n.id))
+  const valid = edges.filter((e) => ids.has(e.source) && ids.has(e.target) && e.source !== e.target)
+  const { order, blocked } = topologicalOrder(nodes, valid)
+  const preds = new Map<string, LayoutEdge[]>(nodes.map((n) => [n.id, []]))
+  for (const e of valid) preds.get(e.target)!.push(e)
+
+  // Rank = longest path from a source (triggers first). Blocked (looping) steps follow the rest.
+  const rank = new Map<string, number>()
+  for (const id of order) {
+    const ps = preds.get(id)!.filter((e) => rank.has(e.source))
+    rank.set(id, ps.length ? Math.max(...ps.map((e) => rank.get(e.source)! + 1)) : 0)
+  }
+  let next = Math.max(-1, ...rank.values()) + 1
+  for (const id of blocked) rank.set(id, next++)
+
+  const byRank = new Map<number, string[]>()
+  const index = new Map(nodes.map((n, i) => [n.id, i]))
+  for (const n of nodes) {
+    const r = rank.get(n.id) ?? 0
+    byRank.set(r, [...(byRank.get(r) ?? []), n.id])
+  }
+  const x = new Map<string, number>()
+  const original = new Map(nodes.map((n) => [n.id, n.position]))
+  const branchBias = (e: LayoutEdge) => (e.sourceHandle === 'false' ? 0.5 : e.sourceHandle === 'true' ? -0.5 : 0)
+
+  for (const r of [...byRank.keys()].sort((a, b) => a - b)) {
+    const row = byRank.get(r)!
+    // Triggers lead row 0; then each step's preferred x is the mean of its placed predecessors.
+    const desired = row.map((id) => {
+      const ps = preds.get(id)!.filter((e) => x.has(e.source))
+      const node = nodes[index.get(id)!]
+      const want = ps.length ? ps.reduce((sum, e) => sum + x.get(e.source)! + branchBias(e) * grid.column, 0) / ps.length : null
+      return { id, want, trigger: node.type === 'trigger', ox: original.get(id)?.x ?? 0, i: index.get(id)! }
+    })
+    desired.sort(
+      (a, b) =>
+        Number(b.trigger) - Number(a.trigger) ||
+        (a.want ?? Number.POSITIVE_INFINITY) - (b.want ?? Number.POSITIVE_INFINITY) ||
+        a.ox - b.ox ||
+        a.i - b.i,
+    )
+    // Unanchored steps (no placed predecessor) line up after the anchored ones.
+    const anchored = desired.filter((d) => d.want !== null)
+    const want = desired.map((d, k) => d.want ?? (anchored.length ? Math.max(...anchored.map((a) => a.want!)) + (k - anchored.length + 1) * grid.column : (k - (desired.length - 1) / 2) * grid.column))
+    // Push apart left to right, then re-center the block on the mean of the wishes.
+    const placed: number[] = []
+    want.forEach((w, k) => placed.push(k === 0 ? w : Math.max(w, placed[k - 1] + grid.column)))
+    const shift = want.reduce((s, w) => s + w, 0) / want.length - placed.reduce((s, p) => s + p, 0) / placed.length
+    desired.forEach((d, k) => x.set(d.id, Math.round(placed[k] + shift)))
+  }
+
+  // Keep the first trigger in the center column.
+  const anchor = nodes.find((n) => n.type === 'trigger') ?? nodes[0]
+  const dx = anchor ? -(x.get(anchor.id) ?? 0) : 0
+  const out: Record<string, { x: number; y: number }> = {}
+  for (const n of nodes) out[n.id] = { x: (x.get(n.id) ?? 0) + dx, y: (rank.get(n.id) ?? 0) * grid.row }
+  return out
+}
+
+/**
+ * True when a graph was laid out left to right (older drafts and the demo data): connections mostly
+ * run sideways. The editor re-lays such graphs top to bottom once.
+ */
+export function isSidewaysLayout(nodes: readonly LayoutNode[], edges: readonly LayoutEdge[]): boolean {
+  const pos = new Map(nodes.map((n) => [n.id, n.position]))
+  let dx = 0
+  let dy = 0
+  for (const e of edges) {
+    const a = pos.get(e.source)
+    const b = pos.get(e.target)
+    if (!a || !b) continue
+    dx += Math.abs(b.x - a.x)
+    dy += Math.abs(b.y - a.y)
+  }
+  return dx > dy
+}
+
+// ---------------------------------------------------------------- templates
+
+/**
+ * Fill `{{key}}` placeholders from the run context. Known keys: subject, sender, priority, category,
+ * summary (the last output's first line), output (the last output). Unknown keys stay as written.
+ */
+export function renderTemplate(text: string, ctx: FlowContext): string {
+  const firstLine = ctx.lastOutput?.split('\n').find((l) => l.trim())?.trim()
+  const values: Record<string, string | undefined> = {
+    subject: ctx.subject,
+    sender: ctx.sender,
+    priority: ctx.priority,
+    category: ctx.category,
+    summary: firstLine ? shorten(firstLine.replace(/[*_`]+/g, ''), 160) : undefined,
+    output: ctx.lastOutput,
+  }
+  return text.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (all, key: string) => values[key.toLowerCase()] ?? all)
+}
+
+// ---------------------------------------------------------------- cron
+
+const DOW_NAMES = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+
+/** One cron field → the allowed values, or null when it cannot be parsed. Supports *, n, a-b, lists and /step. */
+function cronField(field: string, min: number, max: number, names?: readonly string[]): Set<number> | null {
+  const out = new Set<number>()
+  const value = (t: string): number | null => {
+    const lower = t.toLowerCase()
+    if (/^\d+$/.test(lower)) return Number(lower)
+    const idx = names ? names.indexOf(lower.slice(0, 3)) : -1
+    return idx >= 0 ? idx : null
+  }
+  for (const part of field.split(',')) {
+    const m = /^(\*|[\w]+(?:-[\w]+)?)(?:\/(\d+))?$/.exec(part.trim())
+    if (!m) return null
+    const step = m[2] ? Number(m[2]) : 1
+    if (step < 1) return null
+    let lo = min
+    let hi = max
+    if (m[1] !== '*') {
+      const [a, b] = m[1].split('-')
+      const va = value(a)
+      const vb = b !== undefined ? value(b) : m[2] ? max : va
+      if (va === null || vb === null) return null
+      lo = va
+      hi = vb
+    }
+    if (lo < min || hi > (names ? 7 : max) || lo > hi) return null
+    for (let v = lo; v <= hi; v += step) out.add(names ? v % 7 : v)
+  }
+  return out
+}
+
+export interface ParsedCron {
+  minutes: Set<number>
+  hours: Set<number>
+  days: Set<number>
+  months: Set<number>
+  weekdays: Set<number>
+  /** Day-of-month and day-of-week are both restricted: either may match (standard cron). */
+  eitherDay: boolean
+}
+
+/** Parse a 5-field cron expression (minute hour day-of-month month day-of-week), or null when invalid. */
+export function parseCron(cron: string): ParsedCron | null {
+  const parts = cron.trim().split(/\s+/)
+  if (parts.length !== 5) return null
+  const [mi, h, dom, mon, dow] = parts
+  const minutes = cronField(mi, 0, 59)
+  const hours = cronField(h, 0, 23)
+  const days = cronField(dom, 1, 31)
+  const months = cronField(mon, 1, 12)
+  const weekdays = cronField(dow, 0, 6, DOW_NAMES)
+  if (!minutes || !hours || !days || !months || !weekdays) return null
+  return { minutes, hours, days, months, weekdays, eitherDay: dom !== '*' && dow !== '*' }
+}
+
+function dayMatches(c: ParsedCron, d: Date): boolean {
+  if (!c.months.has(d.getMonth() + 1)) return false
+  const dom = c.days.has(d.getDate())
+  const dow = c.weekdays.has(d.getDay())
+  return c.eitherDay ? dom || dow : dom && dow
+}
+
+/** True when the cron expression fires at the minute of `ts` (local time). */
+export function cronMatches(cron: string | ParsedCron, ts: number): boolean {
+  const c = typeof cron === 'string' ? parseCron(cron) : cron
+  if (!c) return false
+  const d = new Date(ts)
+  return dayMatches(c, d) && c.hours.has(d.getHours()) && c.minutes.has(d.getMinutes())
+}
+
+/** The first minute strictly after `from` at which the cron fires (local time), within `horizonDays`. */
+export function nextCronTime(cron: string | ParsedCron, from: number, horizonDays = 400): number | undefined {
+  const c = typeof cron === 'string' ? parseCron(cron) : cron
+  if (!c) return undefined
+  const d = new Date(from)
+  d.setSeconds(0, 0)
+  d.setMinutes(d.getMinutes() + 1)
+  const limit = from + horizonDays * 86_400_000
+  while (d.getTime() <= limit) {
+    if (!dayMatches(c, d)) {
+      d.setDate(d.getDate() + 1)
+      d.setHours(0, 0, 0, 0)
+      continue
+    }
+    if (!c.hours.has(d.getHours())) {
+      d.setHours(d.getHours() + 1, 0, 0, 0)
+      continue
+    }
+    if (!c.minutes.has(d.getMinutes())) {
+      d.setMinutes(d.getMinutes() + 1, 0, 0)
+      continue
+    }
+    return d.getTime()
+  }
+  return undefined
+}
+
 // ---------------------------------------------------------------- run context
 
 export type Priority = 'urgent' | 'high' | 'normal' | 'low'
@@ -175,18 +386,62 @@ const EMAILS: readonly SampleEmail[] = [
   },
 ]
 
+const slugOf = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'workflow'
+
 const PR_TITLES = ['Add retry to label printing', 'Cache weekly volume chart data', 'Validate seat counts on checkout', 'Handle expired refresh tokens', 'Paginate the invoice list']
 const AUTHORS = ['jkim', 'mtorres', 'asingh', 'lchen', 'rbauer']
 
 export interface TriggerPayload {
+  /** Step title for the trigger step (noun-led, e.g. "Email from …"); falls back to "Triggered by …". */
+  title?: string
   detail: string
   output: string
   context: FlowContext
 }
 
+/** A real Atrium event that started (or samples) a run: a knowledge item, task, run or approval. */
+export interface TriggerEventSample {
+  /** e.g. "knowledge.created". */
+  event: string
+  /** What happened, e.g. “Webhook retry risks” was added to Knowledge. */
+  title: string
+  /** Extra lines (project, author, status). */
+  lines?: string[]
+  /** True when the run was started by hand with the latest matching item as a sample. */
+  sample?: boolean
+}
+
+export interface TriggerPayloadOptions {
+  /** Free-text trigger passed to runWorkflow ('manual' = started by hand). */
+  override?: string
+  userName?: string
+  /** The real internal event behind an event trigger. */
+  event?: TriggerEventSample
+  /** "Send test event" on a webhook trigger. */
+  webhookTest?: boolean
+}
+
 /** Simulated payload for a run's trigger. `override` is the free-text trigger passed to runWorkflow. */
-export function triggerPayload(trigger: WorkflowTrigger, node: WorkflowNode | undefined, rng: Rng, opts: { override?: string; userName?: string } = {}): TriggerPayload {
+export function triggerPayload(trigger: WorkflowTrigger, node: WorkflowNode | undefined, rng: Rng, opts: TriggerPayloadOptions = {}): TriggerPayload {
   const event = trigger.event ?? configString(node?.config, 'event') ?? ''
+  if (opts.event) {
+    const e = opts.event
+    return {
+      title: e.title,
+      detail: e.sample ? `Sample event: the latest ${e.event} (started by hand)` : `Event: ${e.event}`,
+      output: [e.title, ...(e.lines ?? [])].join('\n'),
+      context: { subject: e.title },
+    }
+  }
+  if (opts.webhookTest || (trigger.type === 'webhook' && opts.override === 'webhook.test')) {
+    const id = `evt_${rng.int(100_000, 999_999)}`
+    return {
+      title: 'Test event received',
+      detail: 'Simulated webhook test event — nothing called this URL',
+      output: [`POST /hooks/${slugOf(trigger.label || 'workflow')}`, '', '{', `  "id": "${id}",`, `  "event": "${event || 'test'}",`, '  "test": true', '}', '', '(simulated payload)'].join('\n'),
+      context: { subject: 'Test event' },
+    }
+  }
   if (opts.override && opts.override !== 'manual') {
     return { detail: opts.override, output: `Triggered with: ${opts.override}`, context: { subject: opts.override } }
   }
@@ -211,7 +466,7 @@ export function triggerPayload(trigger: WorkflowTrigger, node: WorkflowNode | un
     return { detail: trigger.label || 'Scheduled', output: `Scheduled run (${trigger.label || trigger.cron || 'schedule'}). Started manually for this simulation.`, context: {} }
   }
   if (trigger.type === 'webhook') {
-    return { detail: 'Webhook received', output: `POST /hooks/${trigger.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}\n\n{ "event": "${event || 'custom'}" }\n\n(simulated payload)`, context: {} }
+    return { detail: 'Webhook received', output: `POST /hooks/${slugOf(trigger.label)}\n\n{ "event": "${event || 'custom'}" }\n\n(simulated payload)`, context: {} }
   }
   if (trigger.type === 'event') {
     return { detail: event || trigger.label, output: `Event: ${event || trigger.label} (simulated payload)`, context: {} }

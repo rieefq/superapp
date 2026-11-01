@@ -9,8 +9,10 @@ import { firstSentences } from './serviceHelpers'
  */
 
 export const TEXT_EXTENSIONS = [
-  'txt', 'md', 'markdown', 'json', 'csv', 'tsv', 'yaml', 'yml', 'xml', 'html', 'css', 'js', 'ts', 'tsx', 'jsx',
-  'py', 'rb', 'go', 'rs', 'java', 'sql', 'log', 'sh',
+  'txt', 'md', 'markdown', 'mdx', 'rst', 'adoc', 'org', 'tex', 'json', 'csv', 'tsv', 'yaml', 'yml', 'toml', 'ini', 'cfg',
+  'conf', 'xml', 'html', 'htm', 'css', 'scss', 'less', 'js', 'mjs', 'cjs', 'ts', 'tsx', 'jsx', 'vue', 'svelte', 'py', 'rb',
+  'go', 'rs', 'java', 'kt', 'swift', 'c', 'h', 'cpp', 'hpp', 'cs', 'php', 'lua', 'r', 'dart', 'scala', 'graphql', 'proto',
+  'sql', 'log', 'sh',
 ] as const
 
 const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'avif', 'svg'] as const
@@ -20,8 +22,9 @@ export const PREVIEW_MAX_PX = 480
 
 export type FileClass = 'text' | 'image' | 'pdf' | 'binary'
 
-const PROSE = new Set(['txt', 'md', 'markdown'])
+const PROSE = new Set(['txt', 'md', 'markdown', 'mdx', 'rst', 'adoc', 'org', 'tex'])
 const TABLES = new Set(['csv', 'tsv'])
+const HTML = new Set(['html', 'htm'])
 
 const LANGUAGE: Record<string, { label: string; fence: string }> = {
   json: { label: 'JSON', fence: 'json' },
@@ -29,29 +32,55 @@ const LANGUAGE: Record<string, { label: string; fence: string }> = {
   tsv: { label: 'TSV', fence: 'tsv' },
   yaml: { label: 'YAML', fence: 'yaml' },
   yml: { label: 'YAML', fence: 'yaml' },
+  toml: { label: 'TOML', fence: 'toml' },
+  ini: { label: 'INI', fence: 'ini' },
+  cfg: { label: 'Config', fence: 'ini' },
+  conf: { label: 'Config', fence: 'text' },
   xml: { label: 'XML', fence: 'xml' },
   html: { label: 'HTML', fence: 'html' },
+  htm: { label: 'HTML', fence: 'html' },
   css: { label: 'CSS', fence: 'css' },
+  scss: { label: 'SCSS', fence: 'scss' },
+  less: { label: 'Less', fence: 'less' },
   js: { label: 'JavaScript', fence: 'javascript' },
+  mjs: { label: 'JavaScript', fence: 'javascript' },
+  cjs: { label: 'JavaScript', fence: 'javascript' },
   jsx: { label: 'JavaScript (JSX)', fence: 'jsx' },
   ts: { label: 'TypeScript', fence: 'typescript' },
   tsx: { label: 'TypeScript (TSX)', fence: 'tsx' },
+  vue: { label: 'Vue', fence: 'vue' },
+  svelte: { label: 'Svelte', fence: 'svelte' },
   py: { label: 'Python', fence: 'python' },
   rb: { label: 'Ruby', fence: 'ruby' },
   go: { label: 'Go', fence: 'go' },
   rs: { label: 'Rust', fence: 'rust' },
   java: { label: 'Java', fence: 'java' },
+  kt: { label: 'Kotlin', fence: 'kotlin' },
+  swift: { label: 'Swift', fence: 'swift' },
+  c: { label: 'C', fence: 'c' },
+  h: { label: 'C header', fence: 'c' },
+  cpp: { label: 'C++', fence: 'cpp' },
+  hpp: { label: 'C++ header', fence: 'cpp' },
+  cs: { label: 'C#', fence: 'csharp' },
+  php: { label: 'PHP', fence: 'php' },
+  lua: { label: 'Lua', fence: 'lua' },
+  r: { label: 'R', fence: 'r' },
+  dart: { label: 'Dart', fence: 'dart' },
+  scala: { label: 'Scala', fence: 'scala' },
+  graphql: { label: 'GraphQL', fence: 'graphql' },
+  proto: { label: 'Protocol Buffers', fence: 'protobuf' },
   sql: { label: 'SQL', fence: 'sql' },
   sh: { label: 'Shell', fence: 'bash' },
   log: { label: 'Log', fence: 'text' },
 }
 
 const MIME_BY_EXT: Record<string, string> = {
-  txt: 'text/plain', md: 'text/markdown', markdown: 'text/markdown', csv: 'text/csv', tsv: 'text/tab-separated-values',
-  json: 'application/json', yaml: 'application/yaml', yml: 'application/yaml', xml: 'application/xml', html: 'text/html',
-  css: 'text/css', js: 'text/javascript', jsx: 'text/javascript', ts: 'text/typescript', tsx: 'text/typescript',
-  sql: 'application/sql', pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
-  gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
+  txt: 'text/plain', md: 'text/markdown', markdown: 'text/markdown', mdx: 'text/markdown', csv: 'text/csv',
+  tsv: 'text/tab-separated-values', json: 'application/json', yaml: 'application/yaml', yml: 'application/yaml',
+  toml: 'application/toml', xml: 'application/xml', html: 'text/html', htm: 'text/html', css: 'text/css',
+  js: 'text/javascript', mjs: 'text/javascript', cjs: 'text/javascript', jsx: 'text/javascript', ts: 'text/typescript',
+  tsx: 'text/typescript', sql: 'application/sql', pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg',
+  jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
 }
 
 export function fileExtension(name: string): string {
@@ -200,15 +229,113 @@ export interface PreparedImport {
   file: NonNullable<KnowledgeItem['file']>
 }
 
+/** NUL characters near the start: the file is binary data despite its name or type. */
+export function looksBinary(text: string): boolean {
+  return text.slice(0, 8192).includes('\u0000')
+}
+
+const squash = (s: string) => s.replace(/\s+/g, ' ').trim()
+
+/** Inline elements: their text joins the surrounding paragraph. */
+const INLINE_TAGS = new Set([
+  'A', 'ABBR', 'B', 'BDI', 'BDO', 'CITE', 'CODE', 'DATA', 'DFN', 'EM', 'I', 'KBD', 'LABEL', 'MARK', 'Q', 'S', 'SAMP',
+  'SMALL', 'SPAN', 'STRONG', 'SUB', 'SUP', 'TIME', 'U', 'VAR', 'WBR', 'IMG',
+])
+/** Never readable content (scripts, styles, chrome and controls). */
+const DROP_SELECTOR = 'script, style, noscript, template, svg, canvas, iframe, object, embed, nav, form, button, select, input, textarea'
+
+/**
+ * Readable text of an HTML page (real extraction with the browser's own parser): the title, then
+ * headings, paragraphs, list items, table rows and preformatted blocks as light Markdown. Scripts,
+ * styles, navigation and form controls are dropped. Null when there is no parser or no text.
+ */
+export function htmlToReadable(html: string): { title: string; text: string } | null {
+  if (typeof DOMParser === 'undefined') return null
+  let doc: Document
+  try {
+    doc = new DOMParser().parseFromString(html, 'text/html')
+  } catch {
+    return null
+  }
+  const title = squash(doc.querySelector('title')?.textContent ?? '') || squash(doc.querySelector('h1')?.textContent ?? '')
+  for (const el of Array.from(doc.querySelectorAll(DROP_SELECTOR))) el.remove()
+  const blocks: string[] = []
+  let inline = ''
+  const flush = () => {
+    const t = squash(inline)
+    if (t) blocks.push(t)
+    inline = ''
+  }
+  const visit = (node: Node) => {
+    if (node.nodeType === 3) {
+      inline += node.textContent ?? ''
+      return
+    }
+    if (node.nodeType !== 1) return
+    const el = node as Element
+    const tag = el.tagName
+    if (tag === 'BR') {
+      inline += ' '
+      return
+    }
+    if (INLINE_TAGS.has(tag)) {
+      inline += el.textContent ?? ''
+      return
+    }
+    flush()
+    if (/^H[1-6]$/.test(tag)) {
+      const t = squash(el.textContent ?? '')
+      if (t) blocks.push(`${'#'.repeat(Number(tag[1]))} ${t}`)
+      return
+    }
+    if (tag === 'LI') {
+      const t = squash(el.textContent ?? '')
+      if (t) blocks.push(`- ${t}`)
+      return
+    }
+    if (tag === 'TR') {
+      const cells = Array.from(el.children).map((c) => squash(c.textContent ?? '')).filter(Boolean)
+      if (cells.length) blocks.push(cells.join(' | '))
+      return
+    }
+    if (tag === 'PRE') {
+      const t = (el.textContent ?? '').replace(/\n+$/, '')
+      if (t.trim()) blocks.push(fenced(t, ''))
+      return
+    }
+    for (const child of Array.from(el.childNodes)) visit(child)
+    flush()
+  }
+  if (doc.body) visit(doc.body)
+  flush()
+  const text = blocks.join('\n\n').trim()
+  return text ? { title, text } : null
+}
+
 async function prepareText(file: File, meta: PreparedImport['file']): Promise<PreparedImport> {
   const ext = fileExtension(file.name)
   const title = titleFromFilename(file.name)
   const { text, truncated } = await readTextFile(file)
+  if (looksBinary(text)) {
+    return prepareOpaque(file, meta, false, 'This file looks like binary data rather than text, so its contents were not imported or indexed.')
+  }
   const note = truncated
     ? `\n\n> Only the first ${formatBytes(MAX_TEXT_BYTES)} of this ${formatBytes(file.size)} file were imported.`
     : ''
   if (!text.trim()) {
     return { kind: 'doc', title, content: '_This file is empty._', summary: 'Empty file.', file: meta }
+  }
+  if (HTML.has(ext)) {
+    const page = htmlToReadable(text)
+    if (page) {
+      return {
+        kind: 'doc',
+        title: page.title ? (page.title.length > 120 ? `${page.title.slice(0, 119)}…` : page.title) : title,
+        content: page.text + note,
+        summary: firstSentences(page.text) || undefined,
+        file: meta,
+      }
+    }
   }
   const lang = LANGUAGE[ext]
   if (PROSE.has(ext) || !lang) {
@@ -252,12 +379,14 @@ async function prepareImage(file: File, meta: PreparedImport['file']): Promise<P
   }
 }
 
-function prepareOpaque(file: File, meta: PreparedImport['file'], isPdf: boolean): PreparedImport {
+function prepareOpaque(file: File, meta: PreparedImport['file'], isPdf: boolean, why?: string): PreparedImport {
   const ext = fileExtension(file.name)
   const heading = isPdf ? 'PDF document' : `${ext ? ext.toUpperCase() : 'Binary'} file`
-  const reason = isPdf
-    ? 'Text extraction from PDFs isn’t available in this build, so the contents of this file were not read or indexed.'
-    : 'This file type can’t be read in the browser, so its contents were not imported or indexed.'
+  const reason =
+    why ??
+    (isPdf
+      ? 'Text extraction from PDFs isn’t available in this build, so the contents of this file were not read or indexed.'
+      : 'This file type can’t be read in the browser, so its contents were not imported or indexed.')
   const content = [
     `**${heading}** · ${file.name}`,
     '',

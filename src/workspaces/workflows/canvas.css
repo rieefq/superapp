@@ -1,0 +1,217 @@
+/*
+ * Workflow canvas (docs/DESIGN.md §6.6) on top of @xyflow/react's structural base.css.
+ * Tokens only: sunken background with a 16px dot grid in --line, 240×72 nodes on --surface-raised,
+ * 8px square ports, 1.5px smoothstep edges in --ink-4 (ink-2 once a run crossed them, a moving
+ * live dash on the active edge — static under reduced motion).
+ */
+.wf-canvas {
+  --xy-background-color: var(--surface-sunken);
+  background: var(--surface-sunken);
+}
+.wf-canvas .react-flow__pane {
+  cursor: default;
+}
+.wf-canvas .react-flow__pane.dragging {
+  cursor: grabbing;
+}
+.wf-canvas .react-flow__background {
+  background: var(--surface-sunken);
+}
+.wf-canvas .react-flow__background pattern circle,
+.wf-canvas .react-flow__background-pattern.dots circle {
+  fill: var(--line);
+}
+.wf-canvas .react-flow__node {
+  cursor: grab;
+}
+.wf-canvas .react-flow__node.dragging {
+  cursor: grabbing;
+}
+.wf-canvas .react-flow__node:focus,
+.wf-canvas .react-flow__node:focus-visible {
+  outline: none;
+}
+
+/* Ports: 8px squares. */
+.wf-canvas .react-flow__handle {
+  width: 8px;
+  height: 8px;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 2px;
+  background: var(--surface-raised);
+  border: 1px solid var(--line-input);
+  transition: background-color var(--dur-1) var(--ease-standard), border-color var(--dur-1) var(--ease-standard);
+}
+.wf-canvas .react-flow__handle:hover,
+.wf-canvas .react-flow__handle.connectingfrom,
+.wf-canvas .react-flow__handle.connectingto {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+.wf-canvas .react-flow__handle.connectingto.valid {
+  background: var(--ink);
+}
+@media (pointer: coarse) {
+  .wf-canvas .react-flow__handle::after {
+    content: '';
+    position: absolute;
+    inset: -14px;
+  }
+}
+
+/* Edges. */
+.wf-canvas .react-flow__edge-path,
+.wf-canvas .react-flow__connection-path {
+  stroke: var(--ink-4);
+  stroke-width: 1.5;
+  fill: none;
+}
+.wf-canvas .react-flow__connection-path {
+  stroke: var(--ink-2);
+  stroke-dasharray: 4 3;
+}
+.wf-canvas .react-flow__edge.wf-edge--traversed .react-flow__edge-path {
+  stroke: var(--ink-2);
+}
+.wf-canvas .react-flow__edge.wf-edge--active .react-flow__edge-path {
+  stroke: var(--live);
+  stroke-width: 2;
+  stroke-dasharray: 6 5;
+  animation: wf-edge-flow 900ms linear infinite;
+}
+.wf-canvas .react-flow__edge.selected .react-flow__edge-path,
+.wf-canvas .react-flow__edge:focus-visible .react-flow__edge-path {
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+.wf-canvas .react-flow__edge-interaction {
+  stroke-width: 18;
+}
+@keyframes wf-edge-flow {
+  to {
+    stroke-dashoffset: -22;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-motion='full']) .wf-canvas .react-flow__edge.wf-edge--active .react-flow__edge-path {
+    animation: none;
+  }
+}
+html[data-motion='reduce'] .wf-canvas .react-flow__edge.wf-edge--active .react-flow__edge-path {
+  animation: none;
+}
+
+/* Minimap. */
+.wf-canvas .react-flow__minimap {
+  background: var(--surface-canvas);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.wf-canvas .react-flow__minimap-mask {
+  fill: var(--surface-sunken);
+  fill-opacity: 0.6;
+  stroke: var(--line-strong);
+}
+
+/* Selection rectangle. */
+.wf-canvas .react-flow__selection,
+.wf-canvas .react-flow__nodesselection-rect {
+  background: var(--accent-tint);
+  border: 1px solid var(--ink-3);
+}
+
+.wf-canvas .react-flow__panel {
+  margin: 12px;
+}
+
+/* Node: 240×72, radius 10, raised; dashed when it uses a simulated integration. */
+.wf-node {
+  position: relative;
+  width: 240px;
+  height: 72px;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  transition: border-color var(--dur-1) var(--ease-standard), box-shadow var(--dur-1) var(--ease-standard), opacity var(--dur-2) var(--ease-standard);
+}
+.wf-node[data-sim='true'] {
+  border-style: dashed;
+  border-color: var(--line-input);
+}
+.wf-node[data-selected='true'] {
+  outline: 1.5px solid var(--ink);
+  outline-offset: 2px;
+}
+.wf-node:has(.wf-node__focus:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+/* Run states: a second pixel of border drawn as a ring, so nothing moves. */
+.wf-node[data-state='running'] {
+  border-color: var(--live);
+  border-style: solid;
+  box-shadow: 0 0 0 1px var(--live);
+}
+.wf-node[data-state='waiting'] {
+  border-color: var(--attn);
+  border-style: solid;
+  box-shadow: 0 0 0 1px var(--attn);
+}
+.wf-node[data-state='failed'] {
+  border-color: var(--fail);
+  border-style: solid;
+  box-shadow: 0 0 0 1px var(--fail);
+}
+.wf-node[data-state='skipped'] {
+  opacity: 0.45;
+}
+.wf-node__focus {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  outline: none;
+}
+
+/* Minimap nodes follow the run state (color = state only). */
+.wf-canvas .react-flow__minimap-node.wf-mm {
+  fill: var(--line-strong);
+  stroke: none;
+}
+.wf-canvas .react-flow__minimap-node.wf-mm--running {
+  fill: var(--live);
+}
+.wf-canvas .react-flow__minimap-node.wf-mm--waiting {
+  fill: var(--attn);
+}
+.wf-canvas .react-flow__minimap-node.wf-mm--failed {
+  fill: var(--fail);
+}
+.wf-canvas .react-flow__minimap-node.wf-mm--done {
+  fill: var(--ink-3);
+}
+.wf-canvas .react-flow__minimap-node.wf-mm--skipped {
+  fill: var(--line);
+}
+.wf-canvas .react-flow__edgelabel-renderer {
+  z-index: 5;
+}
+
+/* The library's attribution, kept as its authors ask: small and quiet. */
+.wf-canvas .react-flow__attribution {
+  background: transparent;
+  padding: 0 4px;
+  margin: 0 0 6px 8px;
+  font: 400 10px/14px var(--font-ui);
+}
+.wf-canvas .react-flow__attribution a {
+  color: var(--ink-4);
+  text-decoration: none;
+}
+.wf-canvas .react-flow__attribution a:hover {
+  color: var(--ink-3);
+}

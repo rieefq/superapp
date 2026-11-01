@@ -31,6 +31,104 @@ export const DEPTH_BUDGET: Record<ResearchDepth, DepthBudget> = {
   deep: { searches: 4, resultsPerSearch: [2, 3], readSteps: 3, knowledgeLimit: 4, findings: [5, 6], combinedSearch: false, mergedSynthesis: false, contrarian: true },
 }
 
+/** One line per depth: what the run does differently (the brief's depth control). */
+export const DEPTH_DESCRIPTION: Record<ResearchDepth, string> = {
+  quick: 'One combined search and a short synthesis',
+  standard: 'A search per angle, then a cited report',
+  deep: 'A search per angle, a skeptical search and a cross-check',
+}
+
+type Range = readonly [number, number]
+
+/**
+ * Simulated duration (ms at speed 1) and token ranges of each research step. The run scripts draw from
+ * these ranges, and the brief reads them back as expectations, so the two can never drift apart.
+ */
+export const STEP_PROFILE = {
+  plan: { ms: [1400, 2600], tokens: [450, 900] },
+  context: { ms: [700, 1300], tokens: [200, 500] },
+  knowledge: { ms: [900, 1700], tokens: [300, 700] },
+  search: { ms: [1600, 3200], tokens: [400, 900] },
+  browse: { ms: [2200, 4200], tokens: [1600, 3800] },
+  crossCheck: { ms: [1800, 3000], tokens: [900, 1600] },
+  synthesize: { ms: [2400, 4200], tokens: [1800, 3200] },
+  draft: { ms: [2600, 4800], tokens: [2400, 4600] },
+  merged: { ms: [3000, 5200], tokens: [2400, 4200] },
+} as const satisfies Record<string, { ms: Range; tokens: Range }>
+
+export type ResearchStepName = keyof typeof STEP_PROFILE
+
+export interface DepthExpectation {
+  depth: ResearchDepth
+  /** Steps the run plans. */
+  steps: number
+  /** Sources it is likely to collect: knowledge items plus simulated web results. */
+  sources: Range
+  findings: Range
+  /** Simulated duration at speed 1. */
+  durationMs: Range
+  /** Simulated tokens (costed at reference pricing as an estimate). */
+  tokens: Range
+}
+
+/**
+ * What a run of this depth is likely to take, read from the same budget and step profile the run
+ * script uses. Knowledge passages add a few hundred tokens on top (not counted here).
+ */
+export function depthExpectation(
+  depth: ResearchDepth,
+  opts: { knowledge?: boolean; web?: boolean; angles?: number; context?: boolean } = {},
+): DepthExpectation {
+  const b = DEPTH_BUDGET[depth]
+  const knowledge = opts.knowledge !== false
+  const web = opts.web !== false
+  const angles = Math.max(1, opts.angles ?? (depth === 'quick' ? 3 : 4))
+  const names: ResearchStepName[] = ['plan']
+  if (opts.context) names.push('context')
+  if (knowledge) names.push('knowledge')
+  let webMin = 0
+  let webMax = 0
+  if (web) {
+    const searches = b.combinedSearch ? 1 : Math.min(b.searches, angles)
+    for (let i = 0; i < searches; i++) names.push('search')
+    webMin = b.combinedSearch ? b.resultsPerSearch[1] : searches * b.resultsPerSearch[0]
+    webMax = b.combinedSearch ? b.resultsPerSearch[1] : searches * b.resultsPerSearch[1]
+    if (b.contrarian) {
+      names.push('search')
+      webMin += 2
+      webMax += 2
+    }
+    for (let i = 0; i < Math.min(b.readSteps, Math.max(1, webMax)); i++) names.push('browse')
+    if (b.contrarian) names.push('crossCheck')
+  }
+  names.push(...(b.mergedSynthesis ? (['merged'] as const) : (['synthesize', 'draft'] as const)))
+  const sum = (key: 'ms' | 'tokens', i: 0 | 1) => names.reduce((n, s) => n + STEP_PROFILE[s][key][i], 0)
+  return {
+    depth,
+    steps: names.length,
+    sources: [webMin, webMax + (knowledge ? b.knowledgeLimit : 0)],
+    findings: b.findings,
+    durationMs: [sum('ms', 0), sum('ms', 1)],
+    tokens: [sum('tokens', 0), sum('tokens', 1)],
+  }
+}
+
+const TRAILING_CONNECTIVE = /^(of|for|to|and|or|in|on|with|by|the|a|an|their|its|from|about|into|at|as|than|is|are|be)$/i
+
+/**
+ * The subject of a question for templates, cut at its first clause and at a word boundary:
+ * "How are mid-market forwarders adopting customer portals, and what do they expect?" →
+ * "mid-market forwarders adopting customer portals".
+ */
+export function subjectPhrase(text: string, maxWords = 7): string {
+  const raw = topicPhrase(text, 16)
+  const clause = raw.split(/\s*[,;]\s*|\s+(?:and|or|but|so)\s+(?=(?:what|how|which|who|why|where|when|do|does|did|is|are|can|could|should|would|will)\b)/i)[0] || raw
+  let ws = clause.split(' ').filter(Boolean)
+  if (ws.length > maxWords) ws = ws.slice(0, maxWords)
+  while (ws.length > 2 && TRAILING_CONNECTIVE.test(ws[ws.length - 1])) ws = ws.slice(0, -1)
+  return ws.join(' ') || raw
+}
+
 /** Default investigation title: the question, shortened. */
 export function investigationTitle(question: string): string {
   return capitalize(shorten(cleanSentence(question), 72)) || 'Untitled investigation'
@@ -44,13 +142,13 @@ function shapeOf(q: string): QuestionShape {
   if (/\b(impact|affect\w*|implications?|mandate\w*|regulat\w*|laws?|complian\w*)\b/i.test(q)) return 'impact'
   if (/\b(trends?|future|state of|outlook|emerging)\b/i.test(q)) return 'trend'
   if (/\b(competitor\w*|competitive|position\w*|teardown|landscape|against)\b/i.test(q)) return 'competitor'
-  if (/^\s*(how|what(?:'s| is) the best way)\b/i.test(q)) return 'how'
+  if (/^\s*(?:how (?:do|can|could|should|would|might) (?:we|i|you|teams?|companies)|how to|what(?:'s| is) the best way)\b/i.test(q)) return 'how'
   return 'general'
 }
 
 /** 3–4 templated sub-questions ("angles") derived from the question. */
 export function deriveAngles(question: string, count = 4, opts: { projectName?: string } = {}): string[] {
-  const topic = topicPhrase(question, 6)
+  const topic = subjectPhrase(question, 6)
   const subject = opts.projectName ?? 'our product'
   const comparison = detectComparison(question)
   const proper = keyTerms(question, 4).find((t) => /^\p{Lu}/u.test(t)) ?? topic
@@ -163,7 +261,7 @@ export function synthesizeFindings(input: {
   const knowledge = usable.filter((s) => s.kind === 'knowledge')
   const web = usable.filter((s) => s.kind !== 'knowledge')
   const facets = rng.shuffle(facetsFor(question, 6))
-  const topic = topicPhrase(question, 6)
+  const topic = subjectPhrase(question, 6)
   const comparison = detectComparison(question)
   const out: DraftFinding[] = []
 

@@ -54,6 +54,26 @@ export interface CreateInvestigationInput {
   sources?: { knowledge?: boolean; web?: boolean }
   /** Start the research run immediately (default true). */
   start?: boolean
+  /** Context that rides along with the first run (exactly what the composer's Context Line showed). */
+  context?: EntityRef[]
+  /** The project's memory (goal, instructions) rides along. */
+  memory?: boolean
+}
+
+/** What rides along with a research run: the composer's context, read in a "Read your context" step. */
+export interface ResearchRunOptions {
+  /** Entity refs from the Context Line (held, attached, likely, project-memory items). */
+  context?: readonly EntityRef[]
+  /** The project's goal and instructions ride along. */
+  memory?: boolean
+}
+
+function runParams(base: Record<string, unknown>, opts: ResearchRunOptions | undefined): Record<string, unknown> {
+  const params = { ...base }
+  const refs = (opts?.context ?? []).map((r) => ({ kind: r.kind, id: r.id }))
+  if (refs.length) params.context = refs
+  if (opts?.memory) params.memory = true
+  return params
 }
 
 export function createInvestigation(input: CreateInvestigationInput): Investigation {
@@ -90,7 +110,7 @@ export function createInvestigation(input: CreateInvestigationInput): Investigat
   logActivity({ actor: ME, verb: 'created', target: invRef(inv.id), summary: `Created investigation ${quoted(inv.title)}`, projectId: inv.projectId })
   if (start) {
     try {
-      startInvestigation(inv.id)
+      startInvestigation(inv.id, { context: input.context, memory: input.memory })
     } catch (error) {
       touch(inv.id, { status: 'draft' })
       throw error
@@ -99,7 +119,7 @@ export function createInvestigation(input: CreateInvestigationInput): Investigat
   return db.get('investigations', inv.id) ?? inv
 }
 
-export type InvestigationPatch = Partial<Pick<Investigation, 'title' | 'question' | 'depth' | 'angles' | 'projectId'>>
+export type InvestigationPatch = Partial<Pick<Investigation, 'title' | 'question' | 'depth' | 'angles' | 'projectId' | 'sources'>>
 
 /** Edit a (usually draft) investigation's brief. */
 export function updateInvestigation(id: ID, patch: InvestigationPatch): Investigation | undefined {
@@ -109,6 +129,10 @@ export function updateInvestigation(id: ID, patch: InvestigationPatch): Investig
   if (patch.depth !== undefined) clean.depth = patch.depth
   if (patch.angles !== undefined) clean.angles = patch.angles.map((a) => a.trim()).filter(Boolean)
   if (patch.projectId !== undefined) clean.projectId = patch.projectId
+  if (patch.sources !== undefined) {
+    if (!patch.sources.knowledge && !patch.sources.web) throw new Error('Choose at least one source for the investigation.')
+    clean.sources = { knowledge: patch.sources.knowledge, web: patch.sources.web }
+  }
   return touch(id, (inv) => ({ ...inv, ...clean }))
 }
 
@@ -122,7 +146,7 @@ export function activeResearchRun(inv: Investigation): Run | undefined {
 }
 
 /** Start (or return the already running) research run for an investigation. */
-export function startInvestigation(id: ID): Run | undefined {
+export function startInvestigation(id: ID, opts?: ResearchRunOptions): Run | undefined {
   const inv = db.get('investigations', id)
   if (!inv) return undefined
   const active = activeResearchRun(inv)
@@ -131,7 +155,7 @@ export function startInvestigation(id: ID): Run | undefined {
     kind: 'research',
     title: inv.title,
     factory: RESEARCH_FACTORY,
-    params: { investigationId: id },
+    params: runParams({ investigationId: id }, opts),
     projectId: inv.projectId,
     origin: invRef(id),
     agentId: researchAgentId(),
@@ -141,7 +165,7 @@ export function startInvestigation(id: ID): Run | undefined {
 }
 
 /** Ask a follow-up question: a new run that appends a "Follow-up" section and findings. */
-export function askFollowUp(id: ID, question: string): Run | undefined {
+export function askFollowUp(id: ID, question: string, opts?: ResearchRunOptions): Run | undefined {
   const inv = db.get('investigations', id)
   const q = question.trim()
   if (!inv || !q) return undefined
@@ -149,7 +173,7 @@ export function askFollowUp(id: ID, question: string): Run | undefined {
     kind: 'research',
     title: `Follow-up: ${q.length > 70 ? `${q.slice(0, 69)}…` : q}`,
     factory: RESEARCH_FOLLOW_UP_FACTORY,
-    params: { investigationId: id, question: q },
+    params: runParams({ investigationId: id, question: q }, opts),
     projectId: inv.projectId,
     origin: invRef(id),
     agentId: researchAgentId(),
@@ -165,6 +189,15 @@ export function completeInvestigation(id: ID): Investigation | undefined {
   if (!inv || inv.status === 'complete') return inv
   const next = touch(id, { status: 'complete' })
   logActivity({ actor: ME, verb: 'completed', target: invRef(id), summary: `Completed investigation ${quoted(inv.title)}`, projectId: inv.projectId })
+  return next
+}
+
+/** Reopen a completed investigation for review (undo of Mark complete). */
+export function reopenInvestigation(id: ID): Investigation | undefined {
+  const inv = db.get('investigations', id)
+  if (!inv || inv.status !== 'complete') return inv
+  const next = touch(id, { status: 'review' })
+  logActivity({ actor: ME, verb: 'reopened', target: invRef(id), summary: `Reopened investigation ${quoted(inv.title)} for review`, projectId: inv.projectId })
   return next
 }
 
@@ -198,12 +231,58 @@ export function saveReportToKnowledge(id: ID): KnowledgeItem | undefined {
       projectIds: inv.projectId ? [inv.projectId] : [],
       tags: ['research', ...keyTerms(inv.question, 2).map((t) => t.toLowerCase())],
       source: { type: 'research', ref: invRef(id) },
-      simulated: inv.runIds.length > 0 || undefined,
+      simulated: isInvestigationSimulated(inv) || undefined,
     },
     { verb: 'saved', summary: `Saved the report of ${quoted(inv.title)} to Knowledge` },
   )
   link(invRef(id), { kind: 'knowledge', id: item.id }, 'produced')
   touch(id, { knowledgeId: item.id })
+  return item
+}
+
+/** Anything in the investigation came from the simulator: a simulated run or a simulated source. */
+export function isInvestigationSimulated(inv: Investigation): boolean {
+  return inv.runIds.some((rid) => db.get('runs', rid)?.simulated) || inv.sourceIds.some((sid) => db.get('sources', sid)?.simulated)
+}
+
+/**
+ * Save one finding as a Knowledge snippet: the claim, its confidence and the sources it cites, with
+ * the investigation as its origin. Snippets citing simulated sources stay labeled as simulated.
+ */
+export function saveFindingSnippet(investigationId: ID, findingId: ID): KnowledgeItem | undefined {
+  const inv = db.get('investigations', investigationId)
+  const finding = inv?.findings.find((f) => f.id === findingId)
+  if (!inv || !finding) return undefined
+  const cited = finding.sourceIds.flatMap((sid) => {
+    const s = db.get('sources', sid)
+    if (!s) return []
+    const n = inv.sourceIds.indexOf(sid) + 1
+    const where = s.kind === 'knowledge' ? 'your knowledge base' : [s.domain, s.simulated ? 'simulated source' : null].filter(Boolean).join(' · ')
+    return [`- [${n > 0 ? n : '–'}] ${s.title}${where ? ` — ${where}` : ''}`]
+  })
+  const simulated = finding.sourceIds.some((sid) => db.get('sources', sid)?.simulated)
+  const content = [
+    simulated ? '> From simulated research — some cited sources are fictional publications that were not fetched from the web.\n' : null,
+    finding.text,
+    '',
+    `_Confidence: ${finding.confidence} · from the investigation ${quoted(inv.title)}_`,
+    cited.length ? `\n**Sources**\n${cited.join('\n')}` : null,
+  ]
+    .filter((l) => l !== null)
+    .join('\n')
+  const item = createKnowledge(
+    {
+      kind: 'snippet',
+      title: excerpt(finding.text, 80),
+      content,
+      collectionId: db.get('collections', RESEARCH_COLLECTION_ID) ? RESEARCH_COLLECTION_ID : null,
+      projectIds: inv.projectId ? [inv.projectId] : [],
+      tags: ['research', 'finding'],
+      source: { type: 'research', ref: invRef(investigationId) },
+      simulated: simulated || undefined,
+    },
+    { verb: 'saved', summary: `Saved a finding from ${quoted(inv.title)} as a snippet` },
+  )
   return item
 }
 
@@ -300,9 +379,12 @@ export function discardSource(id: ID): Source | undefined {
 export function restoreSource(id: ID): Source | undefined {
   const cur = db.get('sources', id)
   if (!cur || cur.status !== 'discarded') return cur
-  const cited = cur.investigationId ? db.get('investigations', cur.investigationId)?.findings.some((f) => f.sourceIds.includes(id)) : false
+  const inv = cur.investigationId ? db.get('investigations', cur.investigationId) : undefined
+  const cited = inv ? inv.findings.some((f) => f.sourceIds.includes(id)) : false
   const read = cur.kind === 'knowledge' || (cur.simulated && !!cur.content)
-  return setSourceStatus(id, cited ? 'cited' : read ? 'read' : 'queued')
+  const next = setSourceStatus(id, cited ? 'cited' : read ? 'read' : 'queued')
+  if (inv) logActivity({ actor: ME, verb: 'restored', target: invRef(inv.id), summary: `Restored source ${quoted(cur.title)}`, projectId: inv.projectId })
+  return next
 }
 
 // ---------------------------------------------------------------- findings

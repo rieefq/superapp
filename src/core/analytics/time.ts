@@ -35,6 +35,30 @@ export function localDaysBetween(from: number, to: number): number[] {
   return days
 }
 
+/**
+ * Start of the local clock hour containing `ts`. Computed from the absolute instant (minus the
+ * local minutes and seconds), so both occurrences of a repeated hour on a 25h day keep their own
+ * start and a skipped hour never appears.
+ */
+export function startOfLocalHour(ts: number): number {
+  const d = new Date(ts)
+  return ts - (d.getMinutes() * TIME.MINUTE + d.getSeconds() * 1000 + d.getMilliseconds())
+}
+
+/** Start of every local clock hour from the hour of `from` through the hour of `to` (inclusive). */
+export function localHoursBetween(from: number, to: number): number[] {
+  if (!Number.isFinite(from) || !Number.isFinite(to) || from > to) return []
+  const last = startOfLocalHour(to)
+  const hours: number[] = []
+  for (let t = startOfLocalHour(from); t <= last; ) {
+    hours.push(t)
+    // One hour of absolute time, snapped to the local hour start (30-minute offset shifts snap back).
+    const next = startOfLocalHour(t + TIME.HOUR)
+    t = next > t ? next : t + TIME.HOUR
+  }
+  return hours
+}
+
 /** Index of the bucket containing `ts` in ascending day starts (largest start ≤ ts); -1 before the first. */
 export function dayIndex(days: readonly number[], ts: number): number {
   let lo = 0

@@ -208,3 +208,77 @@ export function describeArt(spec: ArtSpec): ArtDescription {
     alt: `Procedural ${spec.style} ${what} in ${colorNames.join(', ')} (simulated preview, not a model-generated image).`,
   }
 }
+
+// ---------------------------------------------------------------- palette edits (Studio "Edit with instruction")
+
+/** Hex → HSL (h 0–360, s and l 0–1). */
+export function hexToHsl(hex: string): Hsl {
+  const [r, g, b] = hexToRgb(hex).map((c) => c / 255)
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const l = (max + min) / 2
+  if (max === min) return { h: 0, s: 0, l }
+  const d = max - min
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+  const h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4
+  return { h: h * 60, s, l }
+}
+
+/**
+ * A direction for a palette edit, each in −1…1: warmth (cool ↔ warm), light (darker ↔ lighter),
+ * saturation (muted ↔ vivid). Produced by `interpretInstruction` in `./studio`.
+ */
+export interface PaletteAdjust {
+  warmth?: number
+  light?: number
+  saturation?: number
+}
+
+/** Shortest signed distance between two hues, in degrees (−180…180). */
+function hueDelta(from: number, to: number): number {
+  return ((to - from + 540) % 360) - 180
+}
+
+/**
+ * Apply a palette edit, deterministically: warmth pulls hues toward amber (30°) or blue (215°),
+ * light shifts lightness, saturation scales chroma. Relative order of lightness is kept, so
+ * compositions keep their value structure.
+ */
+export function adjustPalette(palette: readonly string[], adjust: PaletteAdjust): string[] {
+  const warmth = Math.max(-1, Math.min(1, adjust.warmth ?? 0))
+  const light = Math.max(-1, Math.min(1, adjust.light ?? 0))
+  const sat = Math.max(-1, Math.min(1, adjust.saturation ?? 0))
+  if (!warmth && !light && !sat) return [...palette]
+  return palette.map((hex) => {
+    const c = hexToHsl(hex)
+    let { h, s, l } = c
+    if (warmth && s > 0.04) {
+      const target = warmth > 0 ? 30 : 215
+      h = wrap(h + hueDelta(h, target) * Math.abs(warmth) * 0.45)
+      s = clamp01(s + Math.abs(warmth) * 0.06)
+    }
+    if (light) l = clamp01(light > 0 ? l + (1 - l) * light * 0.35 : l + l * light * 0.35)
+    if (sat) s = clamp01(sat > 0 ? s + (1 - s) * sat * 0.45 : s * (1 + sat * 0.6))
+    return hslToHex({ h, s, l })
+  })
+}
+
+/** Average warmth of a palette, −1 (cool blue) … 1 (warm amber); 0 for greys. Used in tests and step notes. */
+export function paletteWarmth(palette: readonly string[]): number {
+  let sum = 0
+  let weight = 0
+  for (const hex of palette) {
+    const { h, s } = hexToHsl(hex)
+    if (s < 0.05) continue
+    const distWarm = Math.abs(hueDelta(h, 30))
+    const distCool = Math.abs(hueDelta(h, 215))
+    sum += ((distCool - distWarm) / 180) * s
+    weight += s
+  }
+  return weight ? Math.max(-1, Math.min(1, sum / weight)) : 0
+}
+
+/** Color words named in a text ("make the sky orange" → ['orange']), in order of appearance. */
+export function namedColors(text: string): string[] {
+  return colorWordsIn(text.toLowerCase()).map((c) => c.word)
+}
