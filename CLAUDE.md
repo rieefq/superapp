@@ -101,8 +101,11 @@ Several agents work in this tree at the same time.
   describe it in your final report instead of making it (unless your brief explicitly allows it).
 - Do not run `npm install`/add dependencies unless your brief says so.
 - Do not run `vite build` into `dist/` (other agents may be using it). Typecheck with `npm run typecheck`.
-- Typecheck output may include errors from other agents' in-progress files; filter to your paths:
+- Typecheck ONLY via `npm run typecheck` (slot-limited: at most two run at once; each tsc needs ~1GB — never run
+  raw `npx tsc` in parallel). Output may include other agents' in-progress errors; filter to your paths:
   `npm run typecheck 2>&1 | grep -E 'src/(your|paths)' || echo clean`.
+- Memory is shared by ~12 agents: run at most ONE dev server of your own, reuse it, and kill it (and any e2e server
+  you started) before you finish. Stale dev servers may be recycled automatically — just restart yours if it vanished.
 - Dev server: pick your assigned port and a private cache dir:
   `PORT=52xx VITE_CACHE_DIR=node_modules/.vite-52xx npx vite --port 52xx --strictPort` (run in background).
 - Screenshots: `node scripts/shot.mjs --port 52xx --out /tmp/shots-<you> /route1 /route2`

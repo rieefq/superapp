@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit -p tsconfig.app.json && vite build",
+    "build": "sh scripts/typecheck.sh && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "typecheck": "sh scripts/typecheck.sh",
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test"
