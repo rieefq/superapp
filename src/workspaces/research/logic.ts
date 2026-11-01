@@ -233,6 +233,8 @@ export interface PlanItem {
   key: string
   label: string
   state: CheckState
+  /** Why an angle has no search of its own. */
+  note?: string
   /** "3 sources" next to the item. */
   count?: number
   /** Context, knowledge and skeptical rows are not angles. */
@@ -258,13 +260,18 @@ export function planChecklist(
   if (contextStep) items.push({ key: 'context', label: 'Your context', state: stepState(contextStep), count: contextStep.refs?.length, kind: 'context' })
   const k = steps.find((s) => s.tool === 'knowledge.search')
   if (inv.sources?.knowledge !== false && (generated || k)) {
-    items.push({ key: 'knowledge', label: 'Your knowledge', state: stepState(k), count: k?.status === 'done' ? counts.knowledge : undefined, kind: 'knowledge' })
+    items.push({ key: 'knowledge', label: 'Your knowledge', state: stepState(k), count: k?.status === 'done' ? (k.refs ? k.refs.length : counts.knowledge) : undefined, kind: 'knowledge' })
   }
   const webSearches = steps.filter((s) => s.tool === 'web.search' || (s.kind === 'search' && s.tool !== 'knowledge.search' && s.tool !== 'context'))
   const angleSearches = webSearches.filter((s) => !/skeptic/i.test(s.title))
   const combined = DEPTH_BUDGET[inv.depth].combinedSearch || (!generated && angleSearches.length <= 1)
   if (inv.sources?.web !== false) {
+    const budget = DEPTH_BUDGET[inv.depth].searches
     inv.angles.forEach((angle, i) => {
+      if (!combined && generated && i >= budget) {
+        items.push({ key: `angle-${i}`, label: angle, state: 'skipped', note: 'No search of its own at this depth — covered in the synthesis', kind: 'angle' })
+        return
+      }
       const step = combined ? angleSearches[0] : angleSearches[i]
       items.push({ key: `angle-${i}`, label: angle, state: stepState(step), count: step?.status === 'done' ? step.refs?.length : undefined, kind: 'angle' })
     })

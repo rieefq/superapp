@@ -161,9 +161,8 @@ function SourcePanel({ entity }: LensProps) {
     <div className="flex flex-col gap-4 px-4 py-3.5">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <SourceOriginTag source={s} />
-        <span className="type-caption text-ink-3">{SOURCE_KIND_WORD[s.kind]}</span>
-        <SourceStatus status={s.status} />
-        {n > 0 && <span className="type-meta text-ink-3">cited as [{n}]</span>}
+        {s.kind !== 'knowledge' && <span className="type-caption text-ink-3">{SOURCE_KIND_WORD[s.kind]}</span>}
+        {n > 0 && <span className="type-meta text-ink-3">[{n}] in the report</span>}
       </div>
 
       {s.url && (
@@ -196,7 +195,7 @@ function SourcePanel({ entity }: LensProps) {
         </span>
       </div>
 
-      {s.snippet && (
+      {s.snippet && s.kind !== 'knowledge' && (
         <div className="flex flex-col gap-1.5">
           <span className="type-label text-ink-3">Snippet</span>
           <p className="type-body-sm border-l-2 border-line-strong pl-3 text-pretty text-ink-2">{s.snippet}</p>

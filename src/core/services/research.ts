@@ -91,7 +91,7 @@ export function createInvestigation(input: CreateInvestigationInput): Investigat
     projectId: input.projectId ?? null,
     status: start ? 'running' : 'draft',
     depth,
-    angles: angles.length ? angles : deriveAngles(question, depth === 'quick' ? 3 : 4, { projectName }),
+    angles: angles.length ? angles : deriveAngles(question, depth === 'deep' ? 4 : 3, { projectName }),
     sourceIds: [],
     findings: [],
     runIds: [],

@@ -519,7 +519,7 @@ function MemoryBlock({ project }: { project: Project }) {
     <section aria-labelledby="project-memory">
       <SectionLabel id="project-memory" title="Memory" count={project.pinnedRefs.length} action={<SectionAction onClick={() => navigate(`${base(project)}/memory`)}>Edit</SectionAction>} />
       <p className="type-caption mb-2.5 text-ink-3">
-        Rides along in every run here · ~{formatTokenCount(memory.total)} tok
+        Rides along in every run here · {formatTokenCount(memory.total)} tok
       </p>
       {project.pinnedRefs.length === 0 ? (
         <QuietLine>Nothing held in memory yet.</QuietLine>

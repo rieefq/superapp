@@ -201,7 +201,7 @@ const SourceRow = memo(function SourceRow({ source: s, n, selected, reading, onS
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className={cn('type-body-sm line-clamp-2 text-pretty', discarded ? 'text-ink-3 line-through decoration-ink-4' : 'font-medium text-ink')}>{s.title}</span>
           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-            <SourceOriginTag source={s} compact={compact} />
+            <SourceOriginTag source={s} compact={compact && sourceOrigin(s) !== 'knowledge'} />
             {meta.length > 0 && <span className="type-meta min-w-0 truncate text-ink-3">{meta.join(' · ')}</span>}
           </span>
         </span>

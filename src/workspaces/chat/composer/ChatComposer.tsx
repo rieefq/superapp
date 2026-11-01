@@ -1,6 +1,6 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import { useNavigate } from 'react-router'
-import { Composer, startEvents, toChatSelection, type ComposerContext, type ComposerSubmitMeta } from '@/app/components'
+import { Composer, START_KIND_META, startEvents, toChatSelection, type ComposerContext, type ComposerSubmitMeta } from '@/app/components'
 import { openStartSheet, type StartKind } from '@/app/shell/store'
 import type { SlashCommand } from '@/app/types'
 import { sendMessage, stopGeneration } from '@/core/ai'
@@ -75,9 +75,10 @@ export function ChatComposer({ thread, context, modelId, onModelChange, dropTarg
 
   const source: EntityRef | undefined = threadId ? { kind: 'thread', id: threadId } : undefined
 
-  const open = (kind: StartKind, prefill: Record<string, unknown>, text: string, files: Attachment[]) => {
+  const open = (kind: StartKind, prefill: Record<string, unknown>, text: string, files: Attachment[], background?: boolean) => {
     handOff(text, files)
-    openStartSheet(kind, { source, prefill })
+    // Tasks and notes are created here (toast + chip in the thread); runs keep ⏎ go · ⌘⏎ stay.
+    openStartSheet(kind, { source, prefill, background: background ?? !START_KIND_META[kind].runs })
   }
 
   const onSlashCommand = (command: SlashCommand, args: string, meta: ComposerSubmitMeta): boolean => {
@@ -124,6 +125,8 @@ export function ChatComposer({ thread, context, modelId, onModelChange, dropTarg
         },
         text,
         meta.attachments,
+        // An assignment typed in the conversation keeps you here; its run lands under it.
+        !!threadId,
       )
       return
     }
@@ -155,6 +158,8 @@ export function ChatComposer({ thread, context, modelId, onModelChange, dropTarg
   return (
     <Composer
       context={context}
+      // The host owns the context; the Composer's own fallback context must not publish to Inspector › Context.
+      contextOptions={{ autoPublish: false }}
       value={draft}
       onValueChange={(t) => {
         setDraft(t)

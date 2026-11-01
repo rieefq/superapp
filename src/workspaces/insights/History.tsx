@@ -4,7 +4,7 @@ import {
   ArrowUpRight, Copy, CornerLeftUp, Ellipsis, Layers, PanelRight, Pause, Play, RotateCw, ScanSearch, Square, X,
 } from 'lucide-react'
 import { useInspectEntity } from '@/app/templates'
-import { attachRun } from '@/app/shell/store'
+import { attachRun, openCommandCenter } from '@/app/shell/store'
 import { ESTIMATE_TOOLTIP } from '@/app/components'
 import {
   HISTORY_STATUSES, minuteCeil, queryRuns, rangeToken, recordDurationMs, sortRunRecords, statusGroup, useMinuteNow, useRunRecords,
@@ -127,9 +127,11 @@ export function History() {
   const page = Math.min(pageCount, Math.max(1, Number(params.get('page')) || 1))
   const pageRows = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  const allColumns = useHistoryColumns()
   const [tableRef, tableWidth] = useWidth<HTMLDivElement>()
-  // Columns drop by the room the table has (narrow viewports, or the Inspector docked beside it).
+  // Columns drop by the room the table has (narrow viewports, or the Inspector docked beside it);
+  // below COMPACT_BELOW each run is one two-line row: title, then kind · started · cost · SIM.
+  const compact = tableWidth < COMPACT_BELOW
+  const allColumns = useHistoryColumns(compact)
   const columns = useMemo(() => fitColumns(allColumns, tableWidth, HISTORY_COLUMN_MIN), [allColumns, tableWidth])
   const drills = useDrillChips()
   const agentsLink = agentsBoardLink(params, filters.rangeDays, status, agentId, filters.kind)
@@ -203,8 +205,13 @@ export function History() {
           onRowClick={(r) => navigate(entityRoute({ kind: 'run', id: r.id }))}
           empty={
             <span className="flex flex-col items-center gap-2">
-              <span>{matching.length === 0 && records.length > 0 ? 'No runs match these filters.' : 'No runs yet.'}</span>
-              {(drills.length > 0 || text || status !== 'all') && (
+              <span>{records.length > 0 ? 'No runs match these filters.' : 'No runs yet. Every AI action you start shows up here.'}</span>
+              {records.length === 0 && (
+                <Button size="xs" variant="secondary" kbd="mod+k" onClick={() => openCommandCenter('')}>
+                  Start something
+                </Button>
+              )}
+              {records.length > 0 && (drills.length > 0 || text || status !== 'all') && (
                 <Button
                   size="xs"
                   variant="secondary"
@@ -273,7 +280,9 @@ function useDrillChips(): DrillChip[] {
 // ------------------------------------------------------------------------------------------------ columns
 
 /** Minimum table width (px) at which each optional column is shown. */
-const HISTORY_COLUMN_MIN: Partial<Record<string, number>> = { duration: 520, kind: 720, tokens: 860, owner: 1040 }
+const HISTORY_COLUMN_MIN: Partial<Record<string, number>> = { duration: 680, kind: 760, tokens: 880, owner: 1040 }
+/** Narrower than this, a run is one two-line cell (phones). */
+const COMPACT_BELOW = 600
 
 /** Keep clicks and keys inside a cell from also opening the row. */
 const stop = {
@@ -283,9 +292,15 @@ const stop = {
   },
 }
 
-function useHistoryColumns(): DataColumn<RunRecord>[] {
-  return useMemo<DataColumn<RunRecord>[]>(
-    () => [
+function useHistoryColumns(compact: boolean): DataColumn<RunRecord>[] {
+  return useMemo<DataColumn<RunRecord>[]>(() => {
+    if (compact) {
+      return [
+        { key: 'title', header: 'Run', sortable: true, cell: (r) => <TitleCell record={r} compact /> },
+        { key: 'actions', header: <span className="sr-only">Actions</span>, width: 48, cell: (r) => <RowActions record={r} /> },
+      ]
+    }
+    return [
       { key: 'title', header: 'Run', sortable: true, cell: (r) => <TitleCell record={r} /> },
       {
         key: 'kind',
@@ -353,19 +368,22 @@ function useHistoryColumns(): DataColumn<RunRecord>[] {
         ),
       },
       { key: 'actions', header: <span className="sr-only">Actions</span>, width: 44, cell: (r) => <RowActions record={r} /> },
-    ],
-    [],
-  )
+    ]
+  }, [compact])
 }
 
-const TitleCell = memo(function TitleCell({ record: r }: { record: RunRecord }) {
+const TitleCell = memo(function TitleCell({ record: r, compact }: { record: RunRecord; compact?: boolean }) {
   const route = entityRoute({ kind: 'run', id: r.id })
+  const at = r.startedAt ?? r.createdAt
+  const KindIcon = RUN_KIND_ICON[r.kind]
   // `w-0 min-w-full`: the cell contributes no min-content width, so long titles truncate instead of
   // widening the table past the stage.
   return (
-    <span className="flex w-0 min-w-full items-center gap-2.5 py-1">
-      <RunStatusGlyph status={r.status} />
-      <span className="flex min-w-0 flex-col">
+    <span className={cn('flex w-0 min-w-full gap-2.5 py-1', compact ? 'items-start py-2' : 'items-center')}>
+      <span className={cn('flex shrink-0', compact && 'pt-[3px]')}>
+        <RunStatusGlyph status={r.status} />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col">
         <span className="flex min-w-0 items-baseline gap-2">
           <Link
             {...stop}
@@ -382,6 +400,21 @@ const TitleCell = memo(function TitleCell({ record: r }: { record: RunRecord }) 
         {r.status === 'failed' && r.error && (
           <span className="type-caption truncate text-fail-ink" title={r.error}>
             {r.error}
+          </span>
+        )}
+        {compact && (
+          <span className="type-meta mt-0.5 flex min-w-0 items-center gap-1.5 text-ink-3">
+            <time dateTime={new Date(at).toISOString()} className="shrink-0">
+              {Date.now() - at < DAY ? timeAgo(at) : formatDateTime(at)}
+            </time>
+            <span aria-hidden>·</span>
+            <span className="shrink-0 text-ink-2">{formatCost(r.usage.costUsd, { est: r.simulated })}</span>
+            <span {...stop} className="flex shrink-0">
+              <OriginBadge simulated={r.simulated} />
+            </span>
+            <span aria-hidden>·</span>
+            <KindIcon aria-hidden className="size-3 shrink-0" strokeWidth={1.75} />
+            <span className="min-w-0 truncate">{KIND_LABEL[r.kind]}</span>
           </span>
         )}
       </span>

@@ -168,7 +168,7 @@ function Section({
       ) : (
         <ul className="-mx-2 flex flex-col">
           {refs.slice(0, SHOWN).map((r) => (
-            <WorkRow key={refKey(r)} entity={r} />
+            <WorkRow key={refKey(r)} entity={r} projectName={project.name} />
           ))}
         </ul>
       )}
@@ -176,7 +176,7 @@ function Section({
   )
 }
 
-const WorkRow = memo(function WorkRow({ entity }: { entity: EntityRef }) {
+const WorkRow = memo(function WorkRow({ entity, projectName }: { entity: EntityRef; projectName: string }) {
   const navigate = useNavigate()
   const e = useEntity(entity)
   const status = statusWord(entity.kind, e.status)
@@ -189,7 +189,7 @@ const WorkRow = memo(function WorkRow({ entity }: { entity: EntityRef }) {
       >
         <EntityMark entity={entity} resolved={e} size={16} />
         <span className="type-body-sm min-w-0 flex-1 truncate text-ink-2 group-hover/work:text-ink">{e.title}</span>
-        {e.subtitle && <span className="type-caption hidden max-w-[40%] truncate text-ink-3 sm:block">{e.subtitle}</span>}
+        {e.subtitle && e.subtitle !== projectName && <span className="type-caption hidden max-w-[40%] truncate text-ink-3 sm:block">{e.subtitle}</span>}
         {e.simulated && <SimBadge size="xs" noTooltip />}
         {status && <span className="type-meta hidden shrink-0 text-ink-3 md:inline">{status}</span>}
         {e.updatedAt && <span className="type-meta w-16 shrink-0 text-right text-ink-3">{timeAgo(e.updatedAt).replace(' ago', '')}</span>}

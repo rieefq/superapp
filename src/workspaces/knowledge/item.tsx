@@ -412,15 +412,20 @@ function AvailabilityMenu({ item }: { item: KnowledgeItem }) {
   )
 }
 
+/** The run that produced an item (agents and workflows save knowledge as run outputs). */
+function useProducedBy(id: ID): ID | undefined {
+  return useDB((s: Tables) => {
+    for (const l of Object.values(s.links)) if (l.rel === 'produced' && l.to.kind === 'knowledge' && l.to.id === id && l.from.kind === 'run') return l.from.id
+    return undefined
+  })
+}
+
 function Reader({ item, onEdit }: { item: KnowledgeItem; onEdit: () => void }) {
   const kind = KNOWLEDGE_KIND_META[item.kind] ?? KNOWLEDGE_KIND_META.note
   const words = useMemo(() => countWords(item.content), [item.content])
   const origin = useDB((s: Tables) => originWords(s, item)?.label)
   const usage = useKnowledgeUsage(item.id)
-  const producedBy = useDB((s: Tables) => {
-    for (const l of Object.values(s.links)) if (l.rel === 'produced' && l.to.kind === 'knowledge' && l.to.id === item.id && l.from.kind === 'run') return l.from.id
-    return undefined
-  })
+  const producedBy = useProducedBy(item.id)
   const run = useRow('runs', producedBy)
 
   return (
@@ -543,6 +548,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 /** About this item: collection, projects, source (linking to its origin), author, dates, size, Available to AI. */
 function AboutSection({ item }: { item: KnowledgeItem }) {
   const author = actorName(item.author)
+  const producedBy = useProducedBy(item.id)
   const agent = useDB((s: Tables) => (item.author.type === 'agent' ? s.agents[item.author.id] : undefined))
   const integration = item.source.type === 'integration' ? item.source.integrationId : undefined
   return (
@@ -562,9 +568,11 @@ function AboutSection({ item }: { item: KnowledgeItem }) {
             <EntityChip entity={item.source.ref} showKind />
           ) : integration ? (
             <EntityChip entity={{ kind: 'integration', id: integration }} />
+          ) : producedBy ? (
+            <EntityChip entity={{ kind: 'run', id: producedBy }} showKind />
           ) : (
             <span className="type-body-sm text-ink-2">
-              {item.source.type === 'upload' ? 'Uploaded from your computer — read locally' : item.source.url ? 'Saved link' : 'Added in Atrium'}
+              {item.source.type === 'upload' ? 'Uploaded from your computer — read locally' : item.source.url ? 'Saved link' : 'Written in Atrium'}
             </span>
           )}
         </Row>

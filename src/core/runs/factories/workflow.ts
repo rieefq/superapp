@@ -40,7 +40,8 @@ const RISK_ORDER: Record<RiskLevel, number> = { low: 0, medium: 1, high: 2 }
 function digestData(wf: Workflow): { lines: DigestLine[]; pendingApprovals: number; dateLabel: string } {
   const now = Date.now()
   const weekAgo = now - 7 * TIME.DAY
-  const projects = db.filter('projects', (p) => p.status === 'active' && (!wf.projectId || p.id === wf.projectId))
+  // Every active project, the workflow's own first (a digest is about the whole workspace).
+  const projects = db.filter('projects', (p) => p.status === 'active').sort((a, b) => Number(b.id === wf.projectId) - Number(a.id === wf.projectId) || b.updatedAt - a.updatedAt)
   const lines = projects
     .map((p): DigestLine => {
       const tasks = db.filter('tasks', (t) => t.projectId === p.id)
@@ -243,6 +244,50 @@ function eventSample(ref: EntityRef, event: string, sample: boolean): TriggerEve
 
 const isRef = (v: unknown): v is EntityRef => !!v && typeof v === 'object' && typeof (v as EntityRef).kind === 'string' && typeof (v as EntityRef).id === 'string'
 
+// ---------------------------------------------------------------- reads
+
+/** "7d" / 7 / "14 days" → days (default 7). */
+function configNumberDays(value: unknown): number {
+  if (typeof value === 'number' && value > 0) return Math.round(value)
+  const m = typeof value === 'string' ? /(\d+)/.exec(value) : null
+  return m ? Number(m[1]) : 7
+}
+
+/** Real activity counts from this workspace (tasks, runs, knowledge) over the last `days` days. */
+function workspaceActivity(wf: Workflow, days: number): string {
+  const since = Date.now() - days * TIME.DAY
+  const active = db.filter('projects', (p) => p.status === 'active')
+  const done = db.filter('tasks', (t) => t.status === 'done' && (t.completedAt ?? t.updatedAt) >= since).length
+  const inProgress = db.filter('tasks', (t) => t.status === 'in_progress').length
+  const runs = db.filter('runs', (r) => r.createdAt >= since && r.workflowId !== wf.id)
+  const failed = runs.filter((r) => r.status === 'failed').length
+  const knowledge = db.filter('knowledge', (k) => k.createdAt >= since).length
+  return [
+    `${active.length} active projects · last ${days} days`,
+    `Tasks: ${done} done, ${inProgress} in progress`,
+    `Runs: ${runs.length} (${failed} failed)`,
+    `Knowledge: ${knowledge} items added`,
+    'Read from this workspace.',
+  ].join('\n')
+}
+
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+/** A simulated read from a connected service (no request is made in this build). */
+function integrationRead(node: WorkflowNode, name: string, rng: Rng): string {
+  if (node.integrationId === 'google-calendar' || node.capability === 'calendar.manage') {
+    const meetings = ['Weekly product sync', 'Customer call: Meridian Freight', 'Sprint planning', 'Lumen launch review', 'Pricing review']
+    const picked = rng.shuffle([...meetings]).slice(0, 3)
+    const start = new Date()
+    const lines = picked.map((m, i) => `${DAY_NAMES[(start.getDay() + 1 + i * 2) % 7]} ${String(9 + rng.int(0, 7)).padStart(2, '0')}:00 · ${m}`)
+    return [`${name}: ${picked.length} events in the next 7 days`, ...lines, `(simulated — ${name} was not called)`].join('\n')
+  }
+  if (node.integrationId === 'github') {
+    return [`Fetched the diff and checks from ${name}`, `${rng.int(2, 9)} files changed · +${rng.int(20, 300)} −${rng.int(5, 90)}`, 'checks: typecheck ✓ lint ✓ unit ✓', '(simulated payload)'].join('\n')
+  }
+  return `Read from ${name}.\n(simulated — ${name} was not called)`
+}
+
 // ---------------------------------------------------------------- plan
 
 export function planWorkflow(params: Record<string, unknown>, rng: Rng): RunPlan {
@@ -286,17 +331,23 @@ export function planWorkflow(params: Record<string, unknown>, rng: Rng): RunPlan
 
     switch (node.type) {
       case 'trigger': {
-        const payload = triggerPayload(wf.trigger, node, rng, { override, userName: getSettings().profile.name, event, webhookTest: override === 'webhook.test' })
+        const bySchedule = !!override?.startsWith('Scheduled ·')
+        const payload = triggerPayload(wf.trigger, node, rng, { override: bySchedule ? undefined : override, userName: getSettings().profile.name, event, webhookTest: override === 'webhook.test' })
         Object.assign(flow, payload.context)
-        const scheduled = wf.trigger.type === 'schedule' && (!override || override === 'manual')
+        const scheduled = wf.trigger.type === 'schedule' && (!override || override === 'manual' || bySchedule)
+        const when = wf.trigger.label.toLowerCase().startsWith('every') ? lowerFirst(wf.trigger.label) : wf.trigger.label
         steps.push({
           ...base,
           kind: 'tool',
           title: payload.title ?? (scheduled ? `Scheduled run · ${wf.trigger.label}` : `Triggered by ${node.label || wf.trigger.label}`),
-          detail: scheduled ? `Started now; normally ${wf.trigger.label.toLowerCase().startsWith('every') ? lowerFirst(wf.trigger.label) : wf.trigger.label} — runs only while Atrium is open` : payload.detail,
+          detail: scheduled
+            ? bySchedule
+              ? 'Started by the schedule — runs only while Atrium is open'
+              : `Started now by Test run; normally ${when} — runs only while Atrium is open`
+            : payload.detail,
           tool: 'trigger',
           integrationId: node.integrationId,
-          output: payload.output,
+          output: scheduled ? (bySchedule ? `Scheduled run (${wf.trigger.label}).` : `Test run of a scheduled workflow (${wf.trigger.label}).`) : payload.output,
           durationMs: rng.int(500, 900),
           tokens: rng.int(50, 200),
         })
@@ -360,16 +411,30 @@ export function planWorkflow(params: Record<string, unknown>, rng: Rng): RunPlan
         break
       }
       case 'transform': {
-        const how = configString(node.config, 'operation', 'template', 'expression', 'format', 'lookup') ?? 'format the previous output'
         const def = getIntegration(node.integrationId)
         const conn = node.integrationId ? db.get('connections', node.integrationId) : undefined
         if (def && conn?.status !== 'connected') {
           steps.push({ ...base, kind: 'read', title: node.label, tool: def.name, integrationId: node.integrationId, durationMs: 700, failChance: 1, failMessage: `${def.name} is not connected. Connect it in Integrations and run again.` })
           break
         }
+        const configured = configString(node.config, 'operation', 'template', 'expression', 'format', 'lookup')
         const text = flow.lastOutput ?? ''
-        const transformed = /slack|chat|message/i.test(how) ? `*${wf.name}*\n${text}` : /short|summary|summar/i.test(how) ? excerpt(text, 240) : text
-        flow.lastOutput = transformed
+        let output: string
+        let input: string | undefined = configured
+        if (def) {
+          // A read from a connected service: simulated in this build.
+          output = integrationRead(node, def.name, rng)
+          input = input ?? configString(node.config, 'calendar', 'repo', 'folder', 'include')
+        } else if (!configured && (node.capability === 'tasks.manage' || node.capability === 'knowledge.read' || node.config.window !== undefined)) {
+          // Atrium's own activity: real counts from this workspace.
+          output = workspaceActivity(wf, configNumberDays(node.config.window))
+          input = `last ${configNumberDays(node.config.window)} days · read only`
+        } else {
+          const op = configured ?? 'keep the previous output'
+          output = /slack|chat|message/i.test(op) ? `*${wf.name}*\n${text}` : /short|summary|summar/i.test(op) ? excerpt(text, 240) : text
+          input = op
+          flow.lastOutput = output
+        }
         steps.push({
           ...base,
           kind: def ? 'read' : 'tool',
@@ -377,8 +442,8 @@ export function planWorkflow(params: Record<string, unknown>, rng: Rng): RunPlan
           detail: def ? `${def.name}${def.support === 'simulated' ? ' (simulated)' : ''} · read only` : undefined,
           tool: def?.name ?? 'transform',
           integrationId: node.integrationId,
-          input: how,
-          output: transformed ? shorten(transformed, 600) : 'Nothing to transform.',
+          input,
+          output: output ? shorten(output, 600) : 'Nothing to transform.',
           durationMs: rng.int(600, 1200),
           tokens: rng.int(100, 400),
         })

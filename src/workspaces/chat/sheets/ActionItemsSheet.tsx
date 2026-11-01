@@ -2,12 +2,12 @@ import { useEffect, useId, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { ListChecks } from 'lucide-react'
 import { ProjectPicker } from '@/app/components'
-import { openStartSheet } from '@/app/shell/store'
 import { db } from '@/core/db'
 import { toTask } from '@/core/services'
 import type { ID, Thread } from '@/core/types'
 import { cn } from '@/lib/cn'
 import { Button, Checkbox, EmptyState, Field, Sheet, toast, useBreakpointUp } from '@/ui'
+import { turnInto } from '../actions'
 import { actionItemsFor } from '../logic/actionItems'
 
 /**
@@ -147,7 +147,7 @@ function Review({ thread, onClose }: { thread: Thread; onClose: () => void }) {
                 variant="secondary"
                 onClick={() => {
                   onClose()
-                  openStartSheet('task', { source: { kind: 'thread', id: thread.id } })
+                  turnInto('task', { kind: 'thread', id: thread.id })
                 }}
               >
                 Make one task

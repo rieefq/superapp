@@ -52,7 +52,7 @@ export function FailedCard({ asset, className }: { asset: Asset; className?: str
 
 /** The light table under every preview: --surface-sunken, generous padding, centered content. */
 export function LightTable({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn('flex min-w-0 flex-col items-center gap-3 bg-sunken px-4 py-6 md:px-8 md:py-8', className)}>{children}</div>
+  return <div className={cn('flex min-w-0 flex-col items-center gap-3 bg-sunken px-4 py-5 md:px-8 md:py-6', className)}>{children}</div>
 }
 
 /** A label over one side of an A/B compare. */

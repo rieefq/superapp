@@ -135,7 +135,7 @@ export function StoryboardPlayer({ asset, index, compact, overlay = true }: { as
 
   const ended = time >= total - 0.05
   return (
-    <div className={cn('flex w-full flex-col gap-3', compact && 'max-w-[640px]')} style={compact ? undefined : { maxWidth: `min(960px, calc(max(220px, min(100dvh - 420px, 560px)) * ${ratio}))` }}>
+    <div className={cn('flex w-full flex-col gap-3', compact && 'max-w-[640px]')} style={compact ? undefined : { maxWidth: `min(960px, calc(max(220px, min(100dvh - 560px, 620px)) * ${ratio}))` }}>
       <div className="sim-hatch rounded-md border border-dashed border-line-input p-2">
         <div
           role="region"

@@ -24,6 +24,8 @@ export interface BreakdownItem {
   detail?: ReactNode
   /** Simulated work: hatched bar (and a SIM tag when the list mixes live and simulated rows). */
   simulated?: boolean
+  /** Part of `value` that comes from simulated runs (an estimate): drawn hatched after the live part. */
+  simulatedValue?: number
   /** Drill-down target. */
   to?: string
 }
@@ -61,6 +63,7 @@ export function Breakdown({ items, label, empty, limit = 8 }: BreakdownProps) {
 
 const BreakdownRow = memo(function BreakdownRow({ item, max, tagSimulated }: { item: BreakdownItem; max: number; tagSimulated: boolean }) {
   const share = barShare(item.value, max)
+  const simShare = item.simulated ? 1 : item.value > 0 ? Math.min(1, Math.max(0, (item.simulatedValue ?? 0) / item.value)) : 0
   const valueNode = <span className="type-mono-sm shrink-0 text-ink tabular">{item.valueText}</span>
   const body = (
     <>
@@ -74,13 +77,11 @@ const BreakdownRow = memo(function BreakdownRow({ item, max, tagSimulated }: { i
       </span>
       <span aria-hidden className="relative block h-2">
         {share > 0 && (
-          <span
-            className={cn(
-              'absolute inset-y-0 left-0 rounded-[2px] transition-[width] duration-(--dur-3) ease-standard',
-              item.simulated ? 'sim-hatch border border-dashed border-line-input' : 'bg-ink-2 group-hover/bd:bg-ink',
-            )}
-            style={{ width: `${share * 100}%` }}
-          />
+          <span className="absolute inset-y-0 left-0 flex gap-px transition-[width] duration-(--dur-3) ease-standard" style={{ width: `${share * 100}%` }}>
+            {/* Live part solid, the simulated (estimated) part hatched — never one undifferentiated bar. */}
+            {simShare < 1 && <span className="h-full rounded-[2px] bg-ink-2 group-hover/bd:bg-ink" style={{ flex: `${1 - simShare} 1 0` }} />}
+            {simShare > 0 && <span className="sim-hatch h-full rounded-[2px] border border-dashed border-line-input" style={{ flex: `${simShare} 1 0` }} />}
+          </span>
         )}
       </span>
     </>

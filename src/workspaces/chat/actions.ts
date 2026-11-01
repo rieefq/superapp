@@ -10,6 +10,8 @@ import {
 } from '@/core/ai'
 import { getSettings } from '@/core/settings'
 import { refKey, type EntityRef, type ID } from '@/core/types'
+import { START_KIND_META } from '@/app/components'
+import { openStartSheet, useShellStore, type StartKind } from '@/app/shell/store'
 import { shortCode } from '@/lib/id'
 import { truncate } from '@/lib/format'
 import { confirm, copyText, toast } from '@/ui'
@@ -131,4 +133,23 @@ export function syncThreadContext(threadId: ID, refs: readonly EntityRef[]): voi
   const cur = new Set(thread.contextRefs.map(refKey))
   for (const r of thread.contextRefs) if (!next.has(refKey(r))) removeThreadContext(threadId, r)
   for (const r of refs) if (!cur.has(refKey(r))) addThreadContext(threadId, r)
+}
+
+/**
+ * Show an entity in Inspector › Item right away (a selection in Chat). The `?inspect=` route parameter
+ * reaches the Inspector through a router transition, which streaming answers can hold back for seconds.
+ */
+export function inspectNow(ref: EntityRef): void {
+  const st = useShellStore.getState()
+  st.setSelection({ kind: ref.kind, id: ref.id })
+  st.setInspector('chat', { open: true, tab: 'item' })
+}
+
+/**
+ * Turn into… from Chat. Work that does not run (a task for you, a note) is created where you are: the
+ * Start sheet's Create keeps you in the conversation, toasts a link to it, and the item shows under its
+ * source. Work that runs keeps the usual ⏎ go to it · ⌘⏎ stay here.
+ */
+export function turnInto(kind: StartKind, source: EntityRef, prefill?: Record<string, unknown>): void {
+  openStartSheet(kind, { source, prefill, background: !START_KIND_META[kind].runs })
 }

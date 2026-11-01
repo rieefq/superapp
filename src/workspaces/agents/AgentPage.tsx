@@ -112,7 +112,6 @@ function AgentScreen({ agent, tab, runParam }: { agent: Agent; tab: AgentTab; ru
       header={
         <StageHeader
           title={agent.name}
-          onRename={(name) => updateAgent(agent.id, { name })}
           leading={<AgentMark seed={agent.sigil} hue={agent.hue} size={24} live={status === 'working'} paused={agent.status === 'paused'} label={agent.name} />}
           status={agent.status === 'archived' ? <span className="type-caption rounded-full bg-hover px-2 py-0.5 text-ink-2">Archived</span> : <AgentStatusChip status={status} />}
           backTo="/agents/roster"
@@ -136,9 +135,6 @@ function AgentScreen({ agent, tab, runParam }: { agent: Agent; tab: AgentTab; ru
                   </Button>
                 </span>
               </Tooltip>
-              <Button size="sm" variant="ghost" leadingIcon={ListChecks} disabled={unavailable} onClick={() => openGiveWork(agent.id, 'task')} className="hidden sm:inline-flex">
-                Assign task
-              </Button>
             </>
           }
           menu={menu}
@@ -151,7 +147,7 @@ function AgentScreen({ agent, tab, runParam }: { agent: Agent; tab: AgentTab; ru
           <RunDetail runId={runParam} back={{ label: `${agent.name}’s runs`, to: `${base}/runs` }} />
         ) : (
           <div className="flex flex-col gap-8">
-            <IdentityBand agent={agent} />
+            <IdentityBand agent={agent} compact={tab === 'configure'} />
             <Suspense fallback={<RowsSkeleton rows={6} className="px-0" />}>
               {tab === 'now' && <NowTab agent={agent} />}
               {tab === 'runs' && <RunsTab agent={agent} />}
@@ -169,14 +165,14 @@ function AgentScreen({ agent, tab, runParam }: { agent: Agent; tab: AgentTab; ru
 
 // ------------------------------------------------------------------------------------------------ identity band
 
-function IdentityBand({ agent }: { agent: Agent }) {
+function IdentityBand({ agent, compact }: { agent: Agent; compact?: boolean }) {
   const navigate = useNavigate()
   const status = useAgentLiveStatus(agent.id)
   const [pending, setPending] = useState<Autonomy | null>(null)
   const archived = agent.status === 'archived'
   return (
     <section aria-label={`${agent.name} at a glance`} className="flex min-w-0 flex-col gap-4">
-      <div className="flex min-w-0 items-start gap-4">
+      <div className={cn('flex min-w-0 items-start gap-4', compact && 'hidden')}>
         <AgentMark seed={agent.sigil} hue={agent.hue} size={48} live={status === 'working'} paused={agent.status === 'paused'} className="[--sig-surface:var(--surface-canvas)]" />
         <div className="flex min-w-0 flex-1 flex-col gap-1 pt-0.5">
           <p className="type-body-lg font-medium text-ink">{agent.role}</p>

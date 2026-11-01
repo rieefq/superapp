@@ -64,6 +64,7 @@ function InvestigationScreen({ inv, tabParam }: { inv: Investigation; tabParam?:
   const selectedId = useSelectedSourceId()
   const columns = useBoardColumns()
   const scopeRef = useRef<HTMLDivElement>(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
   const [tasksOpen, setTasksOpen] = useState(false)
   const [turnOpen, setTurnOpen] = useState(false)
   const singleKeys = useSettings((s) => s.appearance.singleKeyShortcuts)
@@ -75,6 +76,10 @@ function InvestigationScreen({ inv, tabParam }: { inv: Investigation; tabParam?:
   const first: Tab = boardMode ? 'board' : 'report'
   const tab: Tab = SUB_TABS.includes(tabParam as Tab) ? (tabParam as Tab) : first
   const readingIds = useMemo(() => readingSourceIds(active ? run : undefined, sources), [active, run, sources])
+  // Each view starts at the top.
+  useEffect(() => {
+    bodyRef.current?.scrollTo({ top: 0 })
+  }, [tab])
   const stats = useMemo(() => sourceStats(sources), [sources])
   const questions = useMemo(() => openQuestions(inv.report).map((q) => ({ id: q.id, text: q.text, section: q.section })), [inv.report])
 
@@ -193,28 +198,33 @@ function InvestigationScreen({ inv, tabParam }: { inv: Investigation; tabParam?:
       }
     />
   )
-  const actions: ReactNode[] = []
+  // Header actions in priority order; how many fit depends on the stage (the title keeps its room).
+  const actions: { key: string; node: ReactNode }[] = []
   if (inv.status === 'failed' && !active)
-    actions.push(
-      <Button key="retry" size="sm" variant="secondary" leadingIcon={RotateCw} onClick={retry}>
-        Retry
-      </Button>,
-    )
+    actions.push({
+      key: 'retry',
+      node: (
+        <Button key="retry" size="sm" variant="secondary" leadingIcon={RotateCw} onClick={retry}>
+          Retry
+        </Button>
+      ),
+    })
   if (inv.status === 'review' && !active)
-    actions.push(
-      <Button key="complete" size="sm" variant="secondary" leadingIcon={Check} onClick={markComplete}>
-        Mark complete
-      </Button>,
-    )
-  if (hasReport) actions.push(<SaveReportButton key="save" inv={inv} />)
-  actions.push(<span key="turn">{turnMenu}</span>)
-  if (inv.status === 'complete' && hasReport)
-    actions.push(
-      <Button key="export" size="sm" variant="ghost" leadingIcon={Download} onClick={exportMd}>
-        Export
-      </Button>,
-    )
-  const visibleActions = phone ? actions.slice(0, 1) : actions.slice(0, 3)
+    actions.push({
+      key: 'complete',
+      node: (
+        <Button key="complete" size="sm" variant="secondary" leadingIcon={Check} onClick={markComplete}>
+          Mark complete
+        </Button>
+      ),
+    })
+  if (inv.status === 'complete' && hasReport) actions.push({ key: 'save', node: <SaveReportButton key="save" inv={inv} /> })
+  actions.push({ key: 'turn', node: <span key="turn">{turnMenu}</span> })
+  if (inv.status !== 'complete' && hasReport) actions.push({ key: 'save', node: <SaveReportButton key="save" inv={inv} /> })
+  const stageWidth = layout.docking.stageWidth
+  const fit = phone || stageWidth < 900 ? 1 : stageWidth < 1240 ? 2 : 3
+  const visibleActions = actions.slice(0, fit)
+  const turnHidden = !visibleActions.some((a) => a.key === 'turn')
 
   // ---- ⌘K: actions for this view
   const commands = useMemo<Command[]>(() => {
@@ -245,6 +255,7 @@ function InvestigationScreen({ inv, tabParam }: { inv: Investigation; tabParam?:
     <div ref={scopeRef} className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
       <Stage
         primary={ref}
+        bodyRef={bodyRef}
         measure="full"
         header={
           <StageHeader<Tab>
@@ -262,8 +273,8 @@ function InvestigationScreen({ inv, tabParam }: { inv: Investigation; tabParam?:
                 { value: 'activity', label: 'Activity' },
               ],
             }}
-            actions={visibleActions.length ? <>{visibleActions}</> : undefined}
-            menu={menu}
+            actions={visibleActions.length ? <>{visibleActions.map((a) => a.node)}</> : undefined}
+            menu={turnHidden ? [...turnInto.filter((i) => i.type !== 'label' && i.type !== 'separator').slice(0, 4), { type: 'separator' }, ...menu] : menu}
             backTo="/research"
           />
         }

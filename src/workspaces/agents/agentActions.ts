@@ -94,7 +94,7 @@ export function agentMenuItems(agent: Agent, navigate: Navigate, opts: { onPage?
   if (agent.status === 'archived') {
     items.push({ id: 'restore', label: 'Restore', icon: ArchiveRestore, onSelect: () => restoreWithFeedback(agent) })
   } else {
-    if (!opts.onPage) items.push({ id: 'assign', label: 'Assign a task…', icon: ListChecks, disabled: agent.status !== 'active', onSelect: () => openGiveWork(agent.id, 'task') })
+    items.push({ id: 'assign', label: 'Assign a task…', icon: ListChecks, disabled: agent.status !== 'active', onSelect: () => openGiveWork(agent.id, 'task') })
     items.push(
       agent.status === 'paused'
         ? { id: 'resume', label: 'Resume agent', icon: Play, onSelect: () => resumeWithFeedback(agent) }

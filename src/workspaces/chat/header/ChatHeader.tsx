@@ -39,6 +39,7 @@ import {
   setArchived,
   threadRoute,
   togglePinned,
+  turnInto,
 } from '../actions'
 
 /**
@@ -59,8 +60,11 @@ export interface ChatHeaderProps {
 
 export const ChatHeader = memo(function ChatHeader({ thread, projectId, onProjectChange, modelId, onModelChange, contextCount, onActionItems }: ChatHeaderProps) {
   const navigate = useNavigate()
+  // Phones keep the title readable: the thread-level Turn into moves into the ⋯ menu.
+  const phone = useShellLayout().formFactor === 'phone'
   const menu: MenuItem[] | undefined = thread
     ? [
+        ...(phone ? [...turnIntoItems(thread, onActionItems), { type: 'separator' as const }] : []),
         { id: 'rename', label: 'Rename', icon: PencilLine, onSelect: startRename },
         { id: 'pin', label: thread.pinned ? 'Unpin' : 'Pin to the top', icon: thread.pinned ? PinOff : Pin, onSelect: () => togglePinned(thread.id) },
         {
@@ -94,7 +98,7 @@ export const ChatHeader = memo(function ChatHeader({ thread, projectId, onProjec
         <>
           <ModelChip value={modelId} onChange={onModelChange} />
           <ContextButton count={contextCount} threadId={thread?.id} />
-          {thread && <ThreadTurnInto thread={thread} onActionItems={onActionItems} />}
+          {thread && !phone && <ThreadTurnInto thread={thread} onActionItems={onActionItems} />}
         </>
       }
       menu={menu}
@@ -184,7 +188,7 @@ function ModelChip({ value, onChange }: { value: string; onChange: (id: string) 
   const model = getModelInfo(value)
   const availability = useModelAvailability(value)
   return (
-    <span className="hidden @min-[640px]:inline-flex">
+    <span className="hidden @min-[920px]:inline-flex">
       <ModelPicker
         value={value}
         onChange={onChange}
@@ -251,8 +255,8 @@ function latestAnswerRun(threadId: ID): ID | undefined {
   return undefined
 }
 
-/** Thread-level Turn into (§6.2): Tasks from action items (review sheet) · Knowledge note · Research brief. */
-function ThreadTurnInto({ thread, onActionItems }: { thread: Thread; onActionItems: () => void }) {
+/** Thread-level Turn into items (§6.2): Tasks from action items (review sheet) · Knowledge note · Research brief. */
+function turnIntoItems(thread: Thread, onActionItems: () => void): MenuItem[] {
   const source = { kind: 'thread' as const, id: thread.id }
   const lastQuestion = () => {
     for (let i = thread.messageIds.length - 1; i >= 0; i--) {
@@ -261,7 +265,7 @@ function ThreadTurnInto({ thread, onActionItems }: { thread: Thread; onActionIte
     }
     return ''
   }
-  const items: MenuItem[] = [
+  return [
     { type: 'label', label: 'Turn this conversation into' },
     { id: 'tasks', label: 'Tasks from action items…', icon: ListChecks, description: 'Review the items found, then create them', onSelect: onActionItems },
     {
@@ -269,7 +273,7 @@ function ThreadTurnInto({ thread, onActionItems }: { thread: Thread; onActionIte
       label: 'Knowledge note',
       icon: NotebookPen,
       description: 'Save the conversation to Knowledge',
-      onSelect: () => openStartSheet('note', { source, prefill: { title: thread.title } }),
+      onSelect: () => turnInto('note', source, { title: thread.title }),
     },
     {
       id: 'research',
@@ -279,9 +283,12 @@ function ThreadTurnInto({ thread, onActionItems }: { thread: Thread; onActionIte
       onSelect: () => openStartSheet('research', { source, prefill: { brief: lastQuestion(), title: thread.title } }),
     },
   ]
+}
+
+function ThreadTurnInto({ thread, onActionItems }: { thread: Thread; onActionItems: () => void }) {
   return (
     <Menu
-      items={items}
+      items={turnIntoItems(thread, onActionItems)}
       placement="bottom-end"
       aria-label="Turn this conversation into"
       trigger={

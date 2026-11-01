@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef } from 'react'
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
+import { Link, useParams, useSearchParams } from 'react-router'
 import { useShallow } from 'zustand/react/shallow'
 import {
   Archive, ArchiveRestore, Check, Copy, Download, FileDiff, Layers, Link2, ListChecks, MessageSquareReply, Pause, Play, SquareTerminal, Square, Trash2,
@@ -19,14 +19,13 @@ import {
 } from '@/ui'
 import { ESTIMATE_TOOLTIP } from '@/app/components'
 import { archiveWithUndo, copyDiff, deleteWithConfirm, exportPatch, restoreWithToast } from '../actions'
-import { useElementWidth } from '../hooks'
 import { changeStats, checksSummary } from '../logic'
 import { BranchLine, RepoMark, RepoModeBadge, SessionStatusChip, useLatestRunStatus } from '../parts'
 import { ActivityPane, PaneHeader, SimTerminalNote } from './Activity'
 import { ChangesPane } from './Changes'
 import { ChecksPane } from './Checks'
 import { FilesPane } from './Files'
-import { useGo } from '../hooks'
+import { useElementWidth, useGo, useUrlValue } from '../hooks'
 
 export type SessionTab = 'activity' | 'changes' | 'files' | 'checks'
 type ReviewTab = Exclude<SessionTab, 'activity'>
@@ -34,6 +33,8 @@ const TABS: readonly SessionTab[] = ['activity', 'changes', 'files', 'checks']
 
 /** Split Activity | Review when the stage is at least this wide (§6.3). */
 export const SPLIT_MIN = 1040
+
+const noop = () => {}
 
 /**
  * A coding session (`/code/:sessionId/(activity|changes|files|checks)`, §6.3). At ≥1040px the stage
@@ -68,45 +69,49 @@ function MissingSession() {
 
 function SessionStage({ session }: { session: CodeSession }) {
   const navigate = useGo()
-  const location = useLocation()
   const params = useParams()
-  const [search, setSearch] = useSearchParams()
+  const [search] = useSearchParams()
   const bodyRef = useRef<HTMLDivElement>(null)
   const width = useElementWidth(bodyRef)
   const split = width >= SPLIT_MIN
   const rest = (params['*'] ?? '').split('/')[0]
-  const tab: SessionTab = (TABS as readonly string[]).includes(rest) ? (rest as SessionTab) : 'activity'
+  const urlTab: SessionTab = (TABS as readonly string[]).includes(rest) ? (rest as SessionTab) : 'activity'
+  // Tab, changed file and open path answer at once (local state); the URL follows (see useUrlValue).
+  const [tabValue, setTab] = useUrlValue(urlTab, noop)
+  const [file, setFile] = useUrlValue(search.get('file'), noop)
+  const [path, setPath] = useUrlValue(search.get('path'), noop)
+  const tab = (tabValue ?? 'activity') as SessionTab
   const reviewTab: ReviewTab = tab === 'activity' ? 'changes' : tab
-  const file = search.get('file')
-  const path = search.get('path')
   const base = `/code/${encodeURIComponent(session.id)}`
 
-  const go = useCallback(
-    (next: SessionTab, query?: Record<string, string | null>) => {
-      const q = new URLSearchParams(location.search)
-      q.delete('run')
-      for (const [k, v] of Object.entries(query ?? {})) {
-        if (v === null) q.delete(k)
-        else q.set(k, v)
-      }
+  const sync = useCallback(
+    (next: { tab: SessionTab; file: string | null; path: string | null }) => {
+      const q = new URLSearchParams()
+      if (next.file) q.set('file', next.file)
+      if (next.path) q.set('path', next.path)
       const qs = q.toString()
-      // flushSync: a tab or file switch answers at once, even while runs stream into the store.
-      navigate(`${base}/${next}${qs ? `?${qs}` : ''}`, { replace: true, flushSync: true })
+      navigate(`${base}/${next.tab}${qs ? `?${qs}` : ''}`, { replace: true })
     },
-    [base, location.search, navigate],
+    [base, navigate],
+  )
+  const go = useCallback(
+    (next: SessionTab, query?: { file?: string | null; path?: string | null }) => {
+      setTab(next)
+      const nextFile = query && 'file' in query ? (query.file ?? null) : file
+      const nextPath = query && 'path' in query ? (query.path ?? null) : path
+      if (nextFile !== file) setFile(nextFile)
+      if (nextPath !== path) setPath(nextPath)
+      sync({ tab: next, file: nextFile, path: nextPath })
+    },
+    [file, path, setFile, setPath, setTab, sync],
   )
   const setParam = useCallback(
-    (key: string, value: string | null) =>
-      setSearch(
-        (p) => {
-          const n = new URLSearchParams(p)
-          if (value) n.set(key, value)
-          else n.delete(key)
-          return n
-        },
-        { replace: true, flushSync: true },
-      ),
-    [setSearch],
+    (key: 'file' | 'path', value: string | null) => {
+      if (key === 'file') setFile(value)
+      else setPath(value)
+      sync({ tab, file: key === 'file' ? value : file, path: key === 'path' ? value : path })
+    },
+    [file, path, setFile, setPath, sync, tab],
   )
   const reviewFile = useCallback((p: string) => go('changes', { file: p }), [go])
   const toActivity = useCallback(() => {
@@ -226,7 +231,7 @@ function SessionStage({ session }: { session: CodeSession }) {
             </section>
           </>
         ) : tab === 'activity' ? (
-          <ActivityPane session={session} onReviewFile={reviewFile} />
+          <ActivityPane session={session} onReviewFile={reviewFile} header={false} />
         ) : (
           <div className="flex min-h-0 flex-1 flex-col">
             {tab === 'checks' && (
@@ -249,7 +254,7 @@ function ReviewBody({
   tab: ReviewTab
   file: string | null
   path: string | null
-  setParam: (key: string, value: string | null) => void
+  setParam: (key: 'file' | 'path', value: string | null) => void
   onReviewFile: (path: string) => void
   onAsk: () => void
   active: boolean

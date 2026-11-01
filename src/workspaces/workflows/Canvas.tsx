@@ -131,8 +131,8 @@ const StepNode = memo(function StepNode({ data }: NodeProps<StepFlowNode>) {
         <>
           <Handle type="source" id="true" position={Position.Bottom} style={{ left: '30%' }} isConnectable={!ctx?.readOnly} />
           <Handle type="source" id="false" position={Position.Bottom} style={{ left: '70%' }} isConnectable={!ctx?.readOnly} />
-          <span aria-hidden className="type-meta pointer-events-none absolute top-full left-[30%] mt-1.5 -translate-x-1/2 text-ink-2">Yes</span>
-          <span aria-hidden className="type-meta pointer-events-none absolute top-full left-[70%] mt-1.5 -translate-x-1/2 text-ink-2">No</span>
+          <span aria-hidden className="type-meta pointer-events-none absolute top-full right-[70%] mt-1 mr-2 text-ink-2">Yes</span>
+          <span aria-hidden className="type-meta pointer-events-none absolute top-full left-[70%] mt-1 ml-2 text-ink-2">No</span>
         </>
       ) : (
         <Handle type="source" position={Position.Bottom} isConnectable={!ctx?.readOnly} />
@@ -205,7 +205,7 @@ function ZoomReadout() {
   return <span className="type-meta w-10 text-center text-ink-3 tabular">{Math.round(zoom * 100)}%</span>
 }
 
-function Toolbar({ readOnly, addOpen, setAddOpen, onAdd, workflowId }: { readOnly: boolean; addOpen: boolean; setAddOpen: (o: boolean) => void; onAdd: (t: WorkflowNodeType) => void; workflowId: string }) {
+function Toolbar({ readOnly, addOpen, setAddOpen, onAdd, workflowId, onFit }: { readOnly: boolean; addOpen: boolean; setAddOpen: (o: boolean) => void; onAdd: (t: WorkflowNodeType) => void; workflowId: string; onFit: () => void }) {
   const rf = useReactFlow()
   const reduced = useReducedMotion()
   const duration = reduced ? 0 : 240
@@ -220,11 +220,12 @@ function Toolbar({ readOnly, addOpen, setAddOpen, onAdd, workflowId }: { readOnl
           size="sm"
           disabled={readOnly}
           onClick={() => {
+            onFit()
             autoLayout(workflowId)
             requestAnimationFrame(() => void rf.fitView({ ...FIT, duration }))
           }}
         />
-        <IconButton icon={Maximize} label="Fit the view" shortcut="shift+1" size="sm" onClick={() => void rf.fitView({ ...FIT, duration })} />
+        <IconButton icon={Maximize} label="Fit the view" shortcut="shift+1" size="sm" onClick={() => { onFit(); void rf.fitView({ ...FIT, duration }) }} />
         <span aria-hidden className="mx-1 h-5 w-px bg-line" />
         <IconButton icon={Minus} label="Zoom out" size="sm" onClick={() => void rf.zoomOut({ duration })} />
         <ZoomReadout />
@@ -263,7 +264,25 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   const [drag, setDrag] = useState<Record<string, { x: number; y: number }>>({})
   const [addOpen, setAddOpen] = useState(false)
   const rfRef = useRef<ReactFlowInstance<StepFlowNode, FlowEdge> | null>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  /** The user panned or zoomed: stop re-fitting when the canvas resizes (Fit hands control back). */
+  const userMoved = useRef(false)
   const reduced = useReducedMotion()
+
+  // Keep the whole graph in view while the stage resizes (Inspector, drawer), until you take over.
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    let last = { w: el.clientWidth, h: el.clientHeight }
+    const ro = new ResizeObserver(() => {
+      const next = { w: el.clientWidth, h: el.clientHeight }
+      if (Math.abs(next.w - last.w) < 48 && Math.abs(next.h - last.h) < 48) return
+      last = next
+      if (!userMoved.current) void rfRef.current?.fitView({ ...FIT, duration: 0 })
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   const flowNodes = useMemo<StepFlowNode[]>(
     () =>
@@ -340,6 +359,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
 
   // Fit when the workflow (or the parent's fit key) changes; keep the viewport while editing.
   useEffect(() => {
+    userMoved.current = false
     const id = requestAnimationFrame(() => void rfRef.current?.fitView({ ...FIT, duration: 0 }))
     return () => cancelAnimationFrame(id)
   }, [workflowId, fitKey])
@@ -356,6 +376,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     if (e.metaKey || e.ctrlKey || e.altKey) return
     if (e.shiftKey && e.code === 'Digit1') {
       e.preventDefault()
+      userMoved.current = false
       void rfRef.current?.fitView({ ...FIT, duration: reduced ? 0 : 240 })
       return
     }
@@ -399,7 +420,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
 
   return (
     <CanvasContext.Provider value={actions}>
-      <div className="wf-canvas relative h-full w-full outline-none" onKeyDown={onKeyDown} role="application" aria-label="Workflow canvas. N adds a step, Delete removes the selection, arrows move it, Shift 1 fits the view." aria-roledescription="canvas">
+      <div ref={wrapRef} className="wf-canvas relative h-full w-full outline-none" onKeyDown={onKeyDown} role="application" aria-label="Workflow canvas. N adds a step, Delete removes the selection, arrows move it, Shift 1 fits the view." aria-roledescription="canvas">
         <ReactFlow<StepFlowNode, FlowEdge>
           nodes={flowNodes}
           edges={flowEdges}
@@ -408,6 +429,9 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           onInit={(instance) => {
             rfRef.current = instance
             void instance.fitView({ ...FIT, duration: 0 })
+          }}
+          onMoveStart={(event) => {
+            if (event) userMoved.current = true
           }}
           onNodesChange={onNodesChange}
           onNodeDragStop={onNodeDragStop}
@@ -450,7 +474,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
               style={{ width: 160, height: 104 }}
             />
           )}
-          <Toolbar readOnly={readOnly} addOpen={addOpen} setAddOpen={setAddOpen} onAdd={addStep} workflowId={workflowId} />
+          <Toolbar readOnly={readOnly} addOpen={addOpen} setAddOpen={setAddOpen} onAdd={addStep} workflowId={workflowId} onFit={() => (userMoved.current = false)} />
           {children}
         </ReactFlow>
       </div>

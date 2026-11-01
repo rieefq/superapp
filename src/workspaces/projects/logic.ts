@@ -463,6 +463,9 @@ export interface Deliverable {
   simulated: boolean
 }
 
+/** Knowledge saved out of work (not written or uploaded by hand). */
+const MADE_FROM_WORK = new Set(['research', 'chat', 'agent', 'studio', 'code'])
+
 const ASSET_KIND_WORD: Record<string, string> = { image: 'Image', video: 'Video', presentation: 'Deck', document: 'Document', audio: 'Audio' }
 
 /** Reports, pull requests (simulated), assets and documents of a project, newest first (§6.9 › Work). */
@@ -474,7 +477,11 @@ export function deliverablesIn(s: Tables, projectId: ID): Deliverable[] {
     out.push({ ref, kind: 'Report', chain: lineageIn(s, ref), updatedAt: inv.updatedAt, simulated: false })
   }
   for (const k of Object.values(s.knowledge)) {
-    if (!k.projectIds.includes(projectId) || (k.kind !== 'report' && k.kind !== 'doc')) continue
+    if (!k.projectIds.includes(projectId)) continue
+    // Reports, and documents made from other work (saved from a run, a report, a conversation…).
+    // Reference material written by hand stays under Knowledge.
+    const made = !!k.source.ref || MADE_FROM_WORK.has(k.source.type)
+    if (k.kind !== 'report' && !((k.kind === 'doc' || k.kind === 'note') && made)) continue
     const ref: EntityRef = { kind: 'knowledge', id: k.id }
     out.push({ ref, kind: k.kind === 'report' ? 'Report' : 'Document', chain: lineageIn(s, ref), updatedAt: k.updatedAt, simulated: !!k.simulated })
   }
@@ -484,7 +491,8 @@ export function deliverablesIn(s: Tables, projectId: ID): Deliverable[] {
     out.push({
       ref,
       kind: `Pull request #${ses.pr.number}${ses.pr.simulated ? ' (simulated)' : ''}`,
-      chain: lineageIn(s, ref),
+      // Message → Investigation → Session → PR (§6.9): the session is the last link before the PR.
+      chain: [...lineageIn(s, ref), ref],
       updatedAt: ses.updatedAt,
       simulated: ses.pr.simulated,
     })

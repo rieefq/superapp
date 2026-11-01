@@ -1,9 +1,10 @@
 import { useCallback } from 'react'
 import { budgetState, formatCost } from '@/app/components'
 import { useMinuteNow } from '@/core/analytics'
-import { useDB, type Tables } from '@/core/db'
-import { useSettings } from '@/core/settings'
-import { Input, Switch, TickMeter, Tooltip } from '@/ui'
+import { useScope } from '@/core/context'
+import { useDB, useRow, type Tables } from '@/core/db'
+import { updateSettings, useSettings } from '@/core/settings'
+import { HUE_FILL, Input, Switch, TickMeter, Tooltip } from '@/ui'
 import { cn } from '@/lib/cn'
 import { budgetInputText, formatBudget, parseBudget } from '../logic'
 import { Group, InlineLink, Row, SectionBody, SettingRow, useDraft, useMarkSaved, useSaveSetting } from '../parts'
@@ -24,14 +25,39 @@ function useMonthSpend(): { live: number; sim: number } {
   return { live, sim }
 }
 
+/** This month's live and simulated spend of runs in one project (the active scope). */
+function useProjectMonthSpend(projectId: string | null): { live: number; sim: number } | null {
+  const now = useMinuteNow()
+  const key = useDB((s: Tables) => {
+    if (!projectId) return ''
+    const d = new Date(now)
+    const from = new Date(d.getFullYear(), d.getMonth(), 1).getTime()
+    let live = 0
+    let sim = 0
+    for (const r of Object.values(s.runs)) {
+      if (r.projectId !== projectId || (r.startedAt ?? r.createdAt) < from) continue
+      if (r.simulated) sim += r.usage.costUsd
+      else live += r.usage.costUsd
+    }
+    return `${live.toFixed(4)}|${sim.toFixed(4)}`
+  })
+  if (!key) return null
+  const [live, sim] = key.split('|').map(Number)
+  return { live, sim }
+}
+
 /** Budgets (§6.12): monthly budget with this month's spend against it, and whether estimates count. */
 export default function BudgetsSection() {
   const safety = useSettings((s) => s.safety)
   const save = useSaveSetting()
   const mark = useMarkSaved()
   const { live, sim } = useMonthSpend()
+  const scope = useScope()
+  const project = useRow('projects', scope)
+  const projectSpend = useProjectMonthSpend(project ? project.id : null)
 
-  const commit = useCallback((monthlyBudgetUsd: number) => save('monthly-budget', 'Monthly budget', 'safety', { monthlyBudgetUsd }), [save])
+  // Saves on every valid keystroke; "Saved" confirms once typing pauses.
+  const commit = useCallback((monthlyBudgetUsd: number) => updateSettings('safety', { monthlyBudgetUsd }), [])
   const draft = useDraft({
     stored: budgetInputText(safety.monthlyBudgetUsd),
     check: parseBudget,
@@ -73,6 +99,17 @@ export default function BudgetsSection() {
             </Tooltip>
             <span>{safety.countSimulatedSpend ? '· counted' : '· not counted'}</span>
           </p>
+          {project && projectSpend && (
+            <p className="type-meta flex flex-wrap items-center gap-x-1.5 gap-y-1 text-ink-3">
+              <span aria-hidden className={cn('size-2 rounded-[2px]', HUE_FILL[project.hue])} />
+              <span className="text-ink-2">{project.name}</span>
+              <span>
+                live {formatCost(projectSpend.live)} · est. {formatCost(projectSpend.sim)} simulated
+              </span>
+              <span aria-hidden>·</span>
+              <span>the budget covers all work</span>
+            </p>
+          )}
         </Row>
       </Group>
 

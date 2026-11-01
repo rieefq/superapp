@@ -13,6 +13,8 @@ export interface KindInfo {
   icon: LucideIcon
   /** What the generator is called in this build. */
   generator: string
+  /** Its short name for tile captions. */
+  short: string
   /** The honest one-liner for a simulated output of this kind (§8.4). */
   simulatedLine: string
   placeholder: string
@@ -28,6 +30,7 @@ export const KINDS: Record<AssetKind, KindInfo> = {
     plural: 'Images',
     icon: Image,
     generator: 'Procedural preview',
+    short: 'Procedural',
     simulatedLine: 'Simulated preview — no image model was called',
     placeholder: 'Describe an image — subject, mood, colors…',
     iteratePlaceholder: 'Make the sky warmer…',
@@ -38,6 +41,7 @@ export const KINDS: Record<AssetKind, KindInfo> = {
     plural: 'Video',
     icon: Clapperboard,
     generator: 'Procedural storyboard',
+    short: 'Storyboard',
     simulatedLine: 'Simulated preview — no video model was called',
     placeholder: 'Describe a video — the story, the shots, the feeling…',
     iteratePlaceholder: 'Make it shorter and more vertical…',
@@ -48,6 +52,7 @@ export const KINDS: Record<AssetKind, KindInfo> = {
     plural: 'Decks',
     icon: Presentation,
     generator: 'Studio writer',
+    short: 'Studio writer',
     simulatedLine: 'Simulated draft — written by the local simulator, no model was called',
     placeholder: 'Describe a deck — audience, goal, the story…',
     iteratePlaceholder: 'Make it more executive and add a slide about pricing…',
@@ -58,6 +63,7 @@ export const KINDS: Record<AssetKind, KindInfo> = {
     plural: 'Docs',
     icon: FileText,
     generator: 'Studio writer',
+    short: 'Studio writer',
     simulatedLine: 'Simulated draft — written by the local simulator, no model was called',
     placeholder: 'Describe the copy — what, for whom, which format…',
     iteratePlaceholder: 'Shorter, and turn it into an email…',
@@ -68,6 +74,7 @@ export const KINDS: Record<AssetKind, KindInfo> = {
     plural: 'Audio',
     icon: AudioLines,
     generator: 'Script only',
+    short: 'Script',
     simulatedLine: 'Simulated narration — a script was written, no audio was synthesized',
     placeholder: 'Describe the narration — topic, voice, length…',
     iteratePlaceholder: 'Calmer voice, a little longer…',

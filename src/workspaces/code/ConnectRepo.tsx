@@ -1,5 +1,4 @@
 import { useId, useRef, useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router'
 import { create } from 'zustand'
 import { ArrowRight, FolderGit2 } from 'lucide-react'
 import { useScope } from '@/core/context'

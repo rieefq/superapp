@@ -23,9 +23,9 @@ interface SavedState {
 const MarkContext = createContext<(id: string, label?: string) => void>(() => {})
 const SavedContext = createContext<SavedState | null>(null)
 
-const SAVED_MS = 2200
+const SAVED_MS = 3000
 
-/** Holds which row saved last; rows show "✓ Saved" next to their label for ~2 seconds. */
+/** Holds which row saved last; rows show "✓ Saved" next to their label for 3 seconds. */
 export function SavedProvider({ children }: { children: ReactNode }) {
   const [saved, setSaved] = useState<SavedState | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)

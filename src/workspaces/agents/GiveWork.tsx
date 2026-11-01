@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useMemo, useState, type KeyboardEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { useShallow } from 'zustand/react/shallow'
 import { create } from 'zustand'
@@ -26,9 +26,11 @@ interface GiveWorkState {
   mode: GiveWorkMode
   /** Prefilled instruction (e.g. the template's example after creating an agent). */
   draft?: string
+  /** Mounted hosts; only the first renders the dialog (the Agents views and the Inspector lens both mount one). */
+  hosts: string[]
 }
 
-const useGiveWorkStore = create<GiveWorkState>(() => ({ agentId: null, mode: 'instruction' }))
+const useGiveWorkStore = create<GiveWorkState>(() => ({ agentId: null, mode: 'instruction', hosts: [] }))
 
 /** Open the dialog from anywhere (the host is mounted once per Agents view). */
 export function openGiveWork(agentId: ID, mode: GiveWorkMode = 'instruction', draft?: string): void {
@@ -47,9 +49,15 @@ export function useAgentReadBack(agent: Agent | undefined, projectId: ID | null,
 }
 
 export function GiveWorkHost() {
+  const hostId = useId()
   const { agentId, mode, draft } = useGiveWorkStore()
+  const primary = useGiveWorkStore((s) => s.hosts[0] === hostId)
+  useEffect(() => {
+    useGiveWorkStore.setState((s) => ({ hosts: [...s.hosts, hostId] }))
+    return () => useGiveWorkStore.setState((s) => ({ hosts: s.hosts.filter((h) => h !== hostId) }))
+  }, [hostId])
   const agent = useRow('agents', agentId)
-  const open = !!agentId && !!agent
+  const open = primary && !!agentId && !!agent
   return (
     <Dialog
       open={open}

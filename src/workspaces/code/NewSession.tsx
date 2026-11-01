@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router'
+import { useSearchParams } from 'react-router'
 import { SquareTerminal } from 'lucide-react'
 import { StartPanel } from '@/app/components'
 import { Stage, StageHeader } from '@/app/templates'

@@ -118,21 +118,38 @@ function AnchorFocus({ section }: { section: SectionId }) {
   useEffect(() => {
     const id = decodeURIComponent(hash.replace(/^#/, ''))
     if (!id) return
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const raf = requestAnimationFrame(() => {
-      const el = document.getElementById(`setting-${id}`)
-      if (!el) return
-      el.scrollIntoView({ block: 'center', behavior: reduced ? 'auto' : 'smooth' })
-      el.setAttribute('data-flash', '')
-      timer = setTimeout(() => el.removeAttribute('data-flash'), 1400)
-      const target = Array.from(el.querySelectorAll<HTMLElement>(FOCUSABLE)).find(
+    const timers: ReturnType<typeof setTimeout>[] = []
+    let tries = 0
+    const targetIn = (el: HTMLElement) =>
+      Array.from(el.querySelectorAll<HTMLElement>(FOCUSABLE)).find(
         (n) => !n.hasAttribute('disabled') && n.getAttribute('aria-hidden') !== 'true' && n.offsetParent !== null,
       )
+    const attempt = () => {
+      const el = document.getElementById(`setting-${id}`)
+      // Wait for the section to draw and for a closing overlay (⌘K) to hand focus back first.
+      if (!el || document.querySelector('[aria-modal="true"]')) {
+        if (tries++ < 12) timers.push(setTimeout(attempt, 80))
+        return
+      }
+      el.scrollIntoView({ block: 'center', behavior: reduced ? 'auto' : 'smooth' })
+      el.setAttribute('data-flash', '')
+      timers.push(setTimeout(() => el.removeAttribute('data-flash'), 1400))
+      const target = targetIn(el)
       target?.focus({ preventScroll: true })
-    })
+      // An overlay that just closed may restore focus a moment later: take it back once.
+      timers.push(
+        setTimeout(() => {
+          if (target && !el.contains(document.activeElement)) {
+            target.focus({ preventScroll: true })
+            el.scrollIntoView({ block: 'center' })
+          }
+        }, 400),
+      )
+    }
+    const raf = requestAnimationFrame(attempt)
     return () => {
       cancelAnimationFrame(raf)
-      clearTimeout(timer)
+      timers.forEach(clearTimeout)
     }
   }, [hash, key, section, reduced])
   return null

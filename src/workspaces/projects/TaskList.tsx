@@ -1,10 +1,11 @@
 import { memo, useMemo, type ReactNode } from 'react'
 import { ListRows } from '@/app/templates'
 import { PRIORITY_RANK, TASK_STATUS_LABEL } from '@/core/services'
-import type { ID, Project, Task, TaskStatus } from '@/core/types'
+import { refKey, type EntityRef, type ID, type Project, type Task, type TaskStatus } from '@/core/types'
+import { useDB, type Tables } from '@/core/db'
 import { cn } from '@/lib/cn'
 import { EntityChip, PriorityGlyph, Tooltip } from '@/ui'
-import { milestoneProgress } from './logic'
+import { lineageIn, milestoneProgress } from './logic'
 import { ActorMark, DueText, RunLine, TaskStatusGlyph, useActorName, useTaskSignal } from './parts'
 import { MilestoneSquare } from './task/fields'
 import { completeWithUndo } from './taskActions'
@@ -60,19 +61,42 @@ export function TaskList({ project, tasks, selectedId, onOpen }: { project: Proj
   )
 }
 
+/**
+ * The origin chip: where the task came from. A run is plumbing, so show what the run came from (the
+ * message or report) when there is one.
+ */
+function useOriginChip(task: Task): EntityRef | null {
+  const key = useDB((s: Tables) => {
+    const o = task.origin
+    if (!o) return ''
+    if (o.kind !== 'run') return refKey(o)
+    const chain = lineageIn(s, { kind: 'task', id: task.id })
+    return refKey(chain.length ? chain[chain.length - 1] : o)
+  })
+  return useMemo(() => {
+    if (!key) return null
+    const at = key.indexOf(':')
+    return { kind: key.slice(0, at) as EntityRef['kind'], id: key.slice(at + 1) }
+  }, [key])
+}
+
 export const TaskListRow = memo(function TaskListRow({
   task,
   selected,
   onOpen,
   showProject,
+  compact,
 }: {
   task: Task
   selected: boolean
   onOpen: (id: ID) => void
   showProject?: { name: string; mark: ReactNode }
+  /** My tasks: no assignee mark (it is always you) and no origin chip. */
+  compact?: boolean
 }) {
   const signal = useTaskSignal(task)
   const assignee = useActorName(task.assignee)
+  const origin = useOriginChip(task)
   const done = task.subtasks.filter((s) => s.done).length
   const closed = task.status === 'done' || task.status === 'cancelled'
   return (
@@ -104,9 +128,9 @@ export const TaskListRow = memo(function TaskListRow({
           <span className="type-caption max-w-36 truncate text-ink-3">{showProject.name}</span>
         </span>
       )}
-      {task.origin && (
+      {origin && !compact && (
         <span className="relative z-10 hidden max-w-48 shrink-0 @min-[760px]:flex">
-          <EntityChip entity={task.origin} size="sm" variant="subtle" />
+          <EntityChip entity={origin} size="sm" variant="subtle" />
         </span>
       )}
       {signal.activeRunId && <RunLine runId={signal.activeRunId} showText={false} className="pointer-events-none hidden shrink-0 @min-[480px]:flex" />}
@@ -126,9 +150,11 @@ export const TaskListRow = memo(function TaskListRow({
           </span>
         )}
       </span>
-      <span className="pointer-events-none flex shrink-0" title={assignee}>
-        <ActorMark actor={task.assignee} size={18} live={signal.live} />
-      </span>
+      {!compact && (
+        <span className="pointer-events-none flex shrink-0" title={assignee}>
+          <ActorMark actor={task.assignee} size={18} live={signal.live} />
+        </span>
+      )}
       <span className="pointer-events-none w-[88px] shrink-0 text-right">
         <DueText dueAt={task.dueAt} done={closed} />
       </span>

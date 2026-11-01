@@ -23,6 +23,7 @@ export function VersionDetails({ asset, index }: { asset: Asset; index: number }
   if (!v) return null
   const params = versionParams(asset, index)
   const facts = Object.keys(PARAM_LABELS)
+    .filter((k) => k !== 'takes')
     .map((k) => [PARAM_LABELS[k], paramDisplay(k, params[k])] as const)
     .filter((x): x is readonly [string, string] => !!x[1])
   const long = v.prompt.length > 220

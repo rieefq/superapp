@@ -7,7 +7,7 @@ const COMMANDS: { id: string; title: string; subtitle: string; to: string; icon:
   { id: 'history', title: 'Execution history', subtitle: 'Every run, searchable and sortable', to: '/insights/history', icon: History, keywords: ['runs', 'executions', 'log', 'history'] },
   { id: 'failed', title: 'Show failed runs', subtitle: 'Insights › History · last 7 days', to: '/insights/history?status=failed', icon: CircleX, keywords: ['failures', 'errors', 'reliability', 'broken'] },
   { id: 'journal', title: 'Activity journal', subtitle: 'Who did what, with Export JSON', to: '/insights/journal', icon: ScrollText, keywords: ['activity', 'audit', 'journal', 'export'] },
-  { id: 'spend', title: 'Spend by model', subtitle: 'Insights · this month against your budget', to: '/insights?range=30d', icon: Wallet, keywords: ['cost', 'budget', 'money', 'tokens', 'spend'] },
+  { id: 'spend', title: 'Spend and budget', subtitle: 'Insights · last 30 days, this month against your budget', to: '/insights?range=30d', icon: Wallet, keywords: ['cost', 'budget', 'money', 'tokens', 'spend', 'model'] },
 ]
 
 export const manifest: WorkspaceManifest = {

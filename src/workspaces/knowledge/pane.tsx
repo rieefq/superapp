@@ -70,7 +70,6 @@ function GroupHeader({ label, count, action }: { label: string; count?: number; 
  * Tags · Tools. Rendered in the list pane and, on phones, in the Browse sheet.
  */
 export function KnowledgeSections({ onNavigate }: { onNavigate?: () => void }) {
-  ;(window as unknown as Record<string, number>).__knPane = ((window as unknown as Record<string, number>).__knPane ?? 0) + 1 // PERF-PROBE
   const navigate = useNavigate()
   const current = useCurrentSection()
   const { scope } = useListScope()

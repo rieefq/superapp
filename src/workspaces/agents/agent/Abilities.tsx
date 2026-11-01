@@ -125,7 +125,7 @@ function ProviderCell({ row, onChange }: { row: AbilityRow; onChange: (p: Partia
   )
   const status =
     provider.status === 'local' ? (
-      <span className="type-caption text-ink-3">In Atrium · real</span>
+      <span className="type-caption text-ink-3">Your workspace data</span>
     ) : provider.status === 'connected' ? (
       <span className="type-caption text-ink-3">Connected</span>
     ) : provider.status === 'error' ? (
@@ -192,10 +192,10 @@ function AbilityRowView({ row, onChange, onRemove }: { row: AbilityRow; onChange
           <span className="type-caption text-ink-3 text-pretty">{info.description}</span>
           {row.alwaysAsk && (
             <span className="type-caption inline-flex items-center gap-1 text-ink-2">
-              <Lock aria-hidden className="size-3" strokeWidth={2} />
-              Always asks:{' '}
+              <Lock aria-hidden className="size-3 shrink-0" strokeWidth={2} />
+              Always asks, per{' '}
               <Link to="/settings/permissions" className="underline decoration-line-input underline-offset-2 hover:text-ink">
-                Settings › Permissions
+                Settings
               </Link>
             </span>
           )}

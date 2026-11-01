@@ -151,17 +151,22 @@ export function KpiPanel({ insights, params }: { insights: Insights; params: URL
         <MiniStat
           label={`Spend · ${window.rangeDays === 1 ? '24h' : `${window.rangeDays}d`}`}
           value={
-            rangeSpendEstimate ? (
+            // Live spend and estimates are never added into one figure.
+            t.liveCostUsd > 0 ? (
+              <>
+                {formatCost(t.liveCostUsd)} <span className="type-meta font-normal text-ink-3">live</span>
+              </>
+            ) : rangeSpendEstimate ? (
               <Tooltip content={ESTIMATE_TOOLTIP}>
-                <span>{formatCost(t.costUsd, { est: t.liveCostUsd === 0 })}</span>
+                <span>{formatCost(t.simulatedCostUsd, { est: true })}</span>
               </Tooltip>
             ) : (
-              formatCost(t.costUsd)
+              formatCost(0)
             )
           }
           sub={
             t.liveCostUsd > 0 && t.simulatedCostUsd > 0
-              ? `${formatCost(t.liveCostUsd)} live · ${formatCost(t.simulatedCostUsd, { est: true })} sim.`
+              ? `+ ${formatCost(t.simulatedCostUsd, { est: true })} simulated`
               : t.liveCostUsd > 0
                 ? 'All live'
                 : t.costUsd > 0
@@ -180,15 +185,17 @@ function deltaText(delta: Delta | null, comparison: string): string {
 }
 
 function DeltaLine({ delta, comparison }: { delta: Delta | null; comparison: string }) {
-  if (!delta || delta.value === 'New') return <span className="type-meta truncate text-ink-3">{comparison.replace(/^vs previous/, 'None in the previous')}</span>
+  // No delta: nothing to compare (no value now or before). "New": the previous period had none.
+  if (!delta) return <span className="type-meta truncate text-ink-3">— {comparison}</span>
+  if (delta.value === 'New') return <span className="type-meta truncate text-ink-3">{comparison.replace(/^vs previous/, 'None in the previous')}</span>
   const Icon = delta.direction === 'up' ? ArrowUpRight : delta.direction === 'down' ? ArrowDownRight : Minus
   const word = delta.direction === 'up' ? 'Up' : delta.direction === 'down' ? 'Down' : 'No change'
   return (
-    <span className="type-meta inline-flex min-w-0 items-center gap-1 text-ink-3">
+    <span className="type-meta flex min-w-0 items-center gap-1 whitespace-nowrap text-ink-3">
       <Icon aria-hidden className="size-3 shrink-0" strokeWidth={2} />
       <span className="sr-only">{word}</span>
-      <span className="text-ink-2">{delta.direction === 'flat' ? 'No change' : delta.value}</span>
-      <span className="truncate">{comparison}</span>
+      <span className="shrink-0 text-ink-2">{delta.direction === 'flat' ? 'No change' : delta.value}</span>
+      <span className="min-w-0 truncate">{comparison}</span>
     </span>
   )
 }
@@ -222,7 +229,7 @@ function KpiTile({ label, figure, figureNote, delta, comparison, meter, sub, to,
     </>
   )
   const cls =
-    'group flex min-h-[132px] min-w-0 flex-col bg-canvas px-4 py-4 text-left transition-colors duration-(--dur-1) hover:bg-hover focus-visible:-outline-offset-2 md:px-5'
+    'group flex min-w-0 flex-col bg-canvas px-4 py-4 text-left transition-colors duration-(--dur-1) hover:bg-hover focus-visible:-outline-offset-2 min-[480px]:min-h-[132px] md:px-5'
   if (to) {
     return (
       <Link to={to} aria-label={ariaLabel} className={cls}>

@@ -4,6 +4,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { useShellStore } from '@/app/shell/store'
 import { useMinuteNow } from '@/core/analytics'
 import { useDB, useRow, type Tables } from '@/core/db'
+import { taskRunIdsIn } from '@/core/services'
 import { useSettings } from '@/core/settings'
 import { isRunActive, type ActorRef, type Hue, type ID, type Project, type Task } from '@/core/types'
 import { cn } from '@/lib/cn'
@@ -126,28 +127,30 @@ export interface TaskSignal {
 }
 
 /** A task's live state, selected narrowly (re-renders only when one of the three values changes). */
-export function useTaskSignal(task: Pick<Task, 'status' | 'runIds'>): TaskSignal {
-  const { status, runIds } = task
+export function useTaskSignal(task: Pick<Task, 'id' | 'status' | 'runIds'>): TaskSignal {
+  const { id, status, runIds } = task
   return useDB(
     useShallow((s: Tables) => {
+      // Its own runs and the turns of coding sessions linked to it.
+      const ids = taskRunIdsIn(s, { id, runIds })
       let activeRunId: ID | undefined
       let live = false
-      for (let i = runIds.length - 1; i >= 0; i--) {
-        const run = s.runs[runIds[i]]
+      for (let i = ids.length - 1; i >= 0; i--) {
+        const run = s.runs[ids[i]]
         if (run && isRunActive(run.status)) {
           activeRunId = run.id
           live = run.status === 'running'
           break
         }
       }
-      const last = runIds.length ? s.runs[runIds[runIds.length - 1]] : undefined
+      const last = ids.length ? s.runs[ids[ids.length - 1]] : undefined
       return { live: live && status === 'in_progress', attention: status === 'review' && !!last?.agentId, activeRunId }
     }),
   )
 }
 
 /** The task glyph (§5.3 squares) with its live and attention states. */
-export const TaskStatusGlyph = memo(function TaskStatusGlyph({ task, size = 12, decorative }: { task: Pick<Task, 'status' | 'runIds'>; size?: number; decorative?: boolean }) {
+export const TaskStatusGlyph = memo(function TaskStatusGlyph({ task, size = 12, decorative }: { task: Pick<Task, 'id' | 'status' | 'runIds'>; size?: number; decorative?: boolean }) {
   const signal = useTaskSignal(task)
   return <TaskGlyph status={task.status} live={signal.live} attention={signal.attention} size={size} decorative={decorative} />
 })

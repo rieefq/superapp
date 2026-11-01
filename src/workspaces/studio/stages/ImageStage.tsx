@@ -16,7 +16,7 @@ export function isFresh(asset: Asset, index: number): boolean {
  * The image at fit size inside a hatched mat (simulated), with the version caption. While a new
  * version generates, the current one dims under the run card.
  */
-export function ImagePreview({ asset, index, maxHeight = 'max(240px, min(100dvh - 360px, 720px))', overlay = true }: { asset: Asset; index: number; maxHeight?: string; overlay?: boolean }) {
+export function ImagePreview({ asset, index, maxHeight = 'max(260px, min(100dvh - 500px, 720px))', overlay = true }: { asset: Asset; index: number; maxHeight?: string; overlay?: boolean }) {
   const reduced = useReducedMotion()
   const version = asset.versions[index]
   const spec = previewSpec(version?.preview)

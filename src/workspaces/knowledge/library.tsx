@@ -79,7 +79,6 @@ import { dismissUpload, retryUpload, uploadFiles, useUploads } from './uploads'
  * bulk selection (X) → move · tag · add to project · delete; drop files anywhere.
  */
 export function LibraryView() {
-  ;(window as unknown as Record<string, number>).__knLib = ((window as unknown as Record<string, number>).__knLib ?? 0) + 1 // PERF-PROBE
   const [query, setQuery] = useLibraryQuery()
   const { scope, projectScope, showingAll } = useListScope()
   const setShowAllFor = useKnowledgePrefs((s) => s.setShowAllFor)

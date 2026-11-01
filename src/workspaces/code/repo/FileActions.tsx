@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router'
 import { Check, Copy, ExternalLink, Layers, MessageSquarePlus, SquareTerminal } from 'lucide-react'
 import { useContextStore } from '@/core/context'
 import { useDB, type Tables } from '@/core/db'

@@ -94,8 +94,9 @@ const PlanList = memo(function PlanList({ items }: { items: readonly PlanItem[] 
           <span className="flex h-[18px] shrink-0 items-center">
             <StepStatusGlyph status={GLYPH[item.state]} context="timeline" size={12} />
           </span>
-          <span className={cn('type-body-sm min-w-0 flex-1 text-pretty', item.state === 'running' ? 'text-live-ink' : item.state === 'done' ? 'text-ink-2' : 'text-ink-3')}>
-            {item.label}
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className={cn('type-body-sm text-pretty', item.state === 'running' ? 'text-live-ink' : item.state === 'done' ? 'text-ink-2' : 'text-ink-3')}>{item.label}</span>
+            {item.note && <span className="type-caption text-ink-3">{item.note}</span>}
           </span>
           {item.count !== undefined && <span className="type-meta shrink-0 pt-px text-ink-3 tabular">{item.count}</span>}
         </li>

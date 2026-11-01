@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import { useNavigate } from 'react-router'
 import { useShallow } from 'zustand/react/shallow'
 import { FileDiff, FolderOpen, Plus } from 'lucide-react'
 import type { LensModule, LensProps } from '@/app/lens/types'

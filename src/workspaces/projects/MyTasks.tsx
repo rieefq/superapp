@@ -104,7 +104,7 @@ function MyTaskRow({ task, selected, onOpen, showProject }: { task: Task; select
     () => (showProject ? { name: project?.name ?? 'No project', mark: project ? <ProjectMark project={project} size={14} /> : <span aria-hidden className="size-3.5 rounded-[3px] border border-line-input" /> } : undefined),
     [showProject, project],
   )
-  return <TaskListRow task={task} selected={selected} onOpen={onOpen} showProject={info} />
+  return <TaskListRow task={task} selected={selected} onOpen={onOpen} showProject={info} compact />
 }
 
 function ShowingAll({ onFilter }: { onFilter: () => void }) {

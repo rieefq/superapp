@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
@@ -134,6 +134,32 @@ function useUsageSignature(enabled: boolean): string {
   })
 }
 
+function sameRanges(a?: Array<[number, number]>, b?: Array<[number, number]>): boolean {
+  if (a === b) return true
+  if (!a || !b || a.length !== b.length) return false
+  return a.every((r, i) => r[0] === b[i][0] && r[1] === b[i][1])
+}
+
+/** Reuse the previous entry object when nothing about it changed, so memoized rows skip re-rendering. */
+function stabilize(entries: LibraryEntry[], cache: Map<ID, LibraryEntry>): LibraryEntry[] {
+  const next = new Map<ID, LibraryEntry>()
+  const out = entries.map((e) => {
+    const prev = cache.get(e.item.id)
+    const same =
+      prev &&
+      prev.item === e.item &&
+      prev.snippet?.text === e.snippet?.text &&
+      sameRanges(prev.snippet?.highlights, e.snippet?.highlights) &&
+      sameRanges(prev.titleRanges, e.titleRanges)
+    const entry = same ? prev : e
+    next.set(e.item.id, entry)
+    return entry
+  })
+  cache.clear()
+  for (const [k, v] of next) cache.set(k, v)
+  return out
+}
+
 /** The library list: scope → section → facets → search (real local BM25) → sort. */
 export function useLibraryResults(query: LibraryQuery, scope: ID | null): LibraryResults {
   const knowledge = useDB((s: Tables) => s.knowledge)
@@ -142,6 +168,7 @@ export function useLibraryResults(query: LibraryQuery, scope: ID | null): Librar
   const q = query.q.trim()
   const { results, ready } = useSearch(q, { kinds: ['knowledge'], limit: SEARCH_LIMIT })
   const usageSig = useUsageSignature(sort === 'used')
+  const cache = useRef(new Map<ID, LibraryEntry>())
 
   return useMemo(() => {
     const all = Object.values(knowledge)
@@ -168,7 +195,7 @@ export function useLibraryResults(query: LibraryQuery, scope: ID | null): Librar
       entries = sortItems(base, sort, used).map((item) => ({ item }))
     }
     return {
-      entries,
+      entries: stabilize(entries, cache.current),
       sectionCount: section.length,
       indexing: !!q && !isSearchReady(),
       pending: !!q && !ready,

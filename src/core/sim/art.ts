@@ -234,15 +234,18 @@ export interface PaletteAdjust {
   saturation?: number
 }
 
-/** Shortest signed distance between two hues, in degrees (−180…180). */
-function hueDelta(from: number, to: number): number {
-  return ((to - from + 540) % 360) - 180
+/** Reference tints for warmth edits: an amber and a blue, applied like a photo filter. */
+const WARM_TINT: [number, number, number] = [232, 150, 62]
+const COOL_TINT: [number, number, number] = [72, 122, 212]
+
+function rgbToHex([r, g, b]: [number, number, number]): string {
+  return `#${[r, g, b].map((c) => Math.round(Math.min(255, Math.max(0, c))).toString(16).padStart(2, '0')).join('')}`
 }
 
 /**
- * Apply a palette edit, deterministically: warmth pulls hues toward amber (30°) or blue (215°),
- * light shifts lightness, saturation scales chroma. Relative order of lightness is kept, so
- * compositions keep their value structure.
+ * Apply a palette edit, deterministically: warmth blends every color toward amber (or blue), like a
+ * warming filter over the whole image; light shifts lightness; saturation scales chroma. The relative
+ * order of lightness is kept, so compositions keep their value structure.
  */
 export function adjustPalette(palette: readonly string[], adjust: PaletteAdjust): string[] {
   const warmth = Math.max(-1, Math.min(1, adjust.warmth ?? 0))
@@ -250,35 +253,38 @@ export function adjustPalette(palette: readonly string[], adjust: PaletteAdjust)
   const sat = Math.max(-1, Math.min(1, adjust.saturation ?? 0))
   if (!warmth && !light && !sat) return [...palette]
   return palette.map((hex) => {
-    const c = hexToHsl(hex)
-    let { h, s, l } = c
-    if (warmth && s > 0.04) {
-      const target = warmth > 0 ? 30 : 215
-      h = wrap(h + hueDelta(h, target) * Math.abs(warmth) * 0.45)
-      s = clamp01(s + Math.abs(warmth) * 0.06)
+    let color = hex
+    if (warmth) {
+      const tint = warmth > 0 ? WARM_TINT : COOL_TINT
+      const f = 0.32 * Math.abs(warmth)
+      const rgb = hexToRgb(hex)
+      color = rgbToHex([0, 1, 2].map((i) => rgb[i] * (1 - f) + tint[i] * f) as [number, number, number])
     }
+    let { h, s, l } = hexToHsl(color)
     if (light) l = clamp01(light > 0 ? l + (1 - l) * light * 0.35 : l + l * light * 0.35)
     if (sat) s = clamp01(sat > 0 ? s + (1 - s) * sat * 0.45 : s * (1 + sat * 0.6))
-    return hslToHex({ h, s, l })
+    if (warmth && !light && !sat) return color
+    return hslToHex({ h: wrap(h), s, l })
   })
 }
 
-/** Average warmth of a palette, −1 (cool blue) … 1 (warm amber); 0 for greys. Used in tests and step notes. */
+/** Average warmth of a palette, −1 (blue) … 1 (red/amber): the mean red–blue balance. */
 export function paletteWarmth(palette: readonly string[]): number {
-  let sum = 0
-  let weight = 0
-  for (const hex of palette) {
-    const { h, s } = hexToHsl(hex)
-    if (s < 0.05) continue
-    const distWarm = Math.abs(hueDelta(h, 30))
-    const distCool = Math.abs(hueDelta(h, 215))
-    sum += ((distCool - distWarm) / 180) * s
-    weight += s
-  }
-  return weight ? Math.max(-1, Math.min(1, sum / weight)) : 0
+  if (!palette.length) return 0
+  const sum = palette.reduce((n, hex) => {
+    const [r, , b] = hexToRgb(hex)
+    return n + (r - b) / 255
+  }, 0)
+  return sum / palette.length
 }
 
-/** Color words named in a text ("make the sky orange" → ['orange']), in order of appearance. */
+/**
+ * Color words named in a text ("make the sky orange" → ['orange']), in order of appearance. "Sky" is
+ * a color only as "sky blue" — in an edit it is usually the subject ("make the sky warmer").
+ */
 export function namedColors(text: string): string[] {
-  return colorWordsIn(text.toLowerCase()).map((c) => c.word)
+  const t = text.toLowerCase()
+  return colorWordsIn(t)
+    .map((c) => c.word)
+    .filter((w) => w !== 'sky' || /\bsky[- ]blue\b/.test(t))
 }

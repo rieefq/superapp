@@ -118,7 +118,7 @@ export function TestRunDialog() {
   }
   const sample =
     wf?.trigger.type === 'schedule'
-      ? `Starts now as if it were ${wf.trigger.label.toLowerCase().startsWith('every') ? wf.trigger.label.toLowerCase() : wf.trigger.label}.`
+      ? `Starts now as a scheduled run (${wf.trigger.label}).`
       : wf?.trigger.type === 'event'
         ? isInternalEvent(wf.trigger.event)
           ? 'Uses the latest matching item in Atrium as the event.'

@@ -6,7 +6,7 @@ import { estimateReferenceCost } from '@/core/ai'
 import { useScope } from '@/core/context'
 import { db, useRow } from '@/core/db'
 import { KIND_META, RESEARCH_AGENT_ID, createInvestigation, resolveEntity, startInvestigation, updateInvestigation } from '@/core/services'
-import { DEPTH_DESCRIPTION, deriveAngles, depthExpectation, investigationTitle } from '@/core/sim/research'
+import { DEPTH_BUDGET, DEPTH_DESCRIPTION, deriveAngles, depthExpectation, investigationTitle } from '@/core/sim/research'
 import type { EntityRef, ID, Investigation, ResearchDepth } from '@/core/types'
 import { cn } from '@/lib/cn'
 import { shortCode } from '@/lib/id'
@@ -79,7 +79,7 @@ export function NewBrief({ draft, initialQuestion, autoFocus, examples, dropTarg
   // Angles are suggested from the question until you edit them.
   const settled = useDebounced(question, 350)
   const suggested = useMemo(
-    () => (settled.trim().length >= 8 ? deriveAngles(settled, depth === 'quick' ? 3 : 4, { projectName: project?.name }) : []),
+    () => (settled.trim().length >= 8 ? deriveAngles(settled, depth === 'deep' ? 4 : 3, { projectName: project?.name }) : []),
     [settled, depth, project?.name],
   )
   const angles = customAngles ?? suggested
@@ -184,6 +184,8 @@ export function NewBrief({ draft, initialQuestion, autoFocus, examples, dropTarg
           angles={angles}
           custom={customAngles !== null}
           hasQuestion={question.trim().length >= 8}
+          searched={DEPTH_BUDGET[depth].combinedSearch || !sources.web ? null : DEPTH_BUDGET[depth].searches}
+          depthLabel={DEPTHS.find((d) => d.value === depth)?.label ?? depth}
           onChange={setCustomAngles}
           onReset={() => setCustomAngles(null)}
         />
@@ -310,10 +312,13 @@ function SourceToggle({ label, on, onToggle, simulated, hint }: { label: string;
 }
 
 /** Editable angles: suggested from the question until you change them; ⏎ adds the next one. */
-function AnglesEditor({ angles, custom, hasQuestion, onChange, onReset }: {
+function AnglesEditor({ angles, custom, hasQuestion, searched, depthLabel, onChange, onReset }: {
   angles: string[]
   custom: boolean
   hasQuestion: boolean
+  /** Angles that get their own web search at this depth (null: one combined search, or no web). */
+  searched: number | null
+  depthLabel: string
   onChange: (angles: string[]) => void
   onReset: () => void
 }) {
@@ -379,6 +384,11 @@ function AnglesEditor({ angles, custom, hasQuestion, onChange, onReset }: {
           angles.length > 0 && <span className="type-caption text-ink-3">Suggested from your question</span>
         )}
       </div>
+      {searched !== null && angles.filter((a) => a.trim()).length > searched && (
+        <p className="type-caption text-ink-3">
+          {depthLabel} depth searches the first {searched} angles; the rest are covered in the synthesis. Deep searches up to {DEPTH_BUDGET.deep.searches}.
+        </p>
+      )}
     </div>
   )
 }

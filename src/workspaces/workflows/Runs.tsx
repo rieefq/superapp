@@ -36,9 +36,9 @@ export function RunsTable({ runs, selectedRunId, onPick }: { runs: Run[]; select
       {
         key: 'status',
         header: 'Status',
-        width: 120,
+        width: 112,
         cell: (r) => (
-          <span className={cn('inline-flex items-center gap-1.5', r.status === 'failed' && 'text-fail-ink', r.status === 'waiting' && 'text-attn-ink', r.status === 'running' && 'text-live-ink')}>
+          <span className={cn('inline-flex items-center gap-1.5 whitespace-nowrap', r.status === 'failed' && 'text-fail-ink', r.status === 'waiting' && 'text-attn-ink', r.status === 'running' && 'text-live-ink')}>
             <RunStatusGlyph status={r.status} size={12} decorative />
             {RUN_STATUS_META[r.status].word}
           </span>
@@ -46,20 +46,28 @@ export function RunsTable({ runs, selectedRunId, onPick }: { runs: Run[]; select
         sortable: true,
         sortValue: (r) => r.status,
       },
-      { key: 'id', header: 'Run', width: 100, mono: true, cell: (r) => <IdCode id={r.id} /> },
-      { key: 'started', header: 'Started', width: 120, mono: true, sortable: true, sortValue: (r) => r.createdAt, cell: (r) => <span title={formatDateTime(r.createdAt)}>{timeAgo(r.createdAt)}</span> },
-      { key: 'trigger', header: 'Trigger', width: 110, hideBelow: 'md', cell: (r) => <span className="text-ink-2">{triggerWord(r)}</span> },
-      { key: 'steps', header: 'Steps', cell: (r) => <StepTape run={r} size="xs" max={14} /> },
-      { key: 'duration', header: 'Duration', width: 90, align: 'right', mono: true, sortable: true, sortValue: (r) => durationOf(r), cell: (r) => (isRunActive(r.status) ? <Elapsed run={r} /> : formatClock(durationOf(r))) },
+      {
+        key: 'id',
+        header: 'Run',
+        width: 168,
+        cell: (r) => (
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+            <IdCode id={r.id} />
+            <span className="type-caption text-ink-3">{triggerWord(r)}</span>
+          </span>
+        ),
+      },
+      { key: 'started', header: 'Started', width: 96, mono: true, sortable: true, sortValue: (r) => r.createdAt, cell: (r) => <span className="whitespace-nowrap" title={formatDateTime(r.createdAt)}>{timeAgo(r.createdAt)}</span> },
+      { key: 'steps', header: 'Steps', cell: (r) => <StepTape run={r} size="xs" max={12} /> },
+      { key: 'duration', header: 'Time', width: 72, align: 'right', mono: true, sortable: true, sortValue: (r) => durationOf(r), cell: (r) => (isRunActive(r.status) ? <Elapsed run={r} /> : formatClock(durationOf(r))) },
       {
         key: 'cost',
         header: 'Cost',
-        width: 110,
+        width: 112,
         align: 'right',
         mono: true,
-        hideBelow: 'sm',
         cell: (r) => (
-          <span className="inline-flex items-center gap-1.5" title={r.simulated ? 'Estimated at reference pricing; no money was spent.' : undefined}>
+          <span className="inline-flex items-center gap-1 whitespace-nowrap" title={r.simulated ? 'Estimated at reference pricing; no money was spent.' : undefined}>
             {formatCost(r.usage.costUsd, { est: r.simulated })}
             {r.simulated && <SimBadge size="xs" noTooltip />}
           </span>

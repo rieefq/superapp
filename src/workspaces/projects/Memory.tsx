@@ -2,10 +2,11 @@ import { useEffect, useState, type ReactNode, type Ref } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Plus, X } from 'lucide-react'
 import { EntityPicker, formatTokenCount, RepoPicker } from '@/app/components'
+import { useInspectEntity } from '@/app/templates'
 import { useDB, type Tables } from '@/core/db'
-import { pinToProject, unpinFromProject, updateProject } from '@/core/services'
+import { KIND_META, pinToProject, unpinFromProject, updateProject, useEntity } from '@/core/services'
 import { refKey, type EntityRef, type Project } from '@/core/types'
-import { Button, EntityChip, IconButton, SimBadge, Textarea, toast } from '@/ui'
+import { Button, EntityMark, IconButton, SimBadge, Textarea, toast } from '@/ui'
 import { useMemoryBreakdown } from './memory'
 import { QuietLine, SectionLabel } from './parts'
 
@@ -152,17 +153,38 @@ function HeldItems({ project }: { project: Project }) {
       ) : (
         <ul className="flex flex-col divide-y divide-line rounded-md border border-line">
           {project.pinnedRefs.map((ref, i) => (
-            <li key={refKey(ref)} className="flex min-h-11 items-center gap-3 px-3 py-1.5">
-              <span className="min-w-0 flex-1">
-                <EntityChip entity={ref} showKind />
-              </span>
-              <span className="type-meta shrink-0 text-ink-3 tabular">~{formatTokenCount(memory.items[i] ?? 0)} tok</span>
-              <IconButton icon={X} size="sm" label="Remove from memory" onClick={() => remove(ref)} />
-            </li>
+            <MemoryItemRow key={refKey(ref)} entity={ref} tokens={memory.items[i] ?? 0} onRemove={() => remove(ref)} />
           ))}
         </ul>
       )}
     </section>
+  )
+}
+
+function MemoryItemRow({ entity, tokens, onRemove }: { entity: EntityRef; tokens: number; onRemove: () => void }) {
+  const e = useEntity(entity)
+  const inspect = useInspectEntity()
+  return (
+    <li className="flex min-h-12 items-center gap-2 py-1 pr-1.5 pl-1.5">
+      <button
+        type="button"
+        onClick={() => inspect(entity)}
+        aria-label={`Inspect ${e.title}`}
+        className="flex min-w-0 flex-1 items-center gap-2.5 rounded-sm px-1.5 py-1 text-left transition-colors duration-(--dur-1) hover:bg-hover"
+      >
+        <EntityMark entity={entity} resolved={e} size={18} />
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className={e.exists ? 'type-body-sm truncate text-ink' : 'type-body-sm truncate text-ink-3 line-through'}>{e.exists ? e.title : 'Deleted item'}</span>
+          <span className="type-caption truncate text-ink-3">
+            {KIND_META[entity.kind].label}
+            {e.subtitle && e.subtitle !== KIND_META[entity.kind].label ? ` · ${e.subtitle}` : ''}
+          </span>
+        </span>
+        {e.simulated && <SimBadge size="xs" />}
+      </button>
+      <span className="type-meta w-16 shrink-0 text-right text-ink-3 tabular">{formatTokenCount(tokens)} tok</span>
+      <IconButton icon={X} size="sm" label={`Remove ${e.title} from memory`} onClick={onRemove} />
+    </li>
   )
 }
 
@@ -246,13 +268,13 @@ function WhatTheAISees({ project }: { project: Project }) {
   ]
   return (
     <section aria-labelledby="memory-sees">
-      <SectionLabel id="memory-sees" title="What the AI sees" action={<span className="type-meta text-ink-2 tabular">~{formatTokenCount(memory.total)} tok</span>} />
+      <SectionLabel id="memory-sees" title="What the AI sees" action={<span className="type-meta text-ink-2 tabular">{formatTokenCount(memory.total)} tok</span>} />
       <dl className="type-mono-sm flex flex-col rounded-md border border-line bg-sunken px-3.5 py-2.5">
         {rows.map((r) => (
           <div key={r.label} className="flex items-baseline gap-2 py-0.5">
             <dt className="shrink-0 text-ink-2">{r.label}</dt>
             <span aria-hidden className="mb-[3px] min-w-3 flex-1 self-end border-b border-dotted border-line-input" />
-            <dd className="shrink-0 text-ink-3 tabular">{r.note ?? `~${formatTokenCount(r.tokens)} tok`}</dd>
+            <dd className="shrink-0 text-ink-3 tabular">{r.note ?? `${formatTokenCount(r.tokens)} tok`}</dd>
           </div>
         ))}
       </dl>

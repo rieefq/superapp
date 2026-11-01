@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router'
 import { MessagesSquare } from 'lucide-react'
 import { useComposerContext } from '@/app/components'
 import { useRegisterCommands } from '@/app/commands/registry'
-import { openStartSheet } from '@/app/shell/store'
+import { useShellStore } from '@/app/shell/store'
 import { Stage, StageHeader, WorkspaceScreen } from '@/app/templates'
 import { regenerate, setThreadModel, setThreadProject, stopGeneration } from '@/core/ai'
 import { useScope } from '@/core/context'
@@ -13,7 +13,7 @@ import type { EntityRef, ID } from '@/core/types'
 import { Button, EmptyState, ErrorState, toast, useHotkey } from '@/ui'
 import type { Command } from '@/app/types'
 import { Archive, Download, GitFork, ListChecks, NotebookPen, PencilLine, RotateCcw, Square, Trash2 } from 'lucide-react'
-import { deleteWithConfirm, exportMarkdown, forkWhole, setArchived, syncThreadContext } from './actions'
+import { deleteWithConfirm, exportMarkdown, forkWhole, setArchived, syncThreadContext, turnInto } from './actions'
 import { ChatComposer } from './composer/ChatComposer'
 import { EmptyThread } from './empty/EmptyThread'
 import { ChatHeader } from './header/ChatHeader'
@@ -60,6 +60,8 @@ export function ChatScreen() {
     reset()
     context.setDraft(useChatUi.getState().drafts[key] ?? '')
     useChatUi.getState().setEditing(null)
+    // A message or source selected in the last conversation does not follow you into this one.
+    if (useShellStore.getState().selection) useShellStore.getState().setSelection(null)
     setActionItemsOpen(false)
     // Only on a conversation switch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -231,7 +233,7 @@ function useThreadCommands(threadId: ID | undefined, openActionItems: () => void
         icon: NotebookPen,
         group: 'Chat',
         keywords: ['knowledge', 'save', 'note'],
-        run: (c) => (c.close(), openStartSheet('note', { source: { kind: 'thread', id }, prefill: { title: thread.title } })),
+        run: (c) => (c.close(), turnInto('note', { kind: 'thread', id }, { title: thread.title })),
       },
       { id: 'chat.fork', title: 'Fork conversation', icon: GitFork, group: 'Chat', run: (c) => (c.close(), forkWhole(id, navigate)) },
       { id: 'chat.export', title: 'Export as Markdown', icon: Download, group: 'Chat', keywords: ['download', 'md'], run: (c) => (c.close(), exportMarkdown(id)) },

@@ -1,7 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { DerivedList, type DerivedItem } from '@/app/components'
-import { useInspectEntity } from '@/app/templates'
 import { attachRun } from '@/app/shell/store'
 import { awaitGeneration, editAndResend, forkThread, getModelInfo, regenerate, setThreadModel } from '@/core/ai'
 import { db, useRow } from '@/core/db'
@@ -9,7 +8,7 @@ import { getSettings, useSettings } from '@/core/settings'
 import type { ID, Message } from '@/core/types'
 import { cn } from '@/lib/cn'
 import { Button, Markdown, ProvenanceLine, Textarea, toast, type Citation as MarkdownCitation } from '@/ui'
-import { threadRoute } from '../actions'
+import { inspectNow, threadRoute } from '../actions'
 import { useChatUi } from '../state'
 import { Attachments, DerivedItemView, ErrorNote, Gutter, Reasoning, Sources, speakerOf, ToolTraces, TurnHeaderLine } from './parts'
 import { AnswerActions, PromptActions, useRetry } from './TurnActions'
@@ -52,14 +51,13 @@ export const Turn = memo(function Turn(props: TurnProps) {
 const ARTICLE =
   'group/turn relative isolate grid grid-cols-1 outline-none @min-[600px]:grid-cols-[72px_minmax(0,1fr)] ' +
   'before:pointer-events-none before:absolute before:-inset-x-3 before:-top-2 before:bottom-4 before:-z-10 before:rounded-md before:bg-highlight before:opacity-0 before:transition-opacity before:duration-700 ' +
-  'data-[highlight=true]:before:opacity-100 focus-visible:before:opacity-100 focus-visible:before:bg-hover'
+  'data-[highlight=true]:before:opacity-100 focus-visible:before:opacity-100 focus-visible:before:bg-transparent focus-visible:before:outline-2 focus-visible:before:outline-(--focus-ring) focus-visible:before:transition-none'
 
 // ------------------------------------------------------------------------------------------------ answer
 
 function AnswerTurn({ message, highlighted, threadId, isLastAnswer, busy }: TurnProps & { message: Message; highlighted: boolean }) {
   const navigate = useNavigate()
   const ref = useRef<HTMLElement>(null)
-  const inspect = useInspectEntity()
   const run = useRow('runs', message.runId)
   const showReasoning = useSettings((s) => s.ai.showReasoning)
   const retry = useRetry(message, navigate)
@@ -71,8 +69,8 @@ function AnswerTurn({ message, highlighted, threadId, isLastAnswer, busy }: Turn
 
   const citations = message.citations
   const markers = useMemo<MarkdownCitation[]>(
-    () => (citations ?? []).map((c, i) => ({ index: i + 1, title: c.title, onClick: () => inspect(c.ref) })),
-    [citations, inspect],
+    () => (citations ?? []).map((c, i) => ({ index: i + 1, title: c.title, onClick: () => inspectNow(c.ref) })),
+    [citations],
   )
   const duration = run?.startedAt !== undefined && run.endedAt !== undefined ? run.endedAt - run.startedAt : undefined
 
@@ -99,8 +97,8 @@ function AnswerTurn({ message, highlighted, threadId, isLastAnswer, busy }: Turn
       className={ARTICLE}
     >
       <Gutter speaker={label} simulated={simulated} at={message.createdAt} runId={message.runId} writing={streaming} failed={failed} stopped={stopped} spine={simulated ? 'sim' : 'line'} />
-      <div className={cn('relative flex min-w-0 flex-col gap-3 pb-9', simulated && '@max-[599px]:pl-3.5')}>
-        {simulated && <span aria-hidden className="sim-band absolute inset-y-0 left-0 mb-9 @min-[600px]:hidden" />}
+      <div className={cn('relative flex min-w-0 flex-col gap-3 pb-11', simulated && '@max-[599px]:pl-3.5')}>
+        {simulated && <span aria-hidden className="sim-band absolute inset-y-0 left-0 mb-11 @min-[600px]:hidden" />}
         <TurnHeaderLine speaker={label} simulated={simulated} at={message.createdAt} runId={message.runId} writing={streaming} failed={failed} stopped={stopped} />
         {(message.tools?.length || (showReasoning && message.reasoning)) && (
           <div className="-my-1 flex flex-col">
@@ -136,7 +134,12 @@ function AnswerTurn({ message, highlighted, threadId, isLastAnswer, busy }: Turn
           onViewRun={run ? () => attachRun(run.id, 'chat') : undefined}
         />
         {message.derived?.length ? <DerivedList source={{ kind: 'message', id: message.id }} /> : null}
-        {!streaming && <AnswerActions message={message} isLast={isLastAnswer} busy={busy} scope={ref} />}
+        {/* The action row sits in the turn's bottom padding, so revealing it on hover never moves anything. */}
+        {!streaming && (
+          <div className={cn('absolute bottom-2 left-0', simulated && '@max-[599px]:left-3.5')}>
+            <AnswerActions message={message} isLast={isLastAnswer} busy={busy} scope={ref} />
+          </div>
+        )}
       </div>
     </article>
   )
@@ -167,7 +170,7 @@ function PromptTurn({ message, highlighted, threadId, isLastPrompt }: TurnProps 
       className={ARTICLE}
     >
       <Gutter speaker="You" simulated={false} at={message.createdAt} spine="line" />
-      <div className="flex min-w-0 flex-col gap-2.5 pb-9">
+      <div className="relative flex min-w-0 flex-col gap-2.5 pb-11">
         <TurnHeaderLine speaker="You" simulated={false} at={message.createdAt} />
         {editing ? (
           <EditPrompt message={message} threadId={threadId} inPlace={isLastPrompt} />
@@ -185,7 +188,11 @@ function PromptTurn({ message, highlighted, threadId, isLastPrompt }: TurnProps 
         )}
         {message.attachments?.length ? <Attachments items={message.attachments} /> : null}
         {message.derived?.length ? <DerivedList source={{ kind: 'message', id: message.id }} /> : null}
-        {!editing && <PromptActions message={message} threadId={threadId} scope={ref} />}
+        {!editing && (
+          <div className="absolute bottom-2 left-0">
+            <PromptActions message={message} threadId={threadId} scope={ref} />
+          </div>
+        )}
       </div>
     </article>
   )
@@ -294,7 +301,7 @@ function MadeHere({ items }: { items: readonly DerivedItem[] }) {
       <div className="hidden @min-[600px]:flex" aria-hidden>
         <span className="ml-px w-px bg-line-strong" />
       </div>
-      <div className="-mt-5 flex min-w-0 flex-col gap-1.5 pb-9" aria-label="Made from this conversation" role="group">
+      <div className="flex min-w-0 flex-col gap-1.5 pb-11" aria-label="Made from this conversation" role="group">
         {items.map((item) => (
           <DerivedItemView key={`${item.ref.kind}:${item.ref.id}`} item={item} />
         ))}

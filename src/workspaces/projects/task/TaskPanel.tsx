@@ -1,7 +1,7 @@
 import { memo, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { useShallow } from 'zustand/react/shallow'
-import { ArrowRight, Check, MessagesSquare, Orbit, PanelRight, Pencil, Play, RotateCw, Square, Telescope, Trash2, Undo2, X } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, Check, MessagesSquare, Orbit, PanelRight, Pencil, Play, RotateCw, Square, Telescope, Trash2, Undo2, X } from 'lucide-react'
 import { useScopedKey } from '@/app/components'
 import { workspaceForPath } from '@/app/registry'
 import { attachRun } from '@/app/shell/store'
@@ -15,8 +15,10 @@ import {
   toggleSubtask,
   updateTask,
   useApprovalsForRun,
+  taskRunIdsIn,
   useTask,
   useTaskRuns,
+  useTaskSessions,
 } from '@/core/services'
 import { isRunActive, refKey, type EntityRef, type ID, type Task } from '@/core/types'
 import { cn } from '@/lib/cn'
@@ -64,8 +66,9 @@ function TaskDrawer({ task }: { task: Task }) {
   const [assigning, setAssigning] = useState<{ open: boolean; agentId: ID | null }>({ open: false, agentId: null })
   const [editing, setEditing] = useState(false)
   const activeRunId = useDB((s: Tables) => {
-    for (let i = task.runIds.length - 1; i >= 0; i--) {
-      const r = s.runs[task.runIds[i]]
+    const ids = taskRunIdsIn(s, task)
+    for (let i = ids.length - 1; i >= 0; i--) {
+      const r = s.runs[ids[i]]
       if (r && isRunActive(r.status)) return r.id
     }
     return undefined
@@ -173,14 +176,49 @@ function TaskDrawer({ task }: { task: Task }) {
  * review decision once it finished, or the failure with Retry.
  */
 function AgentWork({ task, activeRunId, onRetry }: { task: Task; activeRunId: ID | undefined; onRetry: (agentId: ID) => void }) {
-  const lastRunId = task.runIds[task.runIds.length - 1]
+  const lastRunId = useDB((s: Tables) => {
+    const ids = taskRunIdsIn(s, task)
+    return ids[ids.length - 1]
+  })
   const lastRun = useRow('runs', lastRunId)
+  const sessions = useTaskSessions(task.id)
+  const inReview = sessions.find((x) => x.status === 'needs_review')
   if (activeRunId) return <LiveRun runId={activeRunId} />
+  // Coding work is reviewed where the diff is: Code › Changes (approving there moves the task on).
+  if (inReview) return <CodeReview sessionId={inReview.id} />
   if (task.status === 'review' && lastRun?.agentId) return <Review task={task} runId={lastRun.id} />
   if (lastRun && (lastRun.status === 'failed' || lastRun.status === 'cancelled') && lastRun.agentId && task.assignee?.type === 'agent' && task.status !== 'done') {
     return <Failed task={task} runId={lastRun.id} onRetry={onRetry} />
   }
   return null
+}
+
+function CodeReview({ sessionId }: { sessionId: ID }) {
+  const navigate = useNavigate()
+  const ses = useRow('sessions', sessionId)
+  const agent = useRow('agents', ses?.agentId)
+  if (!ses) return null
+  const add = ses.changes.reduce((n, c) => n + c.additions, 0)
+  const del = ses.changes.reduce((n, c) => n + c.deletions, 0)
+  return (
+    <section aria-label="Review" className="flex flex-col gap-2.5 border-t border-l-2 border-t-line border-l-attn bg-attn-tint/45 py-3.5 pr-4 pl-[14px]">
+      <div className="flex items-center gap-2">
+        <span aria-hidden className="text-[10px] leading-none text-attn">
+          ◆
+        </span>
+        <h3 className="type-body-sm font-semibold text-ink">Changes ready for review</h3>
+        <span className="flex-1" />
+        <span className="type-meta text-ink-3">{timeAgo(ses.updatedAt)}</span>
+      </div>
+      <p className="type-meta text-ink-3">{[agent?.name, `${ses.changes.length} files`, `+${add} −${del}`].filter(Boolean).join(' · ')}</p>
+      <p className="type-body-sm text-ink-2">Review the diff in Code. Approving there opens the pull request (simulated) and moves this task to Done.</p>
+      <div>
+        <Button size="sm" variant="primary" trailingIcon={ArrowUpRight} onClick={() => navigate(`/code/${encodeURIComponent(ses.id)}/changes`)}>
+          Review changes
+        </Button>
+      </div>
+    </section>
+  )
 }
 
 const LiveRun = memo(function LiveRun({ runId }: { runId: ID }) {
@@ -410,9 +448,9 @@ function Description({ task, editing, onEditingChange }: { task: Task; editing: 
         </Button>
       </div>
       {task.description ? (
-        <div className="type-body-sm text-ink-2 [&_ul]:my-1">
-          <Markdown prose="ui">{task.description}</Markdown>
-        </div>
+        <Markdown prose="ui" className="text-[14px] leading-5 text-ink-2 [&>:first-child]:mt-0 [&>:last-child]:mb-0">
+          {task.description}
+        </Markdown>
       ) : (
         <button type="button" onClick={start} className="type-body-sm rounded-xs text-ink-3 hover:text-ink-2">
           No description. Add what “done” looks like.
@@ -515,11 +553,20 @@ function Runs({ task }: { task: Task }) {
   const location = useLocation()
   const runs = useTaskRuns(task)
   const agents = useDB((s: Tables) => s.agents)
-  if (!runs.length) return null
+  const sessions = useTaskSessions(task.id)
+  if (!runs.length && !sessions.length) return null
   const ws = workspaceForPath(location.pathname).id
   const latestFirst = [...runs].reverse()
   return (
     <section aria-label="Runs for this task" className="border-t border-line py-3.5">
+      {sessions.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 px-4 pb-3">
+          <span className="type-caption mr-1 text-ink-3">{sessions.length === 1 ? 'Coding session' : 'Coding sessions'}</span>
+          {sessions.map((x) => (
+            <EntityChip key={x.id} entity={{ kind: 'session', id: x.id }} size="sm" />
+          ))}
+        </div>
+      )}
       <h3 className="type-label flex items-center gap-1.5 px-4 pb-2 text-ink-3">
         Runs <span className="type-meta font-normal tracking-normal normal-case">{runs.length}</span>
       </h3>

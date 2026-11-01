@@ -82,23 +82,28 @@ export default function ConfigureTab({ agent }: { agent: Agent }) {
 
 function IdentitySection({ agent }: { agent: Agent }) {
   const [saved, flash] = useSaved()
+  const [name, setName] = useState(agent.name)
   const [role, setRole] = useState(agent.role)
   const [description, setDescription] = useState(agent.description)
+  useEffect(() => setName(agent.name), [agent.name])
   useEffect(() => setRole(agent.role), [agent.role])
   useEffect(() => setDescription(agent.description), [agent.description])
   const save = (patch: AgentPatch) => {
-    const before = JSON.stringify([agent.role, agent.description, agent.hue, agent.sigil])
+    const before = JSON.stringify([agent.name, agent.role, agent.description, agent.hue, agent.sigil])
     const next = updateAgent(agent.id, patch)
-    if (next && JSON.stringify([next.role, next.description, next.hue, next.sigil]) !== before) flash()
+    if (next && JSON.stringify([next.name, next.role, next.description, next.hue, next.sigil]) !== before) flash()
   }
   const hues = HUES.filter((h) => h !== 'volt' || agent.hue === 'volt')
   return (
-    <Section id="configure-identity" title="Identity" description="How the agent appears everywhere: its mark, role and one-line description." saved={saved}>
+    <Section id="configure-identity" title="Identity" description="How the agent appears everywhere: its name, mark, role and a short description." saved={saved}>
       <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Name">
+          <Input value={name} onValueChange={setName} onBlur={() => save({ name })} onKeyDown={(e) => e.key === 'Enter' && save({ name })} />
+        </Field>
         <Field label="Role">
           <Input value={role} onValueChange={setRole} onBlur={() => save({ role })} onKeyDown={(e) => e.key === 'Enter' && save({ role })} />
         </Field>
-        <Field label="Mark">
+        <Field label="Mark" className="sm:col-span-2">
           <div className="flex flex-wrap items-center gap-1.5">
             <div role="radiogroup" aria-label="Mark color" className="flex flex-wrap items-center gap-1">
               {hues.map((h) => (

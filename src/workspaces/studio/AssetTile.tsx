@@ -68,7 +68,7 @@ function Tile({ asset, index, tabbable, onFocusIndex, onMove, onInspect, onKeyDo
       : 'Generating'
     : failed
       ? (run?.status === 'cancelled' ? 'Stopped' : 'Failed')
-      : `v${asset.currentVersion + 1}${versions > 1 ? ` of ${versions}` : ''} · ${asset.generator.label}`
+      : `v${asset.currentVersion + 1}${versions > 1 ? ` of ${versions}` : ''} · ${info.short}`
 
   const [menuOpen, setMenuOpen] = useState(false)
   const toggleHold = () => {

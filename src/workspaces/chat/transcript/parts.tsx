@@ -7,6 +7,7 @@ import { isRunActive, type Attachment, type Citation, type ID, type Message, typ
 import { cn } from '@/lib/cn'
 import { formatBytes, formatDateTime, formatTime } from '@/lib/format'
 import { Button, EntityChip, IdCode, LiveBadge, RunStatusGlyph, SimBadge, StatusGlyph, Tooltip } from '@/ui'
+import { inspectNow } from '../actions'
 import { startOfLocalDay } from '../logic/grouping'
 
 /*
@@ -262,22 +263,29 @@ export function Attachments({ items }: { items: readonly Attachment[] }) {
         </div>
       )}
       {files.length > 0 && (
-        <ul className="flex flex-wrap gap-1.5" aria-label="Attachments">
+        <ul className="flex flex-col items-start gap-1.5" aria-label="Attachments">
           {files.map((a) => {
             const Icon = KIND_ICON[a.kind]
             return (
-              <li key={a.id} className="inline-flex min-w-0">
-                {a.knowledgeId ? (
-                  <EntityChip entity={{ kind: 'knowledge', id: a.knowledgeId }} />
-                ) : (
-                  <span className="type-caption inline-flex h-[22px] max-w-[260px] min-w-0 items-center gap-1.5 rounded-sm border border-line-strong pr-2 pl-1.5 font-medium text-ink">
-                    <Icon aria-hidden className="size-3.5 shrink-0 text-ink-3" strokeWidth={1.75} />
-                    <span className="truncate">{a.name}</span>
-                  </span>
-                )}
-                <span className="type-meta ml-1.5 self-center text-ink-3">{formatBytes(a.size)}</span>
-                {a.kind !== 'text' && a.kind !== 'image' && (
-                  <span className="type-caption ml-1.5 self-center text-ink-3">· not read</span>
+              <li key={a.id} className="flex min-w-0 max-w-full flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="type-caption inline-flex h-[22px] max-w-[280px] min-w-0 items-center gap-1.5 rounded-sm border border-line-strong pr-2 pl-1.5 font-medium text-ink">
+                  <Icon aria-hidden className="size-3.5 shrink-0 text-ink-3" strokeWidth={1.75} />
+                  <span className="truncate">{a.name}</span>
+                </span>
+                <span className="type-meta text-ink-3">{formatBytes(a.size)}</span>
+                {a.kind === 'text' ? (
+                  <span className="type-caption text-ink-3">· read on this device</span>
+                ) : a.kind !== 'image' ? (
+                  <span className="type-caption text-ink-3">· contents not read</span>
+                ) : null}
+                {a.knowledgeId && (
+                  <button
+                    type="button"
+                    onClick={() => inspectNow({ kind: 'knowledge', id: a.knowledgeId as string })}
+                    className="type-caption rounded-xs text-ink-2 underline decoration-line-input underline-offset-2 transition-colors duration-(--dur-1) hover:text-ink hover:decoration-ink"
+                  >
+                    In Knowledge
+                  </button>
                 )}
               </li>
             )

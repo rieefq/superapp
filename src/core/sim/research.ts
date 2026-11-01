@@ -82,7 +82,7 @@ export function depthExpectation(
   const b = DEPTH_BUDGET[depth]
   const knowledge = opts.knowledge !== false
   const web = opts.web !== false
-  const angles = Math.max(1, opts.angles ?? (depth === 'quick' ? 3 : 4))
+  const angles = Math.max(1, opts.angles ?? (depth === 'deep' ? 4 : 3))
   const names: ResearchStepName[] = ['plan']
   if (opts.context) names.push('context')
   if (knowledge) names.push('knowledge')

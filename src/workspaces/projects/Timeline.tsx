@@ -59,7 +59,11 @@ function AxisLabels({ axis }: { axis: TimeAxis }) {
         <span
           key={t.at}
           aria-hidden
-          className={cn('type-meta absolute top-2 -translate-x-1/2 whitespace-nowrap text-ink-3', (t.x < 0.03 || t.x > 0.97) && 'hidden', i % 2 === 1 && '@max-[640px]:hidden')}
+          className={cn(
+            'type-meta absolute top-2 -translate-x-1/2 whitespace-nowrap text-ink-3',
+            (t.x < 0.03 || t.x > 0.97 || Math.abs(t.x - axis.today) < 0.06) && 'hidden',
+            i % 2 === 1 && '@max-[640px]:hidden',
+          )}
           style={{ left: pct(t.x) }}
         >
           {t.label}

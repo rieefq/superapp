@@ -244,7 +244,7 @@ describe('lineage and deliverables', () => {
   it('lists reports and simulated pull requests with their provenance, newest first', () => {
     const items = deliverablesIn(world(), 'prj_1')
     expect(items.map((d) => d.kind)).toEqual(['Pull request #48 (simulated)', 'Report'])
-    expect(items[0].chain.map((r) => r.kind)).toEqual(['message', 'investigation'])
+    expect(items[0].chain.map((r) => r.kind)).toEqual(['message', 'investigation', 'session'])
     expect(items[0].simulated).toBe(true)
   })
 })

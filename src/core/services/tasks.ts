@@ -1,9 +1,11 @@
-import { db, ID_PREFIX, useDB, useRow, useRows, useRowsByIds } from '@/core/db'
+import { useMemo } from 'react'
+import { db, ID_PREFIX, useDB, useRow, useRows, useRowsByIds, type Tables } from '@/core/db'
 import { getSettings } from '@/core/settings'
 import {
   ME,
   isRunActive,
   type ActorRef,
+  type CodeSession,
   type EntityRef,
   type ID,
   type Priority,
@@ -17,7 +19,7 @@ import { logActivity } from './activity'
 import { assertAgentCanRun, runAgent } from './agents'
 import { describeRef, TASK_STATUS_LABEL } from './entities'
 import { notify } from './notifications'
-import { changedKeys, clipLine, forgetRef, markDerived } from './serviceHelpers'
+import { changedKeys, clipLine, forgetRef, markDerived, memoOnTable } from './serviceHelpers'
 
 export const PRIORITY_RANK: Record<Priority, number> = { urgent: 0, high: 1, medium: 2, low: 3, none: 4 }
 
@@ -332,9 +334,11 @@ export function deleteTask(id: ID): void {
 export const BOARD_STATUSES: readonly TaskStatus[] = ['backlog', 'todo', 'in_progress', 'review', 'done']
 
 /** The most recent run attached to a task (runIds are kept most recent last). */
-export function latestTaskRun(task: Pick<Task, 'runIds'>): Run | undefined {
-  for (let i = task.runIds.length - 1; i >= 0; i--) {
-    const run = db.get('runs', task.runIds[i])
+export function latestTaskRun(task: Pick<Task, 'id' | 'runIds'>): Run | undefined {
+  const s = useDB.getState()
+  const ids = taskRunIdsIn(s, task)
+  for (let i = ids.length - 1; i >= 0; i--) {
+    const run = s.runs[ids[i]]
     if (run) return run
   }
   return undefined
@@ -479,19 +483,51 @@ export function useTask(id: ID | null | undefined): Task | undefined {
   return useRow('tasks', id)
 }
 
-/** A task's runs (its own runs, then coding-session turns linked to it), most recent last. */
-export function useTaskRuns(task: Pick<Task, 'runIds'> | null | undefined): Run[] {
-  return useRowsByIds('runs', task?.runIds)
+/** Run ids of coding-session turns per linked task (sessions point at their task with `taskId`). */
+function sessionRunsByTask(sessions: Tables['sessions']): Map<ID, ID[]> {
+  return memoOnTable(sessions, 'runsByTask', () => {
+    const out = new Map<ID, ID[]>()
+    for (const ses of Object.values(sessions)) {
+      if (!ses.taskId) continue
+      const ids = ses.turns.map((t) => t.runId).filter((id): id is ID => !!id)
+      if (ids.length) out.set(ses.taskId, [...(out.get(ses.taskId) ?? []), ...ids])
+    }
+    return out
+  })
+}
+
+/**
+ * Every run that worked on a task — its own (`task.runIds`) and the turns of coding sessions linked
+ * to it — oldest first, so the last one is the latest.
+ */
+export function taskRunIdsIn(s: Pick<Tables, 'runs' | 'sessions'>, task: Pick<Task, 'id' | 'runIds'>): ID[] {
+  const extra = sessionRunsByTask(s.sessions).get(task.id)
+  if (!extra?.length) return task.runIds
+  const ids = [...task.runIds]
+  for (const id of extra) if (!ids.includes(id)) ids.push(id)
+  return ids.filter((id) => s.runs[id]).sort((a, b) => s.runs[a].createdAt - s.runs[b].createdAt)
+}
+
+/** Coding sessions linked to a task, oldest first. */
+export function useTaskSessions(taskId: ID | null | undefined): CodeSession[] {
+  return useRows('sessions', (x) => !!taskId && x.taskId === taskId, (a, b) => a.createdAt - b.createdAt)
+}
+
+/** A task's runs (its own runs and the coding-session turns linked to it), most recent last. */
+export function useTaskRuns(task: Pick<Task, 'id' | 'runIds'> | null | undefined): Run[] {
+  const key = useDB((s) => (task ? taskRunIdsIn(s, task).join(',') : ''))
+  const ids = useMemo(() => (key ? key.split(',') : []), [key])
+  return useRowsByIds('runs', ids)
 }
 
 /**
  * The run working on a task right now (queued, running, waiting or paused), if any — the live tape
  * on cards and rows. Selects one id, so callers re-render only when the active run changes.
  */
-export function useActiveTaskRunId(task: Pick<Task, 'runIds'> | null | undefined): ID | undefined {
-  const ids = task?.runIds
+export function useActiveTaskRunId(task: Pick<Task, 'id' | 'runIds'> | null | undefined): ID | undefined {
   return useDB((s) => {
-    if (!ids) return undefined
+    if (!task) return undefined
+    const ids = taskRunIdsIn(s, task)
     for (let i = ids.length - 1; i >= 0; i--) {
       const run = s.runs[ids[i]]
       if (run && isRunActive(run.status)) return run.id

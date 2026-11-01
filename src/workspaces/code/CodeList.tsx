@@ -1,5 +1,4 @@
 import { memo, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router'
 import { useShallow } from 'zustand/react/shallow'
 import { Archive, ChevronDown, ChevronRight, Plus } from 'lucide-react'
 import { ListGroup, ListPane, ListRow, ListRows, ScopeFilterRow } from '@/app/templates'

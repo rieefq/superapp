@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { Download } from 'lucide-react'
 import { minuteCeil, rangeLabel, useMinuteNow } from '@/core/analytics'
@@ -36,6 +36,8 @@ export function Journal() {
   const kind = (params.get('target') as EntityKind | null) ?? null
   const text = params.get('jq') ?? ''
   const from = now - filters.rangeDays * 86_400_000
+  // A new filter starts from the top of the feed again.
+  useEffect(() => setLimit(PAGE), [actor, verb, kind, text, filters.rangeDays, filters.projectId])
 
   const all = useMemo(() => Object.values(activity), [activity])
   const inWindow = useMemo(

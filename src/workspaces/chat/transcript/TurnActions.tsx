@@ -1,8 +1,7 @@
-import { type RefObject } from 'react'
+import { useState, type RefObject } from 'react'
 import { useNavigate } from 'react-router'
 import { Check, ChevronDown, Copy, CornerUpRight, Ellipsis, GitFork, PencilLine, RotateCcw, ThumbsDown, ThumbsUp } from 'lucide-react'
-import { HoldButton, SaveToKnowledgeButton, START_KIND_META, START_KINDS, TurnIntoMenu, useScopedKey } from '@/app/components'
-import { openStartSheet } from '@/app/shell/store'
+import { HoldButton, SaveToKnowledgeButton, START_KIND_META, START_KINDS, useScopedKey } from '@/app/components'
 import { forkThread, getModelInfo, listModels, regenerate, setFeedback } from '@/core/ai'
 import { useContextStore } from '@/core/context'
 import { toKnowledge } from '@/core/services'
@@ -10,7 +9,7 @@ import { useSettings } from '@/core/settings'
 import type { EntityRef, ID, Message } from '@/core/types'
 import { cn } from '@/lib/cn'
 import { IconButton, Menu, toast, useCoarsePointer, useCopy, type MenuItem } from '@/ui'
-import { forkAndOpen, threadRoute } from '../actions'
+import { forkAndOpen, threadRoute, turnInto } from '../actions'
 import { useChatUi } from '../state'
 
 /**
@@ -114,7 +113,7 @@ export function AnswerActions({
   if (coarse) {
     return (
       <div className={ROW}>
-        <TurnIntoMenu entity={ref} trigger={<IconButton icon={CornerUpRight} label="Turn into…" size="sm" />} />
+        <TurnIntoButton source={ref} />
         <Menu
           aria-label="Answer actions"
           placement="bottom-start"
@@ -155,7 +154,7 @@ export function AnswerActions({
       <IconButton icon={GitFork} label="Fork from here" shortcut="f" size="sm" disabled={!done} onClick={fork} />
       <HoldButton entity={ref} iconOnly size="sm" hotkeyScope={scope} />
       <SaveToKnowledgeButton entity={ref} iconOnly size="sm" hotkeyScope={done ? scope : undefined} />
-      <TurnIntoMenu entity={ref} hotkeyScope={done ? scope : undefined} trigger={<IconButton icon={CornerUpRight} label="Turn into…" shortcut="t" size="sm" disabled={!done} />} />
+      <TurnIntoButton source={ref} scope={scope} disabled={!done} />
       <span aria-hidden className="mx-1 h-4 w-px bg-line" />
       <IconButton icon={ThumbsUp} label="Helpful" size="sm" active={message.feedback === 'up'} disabled={!done} onClick={() => feedback('up')} />
       <IconButton icon={ThumbsDown} label="Not helpful" size="sm" active={message.feedback === 'down'} disabled={!done} onClick={() => feedback('down')} />
@@ -197,10 +196,33 @@ export function PromptActions({ message, threadId, scope }: { message: Message; 
       <IconButton icon={PencilLine} label="Edit" shortcut="e" size="sm" onClick={edit} />
       <IconButton icon={GitFork} label="Fork from here" shortcut="f" size="sm" onClick={fork} />
       <HoldButton entity={ref} iconOnly size="sm" hotkeyScope={scope} />
-      <TurnIntoMenu entity={ref} hotkeyScope={scope} trigger={<IconButton icon={CornerUpRight} label="Turn into…" shortcut="t" size="sm" />} />
+      <TurnIntoButton source={ref} scope={scope} />
     </div>
   )
 }
+
+// ------------------------------------------------------------------------------------------------ turn into
+
+/** Turn into… (`T`): the seven Start sheet kinds, with the message as the source (see `turnInto`). */
+function TurnIntoButton({ source, scope, disabled }: { source: EntityRef; scope?: RefObject<HTMLElement | null>; disabled?: boolean }) {
+  const [open, setOpen] = useState(false)
+  useTurnKey(scope ?? NO_SCOPE, 't', () => setOpen(true), !disabled && !!scope)
+  const items: MenuItem[] = [
+    { type: 'label', label: 'Turn into' },
+    ...START_KINDS.map((k): MenuItem => ({ id: k, label: START_KIND_META[k].label, icon: START_KIND_META[k].icon, onSelect: () => turnInto(k, source) })),
+  ]
+  return (
+    <Menu
+      open={open}
+      onOpenChange={setOpen}
+      items={items}
+      aria-label="Turn into"
+      trigger={<IconButton icon={CornerUpRight} label="Turn into…" shortcut="t" size="sm" disabled={disabled} aria-keyshortcuts="t" />}
+    />
+  )
+}
+
+const NO_SCOPE: RefObject<HTMLElement | null> = { current: null }
 
 // ------------------------------------------------------------------------------------------------ touch menu
 
@@ -236,7 +258,7 @@ function touchItems(o: {
     },
   })
   items.push({ type: 'separator' }, { type: 'label', label: 'Turn into' })
-  for (const k of START_KINDS) items.push({ id: `into:${k}`, label: START_KIND_META[k].label, icon: START_KIND_META[k].icon, onSelect: () => openStartSheet(k, { source: o.ref }) })
+  for (const k of START_KINDS) items.push({ id: `into:${k}`, label: START_KIND_META[k].label, icon: START_KIND_META[k].icon, onSelect: () => turnInto(k, o.ref) })
   if (o.feedback) {
     const f = o.feedback
     items.push(

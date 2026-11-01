@@ -34,9 +34,13 @@ function useStorage(): { report: StorageReport; failed: TableName[] } {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined
     const measure = () => setReport(storageReport(useDB.getState()))
+    // Throttled: measure once persistence has written (it debounces by 400ms), at most every 1.2s.
     const later = () => {
-      clearTimeout(timer)
-      timer = setTimeout(measure, 1200)
+      if (timer) return
+      timer = setTimeout(() => {
+        timer = undefined
+        measure()
+      }, 1200)
     }
     const unsub = useDB.subscribe(later)
     const offError = persistEvents.on('error', ({ table }) => setFailed((f) => (f.includes(table) ? f : [...f, table])))

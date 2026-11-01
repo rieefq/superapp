@@ -105,7 +105,7 @@ function MemoryLine({ project }: { project: Project }) {
   return (
     <p className="type-meta text-ink-3">
       Memory: {project.pinnedRefs.length} {project.pinnedRefs.length === 1 ? 'item' : 'items'}
-      {project.instructions ? ' · instructions' : ''} · ~{formatTokenCount(memory.total)} tok in every run here
+      {project.instructions ? ' · instructions' : ''} · {formatTokenCount(memory.total)} tok in every run here
     </p>
   )
 }

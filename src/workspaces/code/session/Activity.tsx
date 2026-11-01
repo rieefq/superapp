@@ -14,6 +14,7 @@ import {
   formatClock, useNow, useReducedMotion,
 } from '@/ui'
 import { useSessionDrafts } from '../drafts'
+import { summaryMarkdown } from '../logic'
 import { SessionComposer } from './SessionComposer'
 
 /**
@@ -88,6 +89,7 @@ export function ActivityPane({ session, onReviewFile, header = true }: { session
       )}
       <div className="relative min-h-0 flex-1">
         <div ref={scrollRef} className="h-full overflow-y-auto overscroll-contain" data-activity-scroll="">
+          {!header && <SimTerminalNote className="px-4 pt-3 md:px-5" />}
           <ol ref={contentRef} aria-label={`Turns of ${session.title}`} className="flex flex-col gap-10 px-4 pt-5 pb-8 md:px-5">
             {items.map(({ turn, index }) => (
               <TurnItem
@@ -258,7 +260,7 @@ const TurnItem = memo(function TurnItem({ sessionId, turn, version, latest, arch
             <div className="flex flex-col gap-1.5">
               <span className="type-label text-ink-3">Summary</span>
               <Markdown prose="ui" className="type-body-sm text-ink">
-                {summary}
+                {summaryMarkdown(summary)}
               </Markdown>
             </div>
           )}

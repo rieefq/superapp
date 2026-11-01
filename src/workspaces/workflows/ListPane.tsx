@@ -78,14 +78,14 @@ const WorkflowRow = memo(function WorkflowRow({ wf, summary, active }: { wf: Wor
         aria-current={active ? 'page' : undefined}
         aria-label={`${wf.name}, ${wf.enabled ? 'on' : 'off'}, ${wf.trigger.label}${summary?.active ? `, ${summary.active === 'waiting' ? 'needs you' : 'running'}` : ''}`}
         className={cn(
-          'flex h-(--row-h-2) min-w-0 flex-1 items-center gap-2.5 rounded-sm py-1.5 pr-12 pl-2.5 outline-none transition-colors duration-(--dur-1) ease-standard',
+          'flex h-(--row-h-2) min-w-0 flex-1 items-center gap-2.5 rounded-sm py-1.5 pr-2.5 pl-2.5 outline-none transition-colors duration-(--dur-1) ease-standard',
           'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--focus-ring)',
           active ? 'bg-accent-tint' : 'hover:bg-hover',
         )}
       >
         <MonogramMark text={wf.name} hue={wf.hue} size={20} className="shrink-0 self-start mt-0.5" />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="flex min-w-0 items-center gap-1.5">
+          <span className="flex min-w-0 items-center gap-1.5 pr-9">
             <span className={cn('type-body-sm truncate', active ? 'font-medium text-ink' : 'text-ink-2 group-hover:text-ink')}>{wf.name}</span>
             {summary?.active && <RunStatusGlyph status={summary.active} size={12} />}
           </span>
@@ -96,7 +96,7 @@ const WorkflowRow = memo(function WorkflowRow({ wf, summary, active }: { wf: Wor
           </span>
         </span>
       </NavLink>
-      <span className="absolute top-2 right-2">
+      <span className="absolute top-2.5 right-2.5">
         <Switch size="sm" checked={wf.enabled} onCheckedChange={(on) => toggleEnabled(wf, on)} aria-label={`${wf.enabled ? 'Turn off' : 'Turn on'} ${wf.name}`} />
       </span>
     </div>

@@ -290,7 +290,7 @@ export function planInvestigation(params: Record<string, unknown>, rng: Rng): Ru
   if (!inv) return failedPlan('This investigation no longer exists.')
   const id = inv.id
   const budget = DEPTH_BUDGET[inv.depth]
-  const angles = inv.angles.length ? inv.angles : deriveAngles(inv.question, inv.depth === 'quick' ? 3 : 4)
+  const angles = inv.angles.length ? inv.angles : deriveAngles(inv.question, inv.depth === 'deep' ? 4 : 3)
   const useKnowledge = inv.sources?.knowledge !== false
   const useWeb = inv.sources?.web !== false
   const context = contextPlan(inv, paramRefs(params, 'context'))

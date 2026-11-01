@@ -275,20 +275,18 @@ export function ReviewBar({ session }: { session: CodeSession }) {
 
   const sentence = reviewSentence(stats)
   return (
-    <div role="region" aria-label="Review" className="sticky bottom-0 z-(--z-sticky) shrink-0 border-t border-line bg-canvas px-4 py-2.5 md:px-5">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <p className="type-body-sm flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-1 text-ink-2" aria-live="polite">
+    <div role="region" aria-label="Review" className="@container sticky bottom-0 z-(--z-sticky) shrink-0 border-t border-line bg-canvas px-4 py-2.5 md:px-5">
+      <div className="flex flex-col gap-2 @min-[860px]:flex-row @min-[860px]:items-center @min-[860px]:gap-4">
+        <p className="type-body-sm min-w-0 flex-1 text-ink-2" aria-live="polite">
           <span className="tabular">{sentence}</span>
           <span aria-hidden className="text-ink-4">
-            ·
+            {' · '}
           </span>
-          <span className="inline-flex items-center gap-1.5 tabular">
-            {checksClause(checks)}
-            {checks.total > 0 && <SimBadge />}
-          </span>
-          {state === 'review' && stats.accepted === 0 && stats.pending > 0 && <span className="text-ink-3">· Accept the files you want to ship</span>}
+          <span className="tabular">{checksClause(checks)}</span>
+          {checks.total > 0 && <SimBadge className="ml-1.5 align-[-3px]" />}
+          {state === 'review' && stats.accepted === 0 && stats.pending > 0 && <span className="text-ink-3"> · Accept the files you want to ship</span>}
         </p>
-        <div className="flex flex-wrap items-center justify-end gap-1.5">
+        <div className="flex flex-wrap items-center justify-end gap-1.5 @max-[859px]:-mr-1">
           {state === 'archived' && (
             <Button size="sm" variant="secondary" leadingIcon={Undo2} onClick={() => restoreWithToast(session.id)}>
               Restore
@@ -312,10 +310,7 @@ export function ReviewBar({ session }: { session: CodeSession }) {
                 <StatusGlyph shape="check" tone="done" decorative />
                 Pull request #{pr.number} (simulated) is open
               </span>
-              <Button size="sm" variant="primary" leadingIcon={GitMerge} onClick={() => {
-                mergePullRequest(session.id)
-                toast({ tone: 'success', title: `Merged pull request #${pr.number} (simulated)`, description: 'Nothing was pushed or merged on GitHub.' })
-              }}>
+              <Button size="sm" variant="primary" leadingIcon={GitMerge} onClick={() => mergePullRequest(session.id)}>
                 Merge (simulated)
               </Button>
             </>
@@ -439,11 +434,8 @@ function ApproveAndOpen({ session, accepted, pending, disabled, applied }: { ses
     if (timer.current) clearTimeout(timer.current)
     setConfirming(false)
     try {
+      // The bar shows the run in place (tape, then the PR); the result also lands as a quiet update.
       openPullRequest(session.id, { confirmed: true })
-      toast({
-        title: 'Opening a pull request (simulated)',
-        description: `${accepted} accepted ${accepted === 1 ? 'file' : 'files'}${pending ? `; ${pending} not reviewed ${pending === 1 ? 'is' : 'are'} left out` : ''}. Nothing is pushed to GitHub.`,
-      })
     } catch (err) {
       toast({ tone: 'error', title: 'Couldn’t open the pull request', description: err instanceof Error ? err.message : String(err) })
     }
@@ -458,6 +450,12 @@ function ApproveAndOpen({ session, accepted, pending, disabled, applied }: { ses
   }
   const label = confirming ? 'Confirm: open PR (simulated)' : applied ? 'Open PR (simulated)' : 'Approve & open PR (simulated)'
   return (
+    <span className="inline-flex items-center gap-2">
+      {confirming && pending > 0 && (
+        <span className="type-caption text-ink-3" role="status">
+          {pending} unreviewed {pending === 1 ? 'file is' : 'files are'} left out
+        </span>
+      )}
     <span className="inline-flex items-stretch">
       <Button
         size="sm"
@@ -490,6 +488,7 @@ function ApproveAndOpen({ session, accepted, pending, disabled, applied }: { ses
           </button>
         }
       />
+    </span>
     </span>
   )
 }

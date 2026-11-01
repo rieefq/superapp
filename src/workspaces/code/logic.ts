@@ -324,3 +324,28 @@ export function githubBlobUrl(repo: Pick<Repo, 'url' | 'defaultBranch'>, path: s
 export function patchFilename(branch: string): string {
   return `${branch.replace(/[^a-z0-9._-]+/gi, '-').replace(/^-+|-+$/g, '') || 'changes'}.patch`
 }
+
+/**
+ * A turn summary as Markdown: the simulator writes "•" bullet lines and one fact per line; those
+ * become a list and short paragraphs (single newlines would otherwise run together).
+ */
+export function summaryMarkdown(text: string): string {
+  const out: string[] = []
+  for (const raw of text.replace(/\r\n/g, '\n').split('\n')) {
+    const line = raw.trimEnd()
+    if (!line.trim()) {
+      if (out.length && out[out.length - 1] !== '') out.push('')
+      continue
+    }
+    const bullet = /^\s*[•·▪]\s+/.exec(line)
+    const prev = out[out.length - 1]
+    if (bullet) {
+      if (prev !== undefined && prev !== '' && !prev.startsWith('- ')) out.push('')
+      out.push(`- ${line.slice(bullet[0].length)}`)
+    } else {
+      if (prev !== undefined && prev !== '') out.push('')
+      out.push(line)
+    }
+  }
+  return out.join('\n').trim()
+}

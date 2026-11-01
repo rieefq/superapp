@@ -47,8 +47,8 @@ test.describe('Settings', () => {
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
 
     await page.getByRole('radio', { name: 'Light' }).click()
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
     await expect(page.locator('#setting-theme')).toContainText('Saved')
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
     await expect(sectionRow(page, 'Appearance')).toContainText('Light')
 
     await page.reload()

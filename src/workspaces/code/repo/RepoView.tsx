@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
+import { Link, useParams, useSearchParams } from 'react-router'
 import { useShallow } from 'zustand/react/shallow'
 import { ExternalLink, FolderGit2, Link2, Plus, RefreshCw, Star, Unplug } from 'lucide-react'
 import { useRegisterCommands } from '@/app/commands/registry'
@@ -12,7 +12,7 @@ import { timeAgo } from '@/lib/format'
 import { Button, EmptyState, copyText, toast, type MenuItem } from '@/ui'
 import { disconnectWithConfirm, refreshWithToast } from '../actions'
 import { SessionOverviewRow } from '../CodeHome'
-import { useFetchRateLimit, useRateLimit } from '../hooks'
+import { useFetchRateLimit, useRateLimit, useUrlValue } from '../hooks'
 import { rateLimitText } from '../logic'
 import { QuietLine, RepoMark, RepoModeBadge } from '../parts'
 import { CopyPathButton, HoldFileButton, OpenOnGithubButton, StartAboutFileButton } from './FileActions'
@@ -47,12 +47,16 @@ export function RepoView() {
   return <RepoStage repo={repo} />
 }
 
+const noop = () => {}
+
 function RepoStage({ repo }: { repo: Repo }) {
   const navigate = useGo()
   const params = useParams()
   const [search, setSearch] = useSearchParams()
-  const tab = (params['*'] ?? '').startsWith('sessions') ? 'sessions' : 'files'
-  const path = search.get('path')
+  const [tabValue, setTab] = useUrlValue((params['*'] ?? '').startsWith('sessions') ? 'sessions' : 'files', noop)
+  const tab = tabValue === 'sessions' ? 'sessions' : 'files'
+  // The open file answers at once; the URL follows (see useUrlValue).
+  const [path, setPathLocal] = useUrlValue(search.get('path'), noop)
   const base = `/code/repos/${encodeURIComponent(repo.id)}`
   const sessionIds = useDB(
     useShallow((s: Tables) =>
@@ -67,7 +71,8 @@ function RepoStage({ repo }: { repo: Repo }) {
   const rate = useRateLimit()
 
   const setPath = useCallback(
-    (p: string | null) =>
+    (p: string | null) => {
+      setPathLocal(p)
       setSearch(
         (prev) => {
           const n = new URLSearchParams(prev)
@@ -75,10 +80,15 @@ function RepoStage({ repo }: { repo: Repo }) {
           else n.delete('path')
           return n
         },
-        { replace: true, flushSync: true },
-      ),
-    [setSearch],
+        { replace: true },
+      )
+    },
+    [setPathLocal, setSearch],
   )
+  const switchTab = (v: string) => {
+    setTab(v)
+    navigate(`${base}${v === 'sessions' ? '/sessions' : ''}${path && v === 'files' ? `?path=${encodeURIComponent(path)}` : ''}`, { replace: true })
+  }
 
   const menu: MenuItem[] = [
     ...(repo.url ? [{ id: 'github', label: 'Open on GitHub', icon: ExternalLink, onSelect: () => window.open(repo.url, '_blank', 'noopener') }] : []),
@@ -123,7 +133,7 @@ function RepoStage({ repo }: { repo: Repo }) {
               { value: 'sessions', label: 'Sessions', count: sessionIds.length || undefined },
             ],
             value: tab,
-            onChange: (v) => navigate(`${base}${v === 'sessions' ? '/sessions' : ''}${path && v === 'files' ? `?path=${encodeURIComponent(path)}` : ''}`, { replace: true, flushSync: true }),
+            onChange: switchTab,
             'aria-label': 'Repository views',
           }}
           actions={

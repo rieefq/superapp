@@ -24,6 +24,9 @@ import { filterQuery } from './state'
 const COUNT = new Intl.NumberFormat('en-US')
 const PLOT_H = 220
 
+/** Counts never have fractional ticks: label whole numbers only. */
+const countTick = (v: number) => (Number.isInteger(v) ? COUNT.format(v) : '')
+
 type Drill = (extra: Record<string, string | number | null>) => string
 
 function useDrill(params: URLSearchParams): Drill {
@@ -55,8 +58,14 @@ export function RunsCard({ insights, params, now }: { insights: Insights; params
   const outcomeKey = outcomes.map((o) => o.id).join()
   const outcomeSeries: BarSeries[] = useMemo(
     () =>
-      OUTCOMES.filter((o) => outcomeKey.split(',').includes(o.id)).map((o) => ({ id: o.id, label: o.label, values: buckets.map(o.pick), ...seriesOf(o.id) })),
-    [buckets, outcomeKey],
+      OUTCOMES.filter((o) => outcomeKey.split(',').includes(o.id)).map((o) => ({
+        id: o.id,
+        label: o.label,
+        // Nothing ran: no values at all, so the chart shows its empty state instead of a zero axis.
+        values: buckets.map((b) => (t.runs ? o.pick(b) : null)),
+        ...seriesOf(o.id),
+      })),
+    [buckets, outcomeKey, t.runs],
   )
 
   const kindKey = RUN_KINDS.filter((k) => buckets.some((b) => b.byKind[k] > 0)).join()
@@ -65,6 +74,7 @@ export function RunsCard({ insights, params, now }: { insights: Insights; params
     () => kinds.map((k) => ({ id: k, label: KIND_LABEL[k], colorIndex: RUN_KINDS.indexOf(k), points: buckets.map((b) => ({ t: b.start, v: b.byKind[k] })) })),
     [buckets, kinds],
   )
+  // Empty when nothing ran (no series): the chart shows its placeholder.
   const timeFormat = useMemo(() => {
     const byStart = new Map(buckets.map((b) => [b.start, b]))
     return (ts: number) => {
@@ -111,7 +121,25 @@ export function RunsCard({ insights, params, now }: { insights: Insights; params
         : {
             caption: 'Runs by weekday and hour',
             columns: [{ key: 'd', label: 'Day' }, ...Array.from({ length: 24 }, (_, h) => ({ key: `h${h}`, label: String(h).padStart(2, '0'), align: 'right' as const }))],
-            rows: DAYS.map((d, i) => ({ d, ...Object.fromEntries(insights.heatmap[i].map((v, h) => [`h${h}`, v || '·'])) })),
+            rows: DAYS.map((d, i) => ({
+              d,
+              ...Object.fromEntries(
+                insights.heatmap[i].map((v, h) => [
+                  `h${h}`,
+                  v ? (
+                    <Link
+                      to={drill({ cell: `${i}-${h}` })}
+                      aria-label={`${d} ${String(h).padStart(2, '0')}:00, ${v} ${v === 1 ? 'run' : 'runs'}. Show them`}
+                      className="rounded-xs text-ink underline decoration-line-input underline-offset-2 hover:decoration-ink"
+                    >
+                      {v}
+                    </Link>
+                  ) : (
+                    '·'
+                  ),
+                ]),
+              ),
+            })),
           }
 
   return (
@@ -156,6 +184,7 @@ export function RunsCard({ insights, params, now }: { insights: Insights; params
             legend={false}
             hideViewToggle
             format={(v) => COUNT.format(v)}
+            tickFormat={countTick}
             ariaLabel={`Runs per ${unit} by outcome, ${rangeLabel(window.rangeDays).toLowerCase()}: ${outcomeTotals.map((o) => `${o.total} ${o.label.toLowerCase()}`).join(', ')}.`}
             empty="No runs in this period"
           />
@@ -169,7 +198,7 @@ export function RunsCard({ insights, params, now }: { insights: Insights; params
           hideViewToggle
           timeFormat={timeFormat}
           format={(v) => COUNT.format(v)}
-          tickFormat={(v) => COUNT.format(v)}
+          tickFormat={countTick}
           empty="No runs in this period"
         />
       )}
@@ -194,7 +223,9 @@ export function SpendCard({ insights, params, now }: { insights: Insights; param
   const hasSim = buckets.some((b) => b.simulatedCostUsd > 0)
   const daySeries: BarSeries[] = useMemo(
     () => [
-      ...(hasLive || !hasSim ? [{ id: 'live', label: 'Live', values: buckets.map((b) => b.liveCostUsd), ...seriesOf('ink') }] : []),
+      ...(hasLive || !hasSim
+        ? [{ id: 'live', label: 'Live', values: buckets.map((b) => (hasLive ? b.liveCostUsd : null)), ...seriesOf('ink') }]
+        : []),
       ...(hasSim ? [{ id: 'sim', label: 'Simulated (est.)', values: buckets.map((b) => b.simulatedCostUsd), ...seriesOf('sim') }] : []),
     ],
     [buckets, hasLive, hasSim],
@@ -223,19 +254,25 @@ export function SpendCard({ insights, params, now }: { insights: Insights; param
         label: a.name,
         leading: <AgentMark seed={agent?.sigil ?? 1} hue={a.hue} size={16} />,
         value: a.costUsd,
-        valueText: formatCost(a.costUsd, { est: simOnly }),
+        valueText: formatCost(a.costUsd, { est: a.costIsEstimate }),
         estimate: a.costIsEstimate,
         simulated: simOnly,
-        detail: `${COUNT.format(a.runs)} ${a.runs === 1 ? 'run' : 'runs'}`,
+        simulatedValue: a.simulatedCostUsd,
+        detail:
+          a.costIsEstimate && a.liveCostUsd > 0
+            ? `${COUNT.format(a.runs)} runs · ${formatCost(a.liveCostUsd)} live`
+            : `${COUNT.format(a.runs)} ${a.runs === 1 ? 'run' : 'runs'}`,
         to: drill({ agent: a.agentId }),
       }
     })
 
   const delta = deltaPhrase(percentDelta(t.costUsd, p.costUsd), comparisonLabel(window.rangeDays))
+  const mixed = t.liveCostUsd > 0 && t.simulatedCostUsd > 0
   const summary = (
-    <CardSummary figure={formatCost(t.costUsd, { est: estimateOnly })}>
-      {t.liveCostUsd > 0 && t.simulatedCostUsd > 0 ? (
-        `${formatCost(t.liveCostUsd)} live · ${formatCost(t.simulatedCostUsd, { est: true })} simulated`
+    // Live spend and estimates are never added into one figure: live leads, the estimate follows.
+    <CardSummary figure={mixed ? `${formatCost(t.liveCostUsd)} live` : formatCost(t.costUsd, { est: estimateOnly })}>
+      {mixed ? (
+        `+ ${formatCost(t.simulatedCostUsd, { est: true })} simulated · ${rangeLabel(window.rangeDays).toLowerCase()}`
       ) : estimateOnly && view !== 'day' ? (
         <span className="inline-flex items-center gap-1.5">
           <SimBadge size="xs" />
@@ -316,7 +353,7 @@ export function SpendCard({ insights, params, now }: { insights: Insights; param
     >
       {view === 'day' && (
         <div className="flex flex-col gap-3">
-          <ul aria-label="Legend" className="type-caption flex flex-wrap items-center gap-x-4 gap-y-1 text-ink-2">
+          <ul aria-label="Legend" className={cn('type-caption flex flex-wrap items-center gap-x-4 gap-y-1 text-ink-2', t.costUsd === 0 && 'invisible')}>
             {daySeries.map((s) => (
               <li key={s.id} className="inline-flex h-7 items-center gap-1.5">
                 {s.id === 'sim' ? (
@@ -365,8 +402,9 @@ export function TokensCard({ insights, params }: { insights: Insights; params: U
       label: KIND_LABEL[k.kind],
       leading: <Icon aria-hidden className="size-3.5 text-ink-3" strokeWidth={1.75} />,
       value: k.tokens,
-      valueText: `${simOnly ? '~' : ''}${formatTokenCount(k.tokens)} tok`,
+      valueText: `${k.simulatedTokens > 0 ? '~' : ''}${formatTokenCount(k.tokens)} tok`,
       simulated: simOnly,
+      simulatedValue: k.simulatedTokens,
       detail: `${COUNT.format(k.runs)} ${k.runs === 1 ? 'run' : 'runs'} · ${formatTokenCount(k.inputTokens)} in · ${formatTokenCount(k.outputTokens)} out`,
       to: drill({ kind: k.kind }),
     }
@@ -465,6 +503,7 @@ export function WaitCard({ insights }: { insights: Insights }) {
             hideViewToggle
             valueLabels
             format={(v) => COUNT.format(v)}
+            tickFormat={countTick}
             ariaLabel={`Approval wait histogram: ${insights.approvalWaits.map((b) => `${b.label} ${b.count}`).join(', ')}.`}
           />
         ) : (

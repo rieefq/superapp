@@ -246,7 +246,6 @@ function SelectBox({ item, checked, visible, onToggle }: { item: KnowledgeItem; 
 }
 
 const ResultRow = memo(function ResultRow({ entry, isCurrent, checked, selecting, onToggle, onFocusRow }: ItemProps) {
-  ;(window as unknown as Record<string, number>).__knRow = ((window as unknown as Record<string, number>).__knRow ?? 0) + 1 // PERF-PROBE
   const { item, snippet, titleRanges } = entry
   const menu = useRowMenu(item, onToggle, checked)
   const usage = useKnowledgeUsage(item.id)

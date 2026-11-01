@@ -1,5 +1,5 @@
 import { useCallback, useRef, type KeyboardEvent, type ReactNode } from 'react'
-import { useSettings } from '@/core/settings'
+import { updateSettings, useSettings } from '@/core/settings'
 import { HUES, type Hue } from '@/core/types'
 import { Avatar, Input } from '@/ui'
 import { cn } from '@/lib/cn'
@@ -24,19 +24,11 @@ export default function ProfileSection() {
   const save = useSaveSetting()
   const mark = useMarkSaved()
 
-  const commitName = useCallback((name: string) => save('name', 'Name', 'profile', { name }), [save])
-  const name = useDraft({
-    stored: profile.name,
-    check: checkName,
-    commit: (value) => commitName(value),
-    onSettled: () => mark('name', 'Name'),
-  })
-  const email = useDraft({
-    stored: profile.email ?? '',
-    check: checkEmail,
-    commit: (value) => save('email', 'Email', 'profile', { email: value }),
-    onSettled: () => mark('email', 'Email'),
-  })
+  // Text saves on every valid keystroke (the avatar previews it live); "Saved" confirms once typing pauses.
+  const commitName = useCallback((name: string) => updateSettings('profile', { name }), [])
+  const commitEmail = useCallback((email: string | undefined) => updateSettings('profile', { email }), [])
+  const name = useDraft({ stored: profile.name, check: checkName, commit: commitName, onSettled: () => mark('name', 'Name') })
+  const email = useDraft({ stored: profile.email ?? '', check: checkEmail, commit: commitEmail, onSettled: () => mark('email', 'Email') })
 
   const shownName = checkName(name.value).ok ? name.value : profile.name
 

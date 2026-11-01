@@ -1,5 +1,4 @@
 import { memo, useMemo } from 'react'
-import { useNavigate } from 'react-router'
 import { useShallow } from 'zustand/react/shallow'
 import { ArrowUpRight, Ellipsis, FolderGit2, Plus, RefreshCw, SquareTerminal, Unplug } from 'lucide-react'
 import { Stage, StageHeader } from '@/app/templates'

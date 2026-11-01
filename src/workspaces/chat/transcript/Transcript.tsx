@@ -3,12 +3,12 @@ import { useShallow } from 'zustand/react/shallow'
 import { ArrowDown } from 'lucide-react'
 import { SelectionActions, useDerived, type DerivedItem } from '@/app/components'
 import { announce } from '@/app/shell/Announcer'
-import { useInspectEntity } from '@/app/templates'
 import { useIsGenerating } from '@/core/ai'
 import { useDB, type Tables } from '@/core/db'
 import { refKey, type EntityRef, type ID } from '@/core/types'
 import { cn } from '@/lib/cn'
 import { useReducedMotion } from '@/ui'
+import { inspectNow } from '../actions'
 import { placeAfterMessages } from '../logic/commands'
 import { draftKey, useChatUi } from '../state'
 import { useLiveLocation } from '../useLiveLocation'
@@ -77,7 +77,6 @@ export const Transcript = memo(function Transcript({ threadId }: { threadId: ID 
   )
 
   // J/K or ↓/↑ move between turns while a turn has focus; Space inspects it.
-  const inspect = useInspectEntity()
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement
     if (target.tagName !== 'ARTICLE' || e.metaKey || e.ctrlKey || e.altKey) return
@@ -97,7 +96,7 @@ export const Transcript = memo(function Transcript({ threadId }: { threadId: ID 
     } else if (e.key === ' ') {
       e.preventDefault()
       const id = target.getAttribute('data-message-id')
-      if (id) inspect({ kind: 'message', id })
+      if (id) inspectNow({ kind: 'message', id })
     }
   }
 

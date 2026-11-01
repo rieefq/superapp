@@ -98,10 +98,29 @@ export function usePrevious<T>(value: T): T | undefined {
 }
 
 /**
- * `navigate` that renders the next view at once (flushSync) instead of in a transition: while runs
- * stream into the store, transitions can wait seconds behind urgent updates. Event handlers only.
+ * Router state that answers at once: the value lives in React state (urgent) and the URL follows with
+ * `replace`. Router updates run in transitions, and while runs stream into the store a transition can
+ * wait seconds behind urgent renders — a file or tab picked by the user must not. A URL change made
+ * elsewhere (a link, Back) still wins.
  */
+export function useUrlValue(urlValue: string | null, write: (value: string | null) => void): [string | null, (value: string | null) => void] {
+  const [value, setValue] = useState(urlValue)
+  const [seen, setSeen] = useState(urlValue)
+  if (urlValue !== seen) {
+    setSeen(urlValue)
+    setValue(urlValue)
+  }
+  const latestWrite = useRef(write)
+  latestWrite.current = write
+  const set = useCallback((next: string | null) => {
+    setValue(next)
+    latestWrite.current(next)
+  }, [])
+  return [value, set]
+}
+
+/** `navigate` for event handlers (kept as one seam for the Code workspace's navigations). */
 export function useGo() {
   const navigate = useNavigate()
-  return useCallback((to: To, opts?: NavigateOptions) => navigate(to, { flushSync: true, ...opts }), [navigate])
+  return useCallback((to: To, opts?: NavigateOptions) => navigate(to, opts), [navigate])
 }

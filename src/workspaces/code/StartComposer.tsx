@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link } from 'react-router'
 import { SlidersHorizontal, X } from 'lucide-react'
 import { AgentPicker, Composer, EntityPicker, ReadBackLine, RepoPicker, useComposerContext, useReadBack, type ComposerSubmitMeta } from '@/app/components'
 import { pickRepoForScope } from '@/core/assist/repos'
