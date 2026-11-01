@@ -4,7 +4,7 @@ import { Bm25Index, type IndexTerm } from './bm25'
 import { buildDoc, docProjectIds, INDEXED_TABLES, TABLE_KIND, TITLE_WEIGHT, type IndexedTable, type SearchDoc } from './documents'
 import { parseQuery } from './query'
 import { bestSnippet } from './snippet'
-import { analyze } from './text'
+import { forEachTerm } from './text'
 import type { SearchOptions, SearchResult } from './types'
 
 export const DEFAULT_SEARCH_LIMIT = 20
@@ -26,25 +26,31 @@ interface DocMeta {
 
 const keyOf = (table: IndexedTable, id: ID) => `${TABLE_KIND[table]}:${id}`
 
-/** Weighted terms (aggregated per surface) and the phrase string of a document. */
-export function docTerms(doc: SearchDoc): { terms: IndexTerm[]; phrase: string } {
+/** Weighted terms of a document, aggregated per surface (title tokens count TITLE_WEIGHT times). */
+export function docTerms(doc: SearchDoc): IndexTerm[] {
   const bySurface = new Map<string, IndexTerm>()
-  const phraseParts: string[] = []
-  const add = (text: string, weight: number) => {
-    const analyzed = analyze(text)
-    if (!analyzed.length) return
-    const stems: string[] = []
-    for (const t of analyzed) {
+  const add = (text: string, weight: number) =>
+    forEachTerm(text, (t) => {
       const cur = bySurface.get(t.surface)
       if (cur) cur.weight += weight
       else bySurface.set(t.surface, { stem: t.stem, surface: t.surface, weight })
-      stems.push(t.stem)
-    }
-    phraseParts.push(stems.join(' '))
-  }
+    })
   add(doc.title, TITLE_WEIGHT)
   for (const f of doc.body) add(f.text, f.weight)
-  return { terms: [...bySurface.values()], phrase: ` ${phraseParts.join(' | ')} ` }
+  return [...bySurface.values()]
+}
+
+/** " stem stem | stem … " — each field's stems in order, so phrases never span fields. */
+export function docPhrase(doc: SearchDoc): string {
+  const parts: string[] = []
+  const add = (text: string) => {
+    const stems: string[] = []
+    forEachTerm(text, (t) => stems.push(t.stem))
+    if (stems.length) parts.push(stems.join(' '))
+  }
+  add(doc.title)
+  for (const f of doc.body) add(f.text)
+  return ` ${parts.join(' | ')} `
 }
 
 /**
@@ -55,7 +61,11 @@ export function docTerms(doc: SearchDoc): { terms: IndexTerm[]; phrase: string }
 export class EntityIndex {
   private readonly bm25 = new Bm25Index()
   private readonly meta = new Map<string, DocMeta>()
+  /** Phrase strings, computed on demand for ranking candidates and dropped on change. */
+  private readonly phrases = new Map<string, string>()
   private synced: Tables | null = null
+  /** A time-sliced initial build in progress: rows of `state` still to index. */
+  private pending: { state: Tables; rows: Array<[IndexedTable, ID]>; next: number } | null = null
 
   get built(): boolean {
     return this.synced !== null
@@ -71,10 +81,33 @@ export class EntityIndex {
     return !prev || WATCHED_TABLES.some((t) => state[t] !== prev[t])
   }
 
-  /** Bring the index in line with `state`. Returns true when anything changed. */
+  /** Start an initial build of `state` that `continueBuild` performs in slices. */
+  beginBuild(state: Tables): void {
+    if (this.synced || this.pending) return
+    const rows: Array<[IndexedTable, ID]> = []
+    for (const table of INDEXED_TABLES) for (const id in state[table]) rows.push([table, id])
+    this.pending = { state, rows, next: 0 }
+  }
+
+  /** Index pending rows until `deadline` (a performance.now() time). Returns true once built. */
+  continueBuild(deadline = Infinity): boolean {
+    const p = this.pending
+    if (!p) return this.built
+    while (p.next < p.rows.length) {
+      const [table, id] = p.rows[p.next++]
+      this.upsert(table, id, p.state)
+      if ((p.next & 15) === 0 && performance.now() >= deadline) return false
+    }
+    this.synced = p.state
+    this.pending = null
+    return true
+  }
+
+  /** Bring the index in line with `state` (finishing any sliced build first). Returns true when anything changed. */
   sync(state: Tables): boolean {
+    const finishedBuild = this.pending !== null && this.continueBuild()
     const prev = this.synced
-    if (prev && !this.isStale(state)) return false
+    if (prev && !this.isStale(state)) return finishedBuild
     const rebuiltThreads = new Set<ID>()
     for (const table of INDEXED_TABLES) {
       const before = (prev?.[table] ?? {}) as Record<ID, unknown>
@@ -98,14 +131,14 @@ export class EntityIndex {
   }
 
   private upsert(table: IndexedTable, id: ID, state: Tables): void {
-    const doc = buildDoc(table, id, state)
+    const doc = buildDoc(table, id, state, 'index')
     if (!doc) {
       this.remove(table, id)
       return
     }
     const key = keyOf(table, id)
-    const { terms, phrase } = docTerms(doc)
-    this.bm25.set(key, terms, phrase)
+    this.bm25.set(key, docTerms(doc))
+    this.phrases.delete(key)
     const meta: DocMeta = { table, id, projectIds: doc.projectIds, updatedAt: doc.updatedAt }
     if (doc.investigationId) meta.investigationId = doc.investigationId
     this.meta.set(key, meta)
@@ -115,6 +148,17 @@ export class EntityIndex {
     const key = keyOf(table, id)
     this.bm25.delete(key)
     this.meta.delete(key)
+    this.phrases.delete(key)
+  }
+
+  private phraseOf(key: string, meta: DocMeta, state: Tables): string {
+    let phrase = this.phrases.get(key)
+    if (phrase === undefined) {
+      const doc = buildDoc(meta.table, meta.id, state, 'index')
+      phrase = doc ? docPhrase(doc) : ''
+      this.phrases.set(key, phrase)
+    }
+    return phrase
   }
 
   /** Ranked results for `query` against the synced snapshot `state`. */
@@ -152,7 +196,7 @@ export class EntityIndex {
       const cutoff = candidates[Math.min(limit, candidates.length) - 1].score
       for (const c of candidates) {
         if (c.score * PHRASE_BONUS < cutoff) break
-        if (this.bm25.hasPhrase(c.key, parsed.phrase)) c.score *= PHRASE_BONUS
+        if (this.phraseOf(c.key, c.meta, state).includes(parsed.phrase)) c.score *= PHRASE_BONUS
       }
       candidates.sort(byRank)
     }
@@ -160,7 +204,7 @@ export class EntityIndex {
     const results: SearchResult[] = []
     for (const c of candidates) {
       if (results.length >= limit) break
-      const doc = buildDoc(c.meta.table, c.meta.id, state)
+      const doc = buildDoc(c.meta.table, c.meta.id, state, 'display')
       if (!doc) continue
       const snippet = bestSnippet(doc.body, parsed.highlight)
       const result: SearchResult = {

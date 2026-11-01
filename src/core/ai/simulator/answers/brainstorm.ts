@@ -2,7 +2,7 @@ import type { Block, ComposeContext, ComposedParts } from '../types'
 import { marker } from '../evidence'
 import { bullets, heading, numbered } from '../layout'
 import { extractCount } from '../shapes'
-import { capitalize, gerund, keywords, lowerFirst, stripTrailingPunctuation, truncateWords } from '../text'
+import { capitalize, gerund, keywords, stripTrailingPunctuation, truncateWords } from '../text'
 import { closingOffer, lead, take, topicOf } from './common'
 
 const IDEAS = (t: string): string[] => [
@@ -48,17 +48,21 @@ const NAME_REASONS = [
   'pairs well with a simple icon',
 ]
 
-function nameIdeas(ctx: ComposeContext, n: number): string[] {
-  const kws = keywords(ctx.subject.np, 6).filter((k) => !/^(names?|ideas?|product|feature|new|our|your|for)$/.test(k))
-  const roots = (kws.length ? kws : ['atlas']).map((k) => capitalize(k.replace(/[^a-z0-9]/gi, '')))
+const GENERIC_ROOTS = /^(?:names?|ideas?|product|products|feature|features|new|our|your|for|add-on|addon|app|apps|tool|tools|service|platform|module|plugin|thing)$/
+
+function nameIdeas(ctx: ComposeContext, topic: string, n: number): string[] {
+  const kws = keywords(topic, 6).filter((k) => !GENERIC_ROOTS.test(k))
+  const roots = kws.map((k) => capitalize(k.replace(/[^a-z0-9]/gi, ''))).filter((r) => r.length > 2)
   const out = new Set<string>()
-  for (let guard = 0; out.size < n && guard < 60; guard++) {
-    const root = ctx.rng.pick(roots)
-    const form = ctx.rng.int(0, 2)
-    const name = form === 0 ? `${root} ${ctx.rng.pick(NAME_NOUNS)}` : form === 1 ? `${ctx.rng.pick(NAME_PREFIXES)}${root.toLowerCase()}` : ctx.rng.pick(NAME_NOUNS)
+  for (let guard = 0; out.size < n && guard < 80; guard++) {
+    const form = roots.length ? ctx.rng.int(0, 2) : 2
+    const root = roots.length ? ctx.rng.pick(roots) : ''
+    const name =
+      form === 0 ? `${root} ${ctx.rng.pick(NAME_NOUNS)}` : form === 1 ? `${ctx.rng.pick(NAME_PREFIXES)} ${root}` : ctx.rng.pick(NAME_NOUNS)
     out.add(name)
   }
-  return [...out].map((name) => `**${name}** — ${ctx.rng.pick(NAME_REASONS)}`)
+  const reasons = ctx.rng.shuffle(NAME_REASONS)
+  return [...out].map((name, i) => `**${name}** — ${reasons[i % reasons.length]}`)
 }
 
 const LIST_NOUN =
@@ -89,13 +93,15 @@ export function composeBrainstorm(ctx: ComposeContext): ComposedParts {
     priority: Infinity,
   })
 
-  const grounded = evidence.slice(0, deep ? 2 : 1).map((e) =>
-    lead(
-      `Build on ${e.source === 'knowledge' ? `*${e.title}*` : 'your file'}`,
-      `it says ${lowerFirst(stripTrailingPunctuation(truncateWords(e.sentence, 28)))}${marker(e)}; an idea that leans on that has a head start.`,
-    ),
-  )
-  const generic = isNames ? nameIdeas(ctx, n) : isQuestions ? take(ctx, QUESTIONS, n) : take(ctx, IDEAS(t), n)
+  const grounded = isNames
+    ? []
+    : evidence.slice(0, deep ? 2 : 1).map((e) =>
+        lead(
+          `Build on ${e.source === 'knowledge' ? `*${e.title}*` : 'your file'}`,
+          `it says “${stripTrailingPunctuation(truncateWords(e.sentence, 28))}”${marker(e)}; an idea that leans on that has a head start.`,
+        ),
+      )
+  const generic = isNames ? nameIdeas(ctx, t, n) : isQuestions ? take(ctx, QUESTIONS, n) : take(ctx, IDEAS(t), n)
   const list = [...grounded, ...generic].slice(0, Math.max(n, grounded.length + 2))
   blocks.push({ md: numbered(list), priority: Infinity })
 
@@ -113,7 +119,18 @@ export function composeBrainstorm(ctx: ComposeContext): ComposedParts {
 
   return {
     blocks,
-    extras: [{ md: 'Quantity first, judgment second: it is easier to cut a long list than to stretch a short one.', priority: 1 }],
+    extras: isNames
+      ? [
+          {
+            md: heading('What makes a name work') + bullets(['Easy to spell after hearing it once.', "Doesn't box you into a single feature.", 'Reads naturally in a sentence: “Open it in ___.”', 'Clearly different from names your competitors use.']),
+            priority: 1,
+          },
+          { md: heading('Next step') + 'Shortlist three, say each one aloud in a real sentence, and check availability before sharing them widely.', priority: 1 },
+        ]
+      : [
+          { md: 'Quantity first, judgment second: it is easier to cut a long list than to stretch a short one.', priority: 1 },
+          { md: heading('If you only try one') + `Pick the idea you could test this week with the least coordination — momentum on ${t} matters more than picking the perfect option.`, priority: 1 },
+        ],
     approach: {
       format: isNames ? 'a list of name candidates with a reason for each' : isQuestions ? 'a list of questions' : 'a numbered list of distinct ideas',
       structure: 'go wide first, then suggest a quick way to narrow down',

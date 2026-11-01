@@ -473,7 +473,8 @@ function pause(runId: ID): void {
 
 function resume(runId: ID): void {
   const run = db.get('runs', runId)
-  if (!run || run.status !== 'paused') return
+  // Only scripted runs are paused by the engine; anything else has no driver to resume.
+  if (!run?.script || run.status !== 'paused') return
   patchRun(runId, { status: 'running' })
   logActivity({ actor: ME, verb: 'resumed', target: runRef(runId), summary: `Resumed ${quoted(run.title)}`, projectId: run.projectId })
   drive(runId)
@@ -482,18 +483,24 @@ function resume(runId: ID): void {
 function retry(runId: ID): Run | undefined {
   const run = db.get('runs', runId)
   if (!run?.script || !getRunFactory(run.script.factory)) return undefined
-  const next = start({
-    kind: run.kind,
-    title: run.title,
-    factory: run.script.factory,
-    params: run.script.params,
-    projectId: run.projectId,
-    agentId: run.agentId,
-    workflowId: run.workflowId,
-    parentRunId: run.parentRunId,
-    origin: run.origin,
-    modelId: run.modelId,
-  })
+  let next: Run
+  try {
+    next = start({
+      kind: run.kind,
+      title: run.title,
+      factory: run.script.factory,
+      params: run.script.params,
+      projectId: run.projectId,
+      agentId: run.agentId,
+      workflowId: run.workflowId,
+      parentRunId: run.parentRunId,
+      origin: run.origin,
+      modelId: run.modelId,
+    })
+  } catch (error) {
+    console.error(`[runs] could not retry ${runId}`, error)
+    return undefined
+  }
   link(runRef(next.id), runRef(run.id), 'related')
   return next
 }

@@ -33,7 +33,7 @@ export function composeHowto(ctx: ComposeContext): ComposedParts {
     lead('Gather prerequisites', 'list the access, tools and decisions you need up front; missing access tends to stall work midway.'),
     lead('Start somewhere safe', 'try it first in a low-stakes place — a test account, a branch or a draft — before touching anything people rely on.'),
     lead(
-      vp ? capitalize(vp.split(' ').slice(0, 6).join(' ')) : 'Make the core change',
+      vp && vp.split(/\s+/).length <= 7 ? capitalize(vp) : 'Make the core change',
       'do it in one focused pass and note each setting or decision so it is reproducible.',
     ),
     lead('Verify', 'check the result against your definition of done, including one edge case and one failure path.'),

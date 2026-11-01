@@ -5,7 +5,7 @@ import { bashTemplate, renderTsSource, sqlTemplate, TEMPLATES, type CodeTemplate
 import { bullets, heading } from '../layout'
 import { detectLanguage, type CodeLanguage } from '../shapes'
 import { capitalize, ensurePeriod, stripTrailingPunctuation, titleCase } from '../text'
-import { closingOffer, sourcesBlock } from './common'
+import { closingOffer, sourcesBlock, take } from './common'
 
 export const LANGUAGE_LABEL: Record<CodeLanguage, string> = {
   typescript: 'TypeScript', javascript: 'JavaScript', tsx: 'React (TSX)', jsx: 'React (JSX)', python: 'Python', go: 'Go',
@@ -67,7 +67,8 @@ function fill(src: string, values: Record<string, string>): string {
 /** One-sentence description of what the requested code should do, from the request. */
 function describe(np: string): string {
   const m = /\b(?:that|which|to|for)\s+(.+)$/i.exec(np)
-  return ensurePeriod(capitalize(stripTrailingPunctuation(m ? m[1] : np)))
+  const what = (m ? m[1] : np).replace(/\s+(?:in|using|with|written in)\s+(?:typescript|javascript|python|go|golang|rust|java|kotlin|swift|ruby|php|c#|csharp|react|node(?:\.js)?)\b.*$/i, '')
+  return ensurePeriod(capitalize(stripTrailingPunctuation(what)))
 }
 
 function identifier(lang: CodeLanguage, parts: string[]): string {
@@ -82,11 +83,15 @@ function resourceRoute(text: string): string {
 
 interface CodeResult {
   code: string
+  /** Language of the code block when it differs from the requested one (reference implementations). */
+  codeLanguage?: CodeLanguage
   title: string
   notes: string[]
   tests: string[]
   usage?: string
   scaffold: boolean
+  /** True when the code is a reference in another language. */
+  reference?: boolean
 }
 
 function build(ctx: ComposeContext, lang: CodeLanguage): CodeResult {
@@ -124,11 +129,14 @@ function build(ctx: ComposeContext, lang: CodeLanguage): CodeResult {
     }
   }
 
-  const parts = identifierWords(ctx.subject.np)
+  const words = identifierWords(ctx.subject.np)
+  // Components and classes are named after things, not actions: drop a leading verb.
+  const nounParts = words.length > 1 && /^(?:show|display|render|list|let|allow|make|create|handle|manage|track)$/.test(words[0]) ? words.slice(1) : words
+  const parts = lang === 'tsx' || lang === 'jsx' ? nounParts : words
   const values: Record<string, string> = {
     NAME: identifier(lang, parts),
     CLASS: lang === 'java' || lang === 'csharp' ? `${pascalCase(parts)}Utils` : pascalCase(parts),
-    PASCAL: pascalCase(parts.length > 1 ? parts : [...parts, 'list']),
+    PASCAL: pascalCase(parts),
     KEBAB: kebabCase(parts),
     DESC: describe(ctx.subject.np),
     TITLE: titleCase(stripTrailingPunctuation(ctx.subject.np.replace(/^(?:an?|the)\s+/i, ''))),
@@ -138,6 +146,18 @@ function build(ctx: ComposeContext, lang: CodeLanguage): CodeResult {
   }
 
   const picked = pickTemplate(text, lang)
+  const matchedElsewhere = !picked ? TEMPLATES.find((t) => t.match.test(text) && t.sources.ts) : undefined
+  if (matchedElsewhere?.sources.ts && lang !== 'typescript' && lang !== 'javascript') {
+    return {
+      code: renderTsSource(matchedElsewhere.sources.ts, 'ts'),
+      codeLanguage: 'typescript',
+      title: matchedElsewhere.title,
+      notes: matchedElsewhere.notes,
+      tests: matchedElsewhere.tests,
+      scaffold: false,
+      reference: true,
+    }
+  }
   if (picked) {
     const usage = lang === 'python' ? picked.template.usage?.python : lang === 'typescript' ? picked.template.usage?.ts : undefined
     return { code: fill(picked.code, values), title: picked.template.title, notes: picked.template.notes, tests: picked.template.tests, usage, scaffold: false }
@@ -163,15 +183,20 @@ export function composeCode(ctx: ComposeContext): ComposedParts {
   const result = build(ctx, lang)
   const blocks: Block[] = []
 
-  const opener = result.scaffold
+  const fence = FENCE[result.codeLanguage ?? lang]
+  const opener = result.reference
+    ? `I don't have a vetted ${label} version of ${result.title}, so here's a TypeScript reference implementation to port — the logic carries over directly.`
+    : result.scaffold
     ? `Here's a ${label} starting point. The structure and input handling are in place; the core rule is marked TODO because I don't know your exact requirements.`
     : lang === 'sql'
       ? rng.pick([`Here's a SQL query for ${result.title}.`, `This query returns ${result.title}.`])
-      : rng.pick([`Here's ${result.title} in ${label}.`, `Here's a ${label} implementation of ${result.title}.`])
+      : lang === 'bash'
+        ? `Here's ${result.title}.`
+        : rng.pick([`Here's ${result.title} in ${label}.`, `Here's a ${label} implementation of ${result.title}.`])
   blocks.push({ md: opener, priority: Infinity })
-  blocks.push({ md: `\`\`\`${FENCE[lang]}\n${result.code}\n\`\`\``, priority: Infinity })
+  blocks.push({ md: `\`\`\`${fence}\n${result.code}\n\`\`\``, priority: Infinity })
   blocks.push({ md: heading('How it works') + bullets(deep ? result.notes : result.notes.slice(0, 2)), priority: 3 })
-  if (deep && result.usage) blocks.push({ md: `${heading('Usage')}\`\`\`${FENCE[lang]}\n${result.usage}\n\`\`\``, priority: 2 })
+  if (deep && result.usage) blocks.push({ md: `${heading('Usage')}\`\`\`${fence}\n${result.usage}\n\`\`\``, priority: 2 })
   if (deep) blocks.push({ md: heading('Tests to add') + bullets(result.tests), priority: 2 })
 
   const sources = sourcesBlock(ctx, evidence.slice(0, 2), 'Relevant notes from your docs')
@@ -179,9 +204,28 @@ export function composeCode(ctx: ComposeContext): ComposedParts {
   blocks.push({ md: "_I haven't run this code — review it and add tests before relying on it._", priority: Infinity })
   blocks.push(closingOffer(ctx, ['Want tests for it, or a version in another language?', 'I can adapt it to your codebase if you share the surrounding code.']))
 
+  const edgeCases: Block = {
+    md:
+      heading('Edge cases to consider') +
+      bullets(take(ctx, [
+        'Empty or missing input.',
+        'Very large inputs — check memory use and running time.',
+        'Malformed data arriving from outside your system.',
+        'Repeated or concurrent calls.',
+        'Time zones, locales and character encodings.',
+        'Failures in anything it depends on (network, disk, permissions).',
+      ], 3)),
+    priority: 1,
+  }
+  const integration: Block = {
+    md:
+      heading('Fitting it into your codebase') +
+      bullets(['Keep it in a small module with its own tests.', 'Log failures with enough context to debug them later.', 'Write the assumptions in a short comment at the top so reviewers can challenge them.']),
+    priority: 1,
+  }
   return {
     blocks,
-    extras: deep ? undefined : [{ md: heading('Tests to add') + bullets(result.tests), priority: 1 }],
+    extras: deep ? [edgeCases, integration] : [{ md: heading('Tests to add') + bullets(result.tests), priority: 1 }],
     approach: {
       format: `a ${label} code block${result.scaffold ? ' scaffold with the unknown rule marked TODO' : ''}`,
       structure: 'show the code first, then explain how it works and what to test',

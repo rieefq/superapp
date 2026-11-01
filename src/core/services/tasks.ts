@@ -242,6 +242,8 @@ export function updateTask(id: ID, patch: TaskPatch, opts: TaskActivityOptions =
 export function moveTask(id: ID, status: TaskStatus, beforeTaskId?: ID | null): Task | undefined {
   const cur = db.get('tasks', id)
   if (!cur) return undefined
+  // Dropping a card right where it already is (e.g. "before itself") changes nothing.
+  if (beforeTaskId === id && cur.status === status) return cur
   const now = Date.now()
   const column = db.filter('tasks', (t) => t.id !== id && t.projectId === cur.projectId && t.status === status).sort(byOrder)
   const at = beforeTaskId ? column.findIndex((t) => t.id === beforeTaskId) : -1

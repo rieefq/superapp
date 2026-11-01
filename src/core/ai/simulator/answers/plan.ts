@@ -1,7 +1,8 @@
 import type { Block, ComposeContext, ComposedParts } from '../types'
 import { bullets, heading, table } from '../layout'
 import { extractDuration } from '../shapes'
-import { gerund } from '../text'
+import { gerund, stripTrailingPunctuation } from '../text'
+import { relevanceStems } from '../evidence'
 import { closingOffer, noSourcesBlock, sourcesBlock, take, topicOf } from './common'
 
 interface Phase {
@@ -66,7 +67,7 @@ export function planTopic(np: string): string {
   const m = /^(?:(?:a|an|the|my|your)\s+)?(?:[\w-]+\s+){0,3}?(?:plan|roadmap|timeline|strategy|schedule|outline)\s+(for|to|on)\s+(.+)$/i.exec(t)
   if (m) t = m[1].toLowerCase() === 'to' ? gerund(m[2]) : m[2]
   else t = t.replace(/(?:\s+(?:learning|launch|migration|project|rollout|go-to-market))?\s+(?:plan|roadmap|timeline|strategy|schedule|outline)$/i, '')
-  t = t.replace(/^(?:(?:a|an|the)\s+)?(?:\d+|one|two|three|four|six|eight|ten|twelve)[- ](?:day|week|month|quarter)s?\s+/i, '')
+  t = t.replace(/^(?:(a|an|the)\s+)?(?:\d+|one|two|three|four|six|eight|ten|twelve)[- ](?:day|week|month|quarter)s?\s+/i, (_m, article?: string) => (article ? 'the ' : ''))
   t = t.replace(/^(?:a|an)\s+/i, '').trim()
   return t || np
 }
@@ -81,12 +82,14 @@ export function composePlan(ctx: ComposeContext): ComposedParts {
   const durations = phaseDurations(extractDuration(ctx.text), phases.length)
   const blocks: Block[] = []
 
+  const kind = domain === 'learning' ? 'learning plan' : domain === 'launch' ? 'launch plan' : 'plan'
   blocks.push({
-    md: rng.pick([`Here's a phased plan for ${t}.`, `Here's how I'd sequence ${t}, in ${phases.length} phases.`, `A ${phases.length}-phase plan for ${t}:`]),
+    md: rng.pick([`Here's a phased ${kind} for ${t}.`, `Here's how I'd sequence ${t}, in ${phases.length} phases.`, `A ${phases.length}-phase ${kind} for ${t}:`]),
     priority: Infinity,
   })
-  if (facts.projectGoal) {
-    blocks.push({ md: `It's anchored on the project goal: “${facts.projectGoal}”.`, priority: 3 })
+  const goal = facts.projectGoal
+  if (goal && [...relevanceStems(goal)].some((s) => relevanceStems(ctx.text).has(s))) {
+    blocks.push({ md: `It's anchored on the project goal: “${stripTrailingPunctuation(goal)}”.`, priority: 3 })
   }
 
   const phaseMd = phases.map((p, i) => {

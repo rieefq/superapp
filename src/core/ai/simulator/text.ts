@@ -55,11 +55,6 @@ export function keywords(text: string, limit = 12): string[] {
   return out
 }
 
-/** Stems of the keywords of `text`, for overlap scoring. */
-export function keywordStems(text: string): Set<string> {
-  return new Set(keywords(text, 64).map(stem))
-}
-
 const ABBREVIATIONS = new Set([
   'e.g', 'i.e', 'etc', 'vs', 'mr', 'mrs', 'ms', 'dr', 'prof', 'inc', 'ltd', 'co', 'jr', 'sr', 'st', 'no', 'fig',
   'approx', 'est', 'dept', 'u.s', 'a.m', 'p.m', 'cf', 'al',
@@ -125,13 +120,6 @@ export function capitalize(text: string): string {
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : text
 }
 
-/** Sentence case for user-typed text: fixes ALL-CAPS input, then capitalizes the first letter. */
-export function sentenceCase(text: string): string {
-  const letters = text.replace(/[^\p{L}]/gu, '')
-  const base = letters.length > 3 && letters === letters.toUpperCase() ? text.toLowerCase() : text
-  return capitalize(base)
-}
-
 const MINOR_WORDS = new Set(['a', 'an', 'the', 'and', 'or', 'but', 'of', 'for', 'to', 'in', 'on', 'at', 'by', 'with', 'vs'])
 
 /** Title Case, keeping minor words lowercase and acronyms intact. */
@@ -140,24 +128,6 @@ export function titleCase(text: string): string {
     .split(/\s+/)
     .map((w, i) => (i > 0 && MINOR_WORDS.has(w.toLowerCase()) ? w.toLowerCase() : capitalize(w)))
     .join(' ')
-}
-
-/** Words that may start a sentence but are not proper nouns (safe to lowercase mid-sentence). */
-const COMMON_STARTERS = new Set([
-  'the', 'a', 'an', 'this', 'that', 'these', 'those', 'it', 'its', 'we', 'our', 'they', 'their', 'there', 'most',
-  'many', 'some', 'each', 'every', 'all', 'any', 'when', 'if', 'for', 'in', 'on', 'at', 'by', 'with', 'after',
-  'before', 'during', 'because', 'since', 'while', 'to', 'users', 'customers', 'teams', 'you', 'your', 'one', 'two',
-  'three', 'no', 'not', 'only', 'both', 'new', 'existing', 'current', 'once', 'until', 'as', 'what', 'how', 'why',
-  'where', 'which', 'who', 'support', 'sessions', 'tokens', 'pricing', 'customer', 'teams', 'engineers', 'people',
-])
-
-/** Lowercase a sentence's first letter when it is a common word (keeps "Lumen", "SSO", "I"). */
-export function lowerFirst(sentence: string): string {
-  const first = sentence.split(/\s+/)[0] ?? ''
-  const bare = first.replace(/[^\p{L}']/gu, '')
-  if (!bare || bare.length > 1 && bare[1] === bare[1].toUpperCase() && /\p{L}/u.test(bare[1])) return sentence
-  if (!COMMON_STARTERS.has(bare.toLowerCase())) return sentence
-  return sentence.charAt(0).toLowerCase() + sentence.slice(1)
 }
 
 /** Remove trailing sentence punctuation and whitespace. */

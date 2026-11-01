@@ -9,6 +9,8 @@ export interface ReasoningInput {
   /** Titles of knowledge docs the answer draws on. */
   docTitles: string[]
   docCount: number
+  /** Passages that were provided but share nothing with the request. */
+  unmatchedDocs: number
   fileNames: string[]
   imageNames: string[]
 }
@@ -33,6 +35,9 @@ export function reasoningTrace(input: ReasoningInput, rng: Rng): string {
       `The request is ${SHAPE_READ[input.shape]}; ${input.approach.format} is the clearest shape for it.`,
     ]),
   )
+  if (input.approach.material && !input.fileNames.length) {
+    sentences.push(`The material is ${input.approach.material}, so I'll stay close to its actual wording instead of adding anything.`)
+  }
   if (input.fileNames.length) {
     sentences.push(`The attached ${input.fileNames.length > 1 ? 'files' : 'file'} (${joinList(input.fileNames)}) ${input.fileNames.length > 1 ? 'are' : 'is'} the primary material, so I'll stay close to ${input.fileNames.length > 1 ? 'their' : 'its'} actual wording.`)
   }
@@ -44,7 +49,11 @@ export function reasoningTrace(input: ReasoningInput, rng: Rng): string {
         `Retrieval surfaced ${joinList(named)}${input.docCount > 2 ? ' among others' : ''}; I'll quote those passages rather than paraphrase loosely, with [n] citations.`,
       ]),
     )
-  } else if (!input.fileNames.length && input.shape !== 'code') {
+  } else if (input.unmatchedDocs > 0) {
+    sentences.push(
+      `${input.unmatchedDocs} passage${input.unmatchedDocs === 1 ? ' was' : 's were'} provided as context, but none address${input.unmatchedDocs === 1 ? 'es' : ''} this directly, so I'll list them as possibly related rather than lean on them.`,
+    )
+  } else if (!input.fileNames.length && !input.approach.material && input.shape !== 'code') {
     sentences.push(
       rng.pick([
         "Nothing in the workspace knowledge matches, so I'll stay with structure and next steps instead of asserting specifics I can't verify.",
@@ -55,7 +64,7 @@ export function reasoningTrace(input: ReasoningInput, rng: Rng): string {
   if (input.imageNames.length) {
     sentences.push(`I can't view the attached image${input.imageNames.length > 1 ? 's' : ''}, so I'll say so plainly rather than guess at the contents.`)
   }
-  sentences.push(`Plan: ${input.approach.structure}.`)
+  sentences.push(`Approach: ${input.approach.structure}.`)
   if (sentences.length < 4) {
     sentences.push(rng.pick(['Anything I would otherwise have to guess stays a placeholder or a question.', 'I will close with a concrete next step.']))
   }

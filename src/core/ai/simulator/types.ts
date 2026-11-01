@@ -38,6 +38,8 @@ export interface ApproachNotes {
   format: string
   /** e.g. "lead with the short answer, then the criteria, then a next step". */
   structure: string
+  /** Material the answer works from directly ("the text you pasted"), when there is some. */
+  material?: string
 }
 
 export interface ComposedParts {

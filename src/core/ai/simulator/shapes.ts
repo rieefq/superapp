@@ -14,7 +14,7 @@ interface Rule {
 }
 
 export const CODE_LANGUAGE_PATTERN =
-  /\b(typescript|javascript|python|golang|rust|java|kotlin|swift|ruby|php|sql|postgres(?:ql)?|mysql|sqlite|bash|shell script|zsh|powershell|csharp|html|css|tsx|jsx|react|node(?:\.js)?|deno|pandas|django|flask|fastapi|express|vue|svelte|regex)\b|\bin go\b|\bgo (?:code|function|program|service)\b|(?:^|\s)(?:c#|c\+\+)(?=$|[\s,.?!])/i
+  /\b(typescript|javascript|python|golang|rust|java|kotlin|swift|ruby|php|sql|postgres(?:ql)?|mysql|sqlite|bash|shell script|zsh|powershell|csharp|html|css|tsx|jsx|react|node(?:\.js)?|deno|pandas|django|flask|fastapi|express|vue|svelte|regex)\b|\b(?:a|an|in|using|with|written in)\s+go\b(?![-'’])|\bgo (?:code|function|program|service|handler|struct|module)\b|(?:^|\s)(?:c#|c\+\+)(?=$|[\s,.?!])/i
 
 const RULES: Record<RequestShape, Rule[]> = {
   summarize: [
@@ -108,7 +108,7 @@ const LANGUAGE_RULES: Array<[RegExp, CodeLanguage]> = [
   [/\b(typescript|ts|deno)\b/i, 'typescript'],
   [/\b(javascript|js|node(?:\.js)?|express)\b/i, 'javascript'],
   [/\b(python|py|pandas|django|flask|fastapi)\b/i, 'python'],
-  [/\b(golang)\b|\bin go\b|\bgo (?:code|function|program|service|handler)\b/i, 'go'],
+  [/\b(golang)\b|\b(?:a|an|in|using|with|written in)\s+go\b(?![-'’])|\bgo (?:code|function|program|service|handler|struct|module)\b/i, 'go'],
   [/\b(rust)\b/i, 'rust'],
   [/\b(kotlin)\b/i, 'kotlin'],
   [/\b(java)\b(?!script)/i, 'java'],
@@ -148,7 +148,7 @@ export function extractComparisonItems(text: string): string[] {
 }
 
 function splitItems(s: string): string[] {
-  return s.split(/,\s*(?:and\s+|or\s+)?|\s+(?:and|or)\s+/i)
+  return s.split(/,\s*(?:and\s+|or\s+)?|\s+(?:and|or|vs\.?|versus)\s+/i)
 }
 
 function cleanItem(s: string): string {

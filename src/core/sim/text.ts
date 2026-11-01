@@ -121,13 +121,36 @@ export interface Comparison {
   b: string
 }
 
+/** Words that end a comparison subject when reading forward ("Chargebee for billing" → "Chargebee"). */
+const SUBJECT_STOP_FORWARD = new Set(['for', 'in', 'which', 'when', 'to', 'on', 'with', 'that', 'at', 'as', 'if', 'or', 'and', 'by', 'from', 'of', 'vs', 'versus', 'is', 'are'])
+/** Words that end a comparison subject when reading backward ("Should we use Stripe" → "Stripe"). */
+const SUBJECT_STOP_BACKWARD = new Set([
+  'use', 'using', 'choose', 'pick', 'between', 'compare', 'comparing', 'should', 'we', 'our', 'is', 'are', 'the', 'a', 'an', 'of', 'for',
+  'in', 'and', 'to', 'do', 'does', 'how', 'what', 'which', 'adopt', 'buy', 'try', 'with',
+])
+
+/** Up to three words of a comparison subject, stopping at punctuation and connective words. */
 function trimSubject(text: string, fromEnd: boolean): string {
-  const ws = cleanSentence(text)
-    .replace(/^(the|a|an|our|their|between)\s+/i, '')
-    .split(' ')
-    .filter(Boolean)
-  const picked = fromEnd ? ws.slice(-3) : ws.slice(0, 3)
-  return picked.join(' ').replace(/^(the|a|an)\s+/i, '').replace(/[,;:]+$/, '')
+  const ws = text.replace(/\s+/g, ' ').trim().split(' ').filter(Boolean)
+  const picked: string[] = []
+  if (fromEnd) {
+    for (let i = ws.length - 1; i >= 0 && picked.length < 3; i--) {
+      const w = ws[i]
+      if (/[,;:!?()—–]$/.test(w) && picked.length) break
+      const clean = w.replace(/[,;:!?()—–.]+$/, '')
+      if (SUBJECT_STOP_BACKWARD.has(clean.toLowerCase()) && picked.length) break
+      if (clean) picked.unshift(clean)
+    }
+  } else {
+    for (const w of ws) {
+      if (picked.length >= 3) break
+      const clean = w.replace(/^[(“"']+/, '').replace(/[,;:!?()—–.”"']+$/, '')
+      if (SUBJECT_STOP_FORWARD.has(clean.toLowerCase()) && picked.length) break
+      if (clean) picked.push(clean)
+      if (clean !== w && /[,;:!?()—–.]$/.test(w)) break
+    }
+  }
+  return picked.join(' ').replace(/^(the|a|an)\s+/i, '')
 }
 
 /** Detect "A vs B", "compare A and B", "difference between A and B", "should we A or B". */

@@ -42,6 +42,11 @@ export interface GenerateRequest {
   effort?: Effort
   /** Ask the provider to return a reasoning summary when supported. */
   reasoning?: boolean
+  /**
+   * Variation seed (e.g. derived from the run id). The simulator uses it to vary phrasing
+   * deterministically so a regenerated answer differs; live providers ignore it.
+   */
+  seed?: number
 }
 
 export type StreamEvent =

@@ -14,7 +14,7 @@ export interface Toolchain {
   packageVersion: string
   /** e.g. "3.2.0" from package.json (no range prefix). */
   runnerVersion?: string
-  scripts: { test?: string; typecheck?: string; lint?: string }
+  scripts: { test?: string; typecheck?: string; lint?: string; e2e?: string }
   hasTsconfig: boolean
   lint: LintTool | null
   typecheckTool: 'tsc' | 'mypy' | 'go vet' | 'cargo check' | null
@@ -84,7 +84,7 @@ export function detectToolchain(files: readonly WorkingFile[], repoName: string)
       pm,
       runner,
       runnerVersion: version || undefined,
-      scripts: { test: pkg?.scripts?.test, typecheck: pkg?.scripts?.typecheck, lint: pkg?.scripts?.lint },
+      scripts: { test: pkg?.scripts?.test, typecheck: pkg?.scripts?.typecheck, lint: pkg?.scripts?.lint, e2e: pkg?.scripts?.e2e },
       lint: has(/(^|\/)(\.eslintrc(\.[a-z]+)?|eslint\.config\.[cm]?[jt]s)$/) || 'eslint' in deps ? 'eslint' : has(/(^|\/)biome\.jsonc?$/) ? 'biome' : null,
       typecheckTool: base.hasTsconfig ? 'tsc' : null,
     }
@@ -110,8 +110,22 @@ function runScript(tc: Toolchain, script: string): string {
   return `${tc.pm} ${script}`
 }
 
+/** End-to-end (browser) tests are run by Playwright, not the unit test runner. */
+export function isE2EPath(path: string): boolean {
+  return /(^|\/)e2e\//.test(path) || /\.e2e\.[a-z]+$/.test(path)
+}
+
+/** Unit test files only (no end-to-end specs). */
+export function unitTestFiles(tc: Toolchain): string[] {
+  return tc.testFiles.filter((p) => !isE2EPath(p))
+}
+
 /** Command that runs one test file (or the whole suite). */
 export function testCommand(tc: Toolchain, file?: string | null): string {
+  if (file && tc.ecosystem === 'node' && isE2EPath(file)) {
+    if (tc.scripts.e2e) return tc.pm === 'npm' ? `npm run e2e -- ${file}` : `${tc.pm} e2e ${file}`
+    return `npx playwright test ${file}`
+  }
   switch (tc.runner) {
     case 'pytest':
       return file ? `pytest ${file}` : 'pytest'

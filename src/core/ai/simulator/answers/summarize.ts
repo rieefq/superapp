@@ -39,7 +39,7 @@ export function extractiveSummary(text: string, keep: number): ExtractiveSummary
     .sort((a, b) => a.i - b.i)
     .map((x) => x.s)
   const pickedSet = new Set(picked)
-  const actions = sentences.filter((s) => !pickedSet.has(s) && ACTION_RE.test(s)).slice(0, 4)
+  const actions = sentences.filter((s) => !pickedSet.has(s) && !s.trim().endsWith('?') && ACTION_RE.test(s)).slice(0, 4)
   const questions = sentences.filter((s) => s.trim().endsWith('?') && !pickedSet.has(s)).slice(0, 3)
   return { picked, actions, questions, total: sentences.length }
 }
@@ -87,7 +87,7 @@ export function composeSummarize(ctx: ComposeContext): ComposedParts {
     }
     blocks.push({ md: '_Extractive summary: every point is a sentence from the cited passage, lightly trimmed._', priority: 2 })
     blocks.push(closingOffer(ctx, ['Want me to pull these into a single brief{project}?', 'I can turn these into tasks{project} if any need action.']))
-    return { blocks, noPadding: true, approach: { format: 'a per-document extractive summary', structure: 'keep each point traceable to its document' } }
+    return { blocks, noPadding: true, approach: { format: 'a per-document extractive summary', structure: 'keep each point traceable to its document', material: 'the matching knowledge passages' } }
   }
 
   if (!source) {
@@ -118,6 +118,6 @@ export function composeSummarize(ctx: ComposeContext): ComposedParts {
   return {
     blocks,
     noPadding: true,
-    approach: { format: `an extractive summary of ${source.name}`, structure: 'lead with the single most central sentence, then key points and action items' },
+    approach: { format: `an extractive summary of ${source.name}`, structure: 'lead with the single most central sentence, then key points and action items', material: source.name },
   }
 }

@@ -159,7 +159,8 @@ export function firstSentences(markdown: string, maxSentences = 2, maxChars = 24
     .join('\n')
   const flat = plainText(prose).replace(/\s+/g, ' ').trim()
   if (!flat) return ''
-  const sentences = flat.match(/[^.!?]+(?:[.!?]+["”’)\]]*|$)/g)?.map((s) => s.trim()).filter(Boolean) ?? [flat]
+  // Split after . ! ? followed by whitespace and a capital/digit/quote, so "v2.5" and "e.g. x" stay intact.
+  const sentences = flat.split(/(?<=[.!?]["”’)\]]?)\s+(?=[A-Z0-9“"‘'(\[])/).map((s) => s.trim()).filter(Boolean)
   let out = ''
   for (const sentence of sentences.slice(0, maxSentences)) {
     const next = out ? `${out} ${sentence}` : sentence

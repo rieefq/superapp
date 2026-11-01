@@ -18,15 +18,23 @@ export const MIN_TOKEN_LENGTH = 2
 export const MAX_TOKEN_LENGTH = 40
 
 // A token starts with a letter or digit and continues with letters, digits, combining marks or apostrophes.
-const TOKEN_RE = /[\p{L}\p{N}][\p{L}\p{N}\p{M}'’]*/gu
-const NON_ASCII_RE = /[^\x00-\x7f]/
+const TOKEN_SOURCE = "[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{M}'’]*"
+/** A fresh regex per call keeps tokenizing re-entrant (callbacks may tokenize too). */
+const tokenRe = () => new RegExp(TOKEN_SOURCE, 'gu')
 const MARKS_RE = /\p{M}+/gu
 const APOSTROPHES_RE = /['’]/g
 
+function isPlainAscii(s: string): boolean {
+  for (let i = 0; i < s.length; i++) if (s.charCodeAt(i) > 127) return false
+  return true
+}
+
 /** Lowercase, strip diacritics (é → e) and apostrophes (don't → dont). */
 export function fold(text: string): string {
-  const base = NON_ASCII_RE.test(text) ? text.normalize('NFKD').replace(MARKS_RE, '') : text
-  return base.toLowerCase().replace(APOSTROPHES_RE, '')
+  let s = text.toLowerCase()
+  if (!isPlainAscii(s)) s = s.normalize('NFKD').replace(MARKS_RE, '')
+  if (s.includes("'") || s.includes('’')) s = s.replace(APOSTROPHES_RE, '')
+  return s
 }
 
 const LETTERS_ONLY_RE = /^[a-z]+$/
@@ -62,43 +70,72 @@ export function isTermSurface(surface: string): boolean {
   return surface.length >= MIN_TOKEN_LENGTH && surface.length <= MAX_TOKEN_LENGTH && !STOPWORDS.has(surface)
 }
 
-export interface Token {
+export interface Term {
+  /** Folded form (lowercase, no diacritics/apostrophes). */
+  readonly surface: string
+  readonly stem: string
+  /** False for stopwords and tokens that are too short/long to index. */
+  readonly isTerm: boolean
+}
+
+/**
+ * Raw token → analyzed term. Word frequencies are Zipfian, so most lookups hit; the cache
+ * is cleared wholesale when it grows large (cheap, and keeps memory bounded).
+ */
+const termCache = new Map<string, Term>()
+const TERM_CACHE_LIMIT = 100_000
+
+function termOf(raw: string): Term {
+  let term = termCache.get(raw)
+  if (!term) {
+    const surface = fold(raw)
+    const isTerm = isTermSurface(surface)
+    term = { surface, stem: isTerm ? stem(surface) : surface, isTerm }
+    if (termCache.size >= TERM_CACHE_LIMIT) termCache.clear()
+    termCache.set(raw, term)
+  }
+  return term
+}
+
+export interface Token extends Term {
   /** [start, end) offsets in the original text. */
   start: number
   end: number
-  /** Folded form (lowercase, no diacritics/apostrophes). */
-  surface: string
-  stem: string
-  /** False for stopwords and tokens that are too short/long to index. */
-  isTerm: boolean
 }
 
 /** Tokenize with offsets into the original string (used for snippets and highlighting). */
 export function tokenize(text: string): Token[] {
   const out: Token[] = []
-  TOKEN_RE.lastIndex = 0
-  for (let m = TOKEN_RE.exec(text); m; m = TOKEN_RE.exec(text)) {
-    const surface = fold(m[0])
-    const isTerm = isTermSurface(surface)
-    out.push({ start: m.index, end: m.index + m[0].length, surface, stem: isTerm ? stem(surface) : surface, isTerm })
+  const re = tokenRe()
+  for (let m = re.exec(text); m; m = re.exec(text)) {
+    const { surface, stem: s, isTerm } = termOf(m[0])
+    out.push({ start: m.index, end: m.index + m[0].length, surface, stem: s, isTerm })
   }
   return out
 }
 
-export interface Term {
-  surface: string
-  stem: string
+/** Index-side analysis: call `fn` for each meaningful term, in order. */
+export function forEachTerm(text: string, fn: (term: Term) => void): void {
+  const re = tokenRe()
+  for (let m = re.exec(text); m; m = re.exec(text)) {
+    const term = termOf(m[0])
+    if (term.isTerm) fn(term)
+  }
 }
 
 /** Index-side analysis: only meaningful terms, in order (no offsets). */
 export function analyze(text: string): Term[] {
   const out: Term[] = []
-  TOKEN_RE.lastIndex = 0
-  for (let m = TOKEN_RE.exec(text); m; m = TOKEN_RE.exec(text)) {
-    const surface = fold(m[0])
-    if (isTermSurface(surface)) out.push({ surface, stem: stem(surface) })
-  }
+  forEachTerm(text, (t) => out.push(t))
   return out
+}
+
+/**
+ * Cheap cleanup for indexing (full markdown stripping is reserved for displayed snippets):
+ * link/image targets would only add URL fragments as terms.
+ */
+export function indexableText(markdown: string): string {
+  return markdown.includes('](') ? markdown.replace(/\]\([^)\s]*\)/g, ']') : markdown
 }
 
 /**

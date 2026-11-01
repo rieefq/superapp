@@ -1,1 +1,27 @@
-export {}
+/**
+ * Display components (track A2): documents, code, diffs, terminals, trees, tables,
+ * activity and figures. Import from '@/ui'.
+ */
+export { Markdown, CitationMarker } from './Markdown'
+export type { MarkdownProps, Citation, CitationMarkerProps } from './Markdown'
+export { CodeBlock, InlineCode, parseLineSpec } from './CodeBlock'
+export type { CodeBlockProps } from './CodeBlock'
+export { DiffView, DiffStat } from './DiffView'
+export type { DiffViewProps, DiffStatProps, DiffMode } from './DiffView'
+export { computeDiffStats, diffStatCells, parseUnifiedDiff } from './diff'
+export type { DiffStats, DiffLine } from './diff'
+export { Terminal, LogView } from './Terminal'
+export type { TerminalProps, TerminalLine, TerminalHeight } from './Terminal'
+export { Tree } from './Tree'
+export type { TreeProps, TreeNode } from './Tree'
+export { FileIcon } from './FileIcon'
+export type { FileIconProps } from './FileIcon'
+export { DataTable, Pagination } from './DataTable'
+export type { DataTableProps, DataColumn, TableSort, PaginationProps } from './DataTable'
+export { ActivityFeed } from './ActivityFeed'
+export type { ActivityFeedProps, ActivityItem } from './ActivityFeed'
+export { Stat, Meter } from './Stat'
+export type { StatProps, StatDelta, MeterProps } from './Stat'
+export { classifyLogLine, fileKind, paginate, sortRows, groupByDay } from './logic'
+export type { LogTone, FileKind, SortDirection } from './logic'
+export { highlightLines, languageLabel, languageFromPath } from './highlight'

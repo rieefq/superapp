@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import { db, ID_PREFIX, useDB, useRow, useRows, type Tables } from '@/core/db'
 import { runEngine } from '@/core/runs'
 import { getSettings } from '@/core/settings'
@@ -46,13 +47,17 @@ export interface CreateAgentInput {
 
 const randomSigil = () => Math.floor(Math.random() * 0x7fffffff)
 
-/** One grant per capability (the first wins), copied so templates are never shared by reference. */
+/**
+ * One grant per capability + integration (the first wins), copied so templates are never
+ * shared by reference. Several grants may exist for one capability via different integrations.
+ */
 function normalizeGrants(grants: readonly CapabilityGrant[]): CapabilityGrant[] {
   const seen = new Set<string>()
   const out: CapabilityGrant[] = []
   for (const g of grants) {
-    if (seen.has(g.capability)) continue
-    seen.add(g.capability)
+    const key = `${g.capability}|${g.integrationId ?? ''}`
+    if (seen.has(key)) continue
+    seen.add(key)
     out.push(g.integrationId ? { capability: g.capability, mode: g.mode, integrationId: g.integrationId } : { capability: g.capability, mode: g.mode })
   }
   return out
@@ -237,7 +242,6 @@ export function runAgent(agentId: ID, input: RunAgentInput): Run {
   const task = input.taskId ? db.get('tasks', input.taskId) : undefined
   const projectId = input.projectId !== undefined ? input.projectId : (task?.projectId ?? null)
   const origin = input.origin ?? (task ? { kind: 'task' as const, id: task.id } : undefined)
-  const initiator = input.initiator ?? ME
   const params: Record<string, unknown> = { agentId, instruction }
   if (task) params.taskId = task.id
   if (projectId) params.projectId = projectId
@@ -250,30 +254,33 @@ export function runAgent(agentId: ID, input: RunAgentInput): Run {
     agentId,
     projectId,
     origin,
-    initiator,
+    initiator: input.initiator ?? ME,
     modelId: agent.modelId,
   })
 
-  const runRef: EntityRef = { kind: 'run', id: run.id }
-  if (origin) markDerived(runRef, origin)
-  if (task) {
-    db.update('tasks', task.id, (t) => ({
+  // The run service logs “Started …” and links run → origin; record message backlinks too.
+  if (origin) markDerived({ kind: 'run', id: run.id }, origin)
+  if (task) attachRunToTask(task.id, run.id, agentId)
+  return run
+}
+
+/**
+ * Record that a run works on a task: append it to `task.runIds`, move an open task to
+ * In progress and assign the agent when nobody is assigned. Idempotent.
+ */
+export function attachRunToTask(taskId: ID, runId: ID, agentId: ID): void {
+  db.update('tasks', taskId, (t) => {
+    const attached = t.runIds.includes(runId)
+    const closed = t.status === 'done' || t.status === 'cancelled'
+    if (attached && (closed || t.status === 'in_progress') && t.assignee) return t
+    return {
       ...t,
-      runIds: t.runIds.includes(run.id) ? t.runIds : [...t.runIds, run.id],
-      status: t.status === 'done' || t.status === 'cancelled' ? t.status : 'in_progress',
+      runIds: attached ? t.runIds : [...t.runIds, runId],
+      status: closed ? t.status : 'in_progress',
       assignee: t.assignee ?? { type: 'agent', id: agentId },
       updatedAt: Date.now(),
-    }))
-  }
-  logActivity({
-    actor: initiator,
-    verb: 'delegated',
-    target: agentRef(agentId),
-    summary: task ? `Asked ${agent.name} to work on “${task.title}”` : `Asked ${agent.name}: “${run.title}”`,
-    projectId,
-    meta: { runId: run.id, taskId: task?.id },
+    }
   })
-  return run
 }
 
 // ---------------------------------------------------------------- live status & stats
@@ -301,7 +308,8 @@ function runsByAgent(runs: Tables['runs']): Map<ID, Run[]> {
  * (last finished run failed within 24h) › idle.
  */
 export function computeAgentLiveStatus(agent: Pick<Agent, 'status'> | undefined, runs: readonly Run[], now = Date.now()): AgentLiveStatus {
-  if (!agent || agent.status !== 'active') return 'paused'
+  if (!agent) return 'idle'
+  if (agent.status !== 'active') return 'paused'
   if (runs.some((r) => r.status === 'waiting' || r.status === 'paused')) return 'waiting'
   if (runs.some((r) => r.status === 'running' || r.status === 'queued')) return 'working'
   let last: Run | undefined
@@ -381,11 +389,14 @@ export function useAgentLiveStatus(agentId: ID): AgentLiveStatus {
   return useDB((s) => computeAgentLiveStatus(s.agents[agentId], runsByAgent(s.runs).get(agentId) ?? NO_RUNS))
 }
 
+/** 30-day stats for an agent; re-renders only when a value changes. */
 export function useAgentStats(agentId: ID): AgentStats {
-  return useDB((s) => {
-    const now = Date.now()
-    return memoOnTable(s.runs, `agentStats:${agentId}:${timeBucket(TIME.HOUR, now)}`, () =>
-      computeAgentStats(runsByAgent(s.runs).get(agentId) ?? NO_RUNS, now),
-    )
-  })
+  return useDB(
+    useShallow((s: Tables) => {
+      const now = Date.now()
+      return memoOnTable(s.runs, `agentStats:${agentId}:${timeBucket(TIME.HOUR, now)}`, () =>
+        computeAgentStats(runsByAgent(s.runs).get(agentId) ?? NO_RUNS, now),
+      )
+    }),
+  )
 }

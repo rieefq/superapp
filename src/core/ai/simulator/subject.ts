@@ -83,9 +83,13 @@ export function extractSubject(text: string): Subject {
     const vp = capWords(m[1], 12)
     return { kind: 'action', vp, np: gerund(vp), phrase, keywords: kw }
   }
-  // "what is X" / "who are X" → thing
-  if ((m = new RegExp(`^(?:what|who|which)(?:'s| ${AUX})\\s+(.+)$`, 'i').exec(phrase))) {
+  // "what is X" / "who are X" → thing (only copulas give a clean noun phrase)
+  if ((m = /^(?:what|who|which)(?:'s|'re| is| are| was| were)\s+(.+)$/i.exec(phrase))) {
     return mk('thing', m[1])
+  }
+  // "what should we do about X" / "which tool can …" → question
+  if (new RegExp(`^(?:what|who|which|how)\\s+(?:\\w+\\s+)?${AUX}\\b`, 'i').test(phrase)) {
+    return mk('question', phrase.charAt(0).toLowerCase() + phrase.slice(1))
   }
   // "why does X" / "when should X" / yes-no questions → question
   if (/^(?:why|when|where|whether)\b/i.test(phrase) || new RegExp(`^${AUX}\\b`, 'i').test(phrase)) {

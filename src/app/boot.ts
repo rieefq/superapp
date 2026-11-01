@@ -2,6 +2,7 @@ import { db, hydrate, startPersistence, writeAll } from '@/core/db'
 import { registerAllFactories } from '@/core/runs/factories'
 import { runEngine } from '@/core/runs'
 import { buildSeed } from '@/core/seed'
+import { recoverInterruptedMessages } from '@/core/ai/chat'
 
 let booted = false
 
@@ -22,7 +23,11 @@ export async function boot(): Promise<void> {
     writeAll(seed)
   }
   startPersistence()
-  // TODO(orchestrator): call recoverInterruptedMessages() from '@/core/ai/chat' once it lands.
+  try {
+    recoverInterruptedMessages()
+  } catch (err) {
+    console.warn('[boot] chat recovery failed', err)
+  }
   try {
     runEngine.resumeInterrupted()
   } catch (err) {

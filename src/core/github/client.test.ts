@@ -10,7 +10,7 @@ function json(body: unknown, status = 200, headers: Record<string, string> = {})
 }
 
 function text(body: string | Uint8Array, status = 200, headers: Record<string, string> = {}): Response {
-  return new Response(body, { status, headers })
+  return new Response(typeof body === 'string' ? body : (body.slice().buffer as ArrayBuffer), { status, headers })
 }
 
 let fetchMock: ReturnType<typeof vi.fn>

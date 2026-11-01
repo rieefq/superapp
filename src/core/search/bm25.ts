@@ -5,7 +5,6 @@
  *   with weight 3 counts three times (a simple BM25F-style field boost).
  * - Surfaces (folded, unstemmed tokens) are kept in a lazily merged sorted list for
  *   as-you-type prefix expansion: "migr" → surface "migration" → stem "migration".
- * - Each document can carry a phrase string (" stem stem | stem … ") for exact-phrase checks.
  */
 
 export interface IndexTerm {
@@ -30,8 +29,8 @@ export interface DocScore {
 interface DocEntry {
   length: number
   terms: Map<string, number>
+  /** Surfaces counted for this document (one reference each). */
   surfaces: string[]
-  phrase: string
 }
 
 export class Bm25Index {
@@ -70,32 +69,34 @@ export class Bm25Index {
     return Math.log(1 + (total - n + 0.5) / (n + 0.5))
   }
 
-  /** Add or replace a document. Documents without terms are not stored. */
-  set(key: string, terms: readonly IndexTerm[], phrase = ''): void {
+  /**
+   * Add or replace a document. Pass terms aggregated per surface (weights summed) for
+   * best performance; repeated surfaces are still counted correctly. Documents without
+   * terms are not stored.
+   */
+  set(key: string, terms: readonly IndexTerm[]): void {
     this.delete(key)
     if (!terms.length) return
     const tf = new Map<string, number>()
-    const surfaces = new Map<string, string>()
+    const surfaces: string[] = []
     let length = 0
     for (const t of terms) {
       tf.set(t.stem, (tf.get(t.stem) ?? 0) + t.weight)
       length += t.weight
-      surfaces.set(t.surface, t.stem)
+      surfaces.push(t.surface)
+      const info = this.surfaceInfo.get(t.surface)
+      if (info) info.refs++
+      else {
+        this.surfaceInfo.set(t.surface, { stem: t.stem, refs: 1 })
+        this.pendingSurfaces.push(t.surface)
+      }
     }
-    this.docs.set(key, { length, terms: tf, surfaces: [...surfaces.keys()], phrase })
+    this.docs.set(key, { length, terms: tf, surfaces })
     this.totalLength += length
     for (const [stem, weight] of tf) {
       let posting = this.postings.get(stem)
       if (!posting) this.postings.set(stem, (posting = new Map()))
       posting.set(key, weight)
-    }
-    for (const [surface, stem] of surfaces) {
-      const info = this.surfaceInfo.get(surface)
-      if (info) info.refs++
-      else {
-        this.surfaceInfo.set(surface, { stem, refs: 1 })
-        this.pendingSurfaces.push(surface)
-      }
     }
   }
 
@@ -127,11 +128,6 @@ export class Bm25Index {
     this.pendingSurfaces = []
     this.removedSurfaces = 0
     this.totalLength = 0
-  }
-
-  /** True when the document's phrase string contains the (space-delimited) phrase. */
-  hasPhrase(key: string, phrase: string): boolean {
-    return this.docs.get(key)?.phrase.includes(phrase) ?? false
   }
 
   /** Merge newly seen surfaces into the sorted list and drop removed ones. */

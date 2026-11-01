@@ -1,6 +1,6 @@
 import { useShallow } from 'zustand/react/shallow'
 import { useDB, useRow } from '@/core/db'
-import { ACTIVE_RUN_STATUSES, sameRef, type EntityRef, type ID, type Run, type RunKind, type RunStatus } from '@/core/types'
+import { ACTIVE_RUN_STATUSES, type EntityRef, type ID, type Run, type RunKind, type RunStatus } from '@/core/types'
 
 export interface ActiveRunsFilter {
   /** Restrict to one project (null/undefined = all work). */
@@ -65,7 +65,7 @@ export function useRunsForOrigin(ref: EntityRef | null | undefined): Run[] {
   return useDB(
     useShallow((s) => {
       if (!kind || !id) return []
-      return Object.values(s.runs).filter((r) => sameRef(r.origin, { kind, id })).sort(newestFirst)
+      return Object.values(s.runs).filter((r) => r.origin?.kind === kind && r.origin.id === id).sort(newestFirst)
     }),
   )
 }

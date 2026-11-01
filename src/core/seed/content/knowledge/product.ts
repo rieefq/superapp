@@ -322,7 +322,7 @@ Applies to all Atlas plans. Times are first-response targets. Resolution times a
 | Severity | Definition | Examples |
 |---|---|---|
 | **S1, critical** | Production unusable or data at risk for many users, no workaround | Users cannot log in; shipments not updating for all users; checkout down |
-| **S2, high** | Major feature degraded; the workaround is painful | Checkout slow; repeated SSO logouts for one tenant; wrong invoices for one account |
+| **S2, high** | Major feature degraded; the workaround is painful | Checkout slow for one account; repeated SSO logouts for one tenant; wrong invoices for one account |
 | **S3, normal** | Minor feature problem with a reasonable workaround | Report export fails intermittently |
 | **S4, low** | Question, how-to or feature request | How do I add a carrier? |
 

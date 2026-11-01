@@ -35,10 +35,11 @@ function detectTone(text: string): Tone {
   return 'neutral'
 }
 
-type Purpose = 'launch' | 'update' | 'followup' | 'request' | 'thanks' | 'invite' | 'apology' | 'general'
+type Purpose = 'launch' | 'announce' | 'update' | 'followup' | 'request' | 'thanks' | 'invite' | 'apology' | 'general'
 
 function detectPurpose(text: string): Purpose {
-  if (/\b(launch|launching|introduc|announc|release|unveil)/i.test(text)) return 'launch'
+  if (/\b(launch|launching|introduc|release|unveil)/i.test(text)) return 'launch'
+  if (/\b(announc|heads[- ]up|change to|changes to|new policy|rotation|reorg)/i.test(text)) return 'announce'
   if (/\b(follow[- ]?up|following up|chase|reminder)\b/i.test(text)) return 'followup'
   if (/\b(update|status|progress|recap|weekly|monthly)\b/i.test(text)) return 'update'
   if (/\b(thank|thanks|gratitude|appreciat)/i.test(text)) return 'thanks'
@@ -75,15 +76,21 @@ function signoff(tone: Tone, name: string): string {
   return `${word}  \n${name}`
 }
 
-/** Key points for the draft: real sentences from sources, or honest placeholders. */
-function points(evidence: readonly Evidence[], n: number): string[] {
-  const real = evidence.slice(0, n).map((e) => ensurePeriod(truncateWords(e.sentence, 30)))
+const INTERNAL_RE = /\b(success means|kpis?|metrics?|targets?|internal(?:ly)?|okrs?|we will measure|margin goal)\b|%/i
+
+/** Key points for the draft: real statements from sources, or honest placeholders. */
+function points(evidence: readonly Evidence[], n: number, external: boolean): string[] {
+  const real = evidence
+    .filter((e) => e.kind === 'statement' && !(external && INTERNAL_RE.test(e.sentence)))
+    .slice(0, n)
+    .map((e) => ensurePeriod(truncateWords(e.sentence, 30)))
   const placeholders = ['[Key point — what changes for the reader]', '[Why it matters to them]', '[What they need to do, if anything]', '[Where to learn more — link]']
   return [...real, ...placeholders].slice(0, Math.max(n, real.length))
 }
 
 const SUBJECTS: Record<Purpose, (a: string) => string> = {
   launch: (a) => `Introducing ${a}`,
+  announce: (a) => `Heads-up: ${a}`,
   update: (a) => `${capitalize(a)}: a quick update`,
   followup: (a) => `Following up: ${a}`,
   request: (a) => `Request: ${a}`,
@@ -95,6 +102,7 @@ const SUBJECTS: Record<Purpose, (a: string) => string> = {
 
 const OPENINGS: Record<Purpose, (a: string) => string> = {
   launch: (a) => `We're launching ${a} on [date], and I wanted you to hear about it first.`,
+  announce: (a) => `Quick heads-up about ${a}: [the one-line news, and when it takes effect].`,
   update: (a) => `Here's a quick update on ${a}.`,
   followup: (a) => `I'm following up on ${a} to make sure it didn't get lost.`,
   request: (a) => `I'm reaching out about ${a}.`,
@@ -106,6 +114,7 @@ const OPENINGS: Record<Purpose, (a: string) => string> = {
 
 const CTAS: Record<Purpose, string> = {
   launch: "If you have questions, just reply — I'm happy to walk you through it.",
+  announce: 'Questions or concerns? Reply here and I will follow up.',
   update: 'Let me know if anything here needs a closer look.',
   followup: 'Could you let me know where this stands by [date]?',
   request: 'Could you let me know by [date]? Happy to talk it through if that is easier.',
@@ -194,7 +203,7 @@ export function composeWriting(ctx: ComposeContext): ComposedParts {
     ]
     blocks.push({ md: `**What changed**\n\n${bullets(notes)}`, priority: 2 })
     blocks.push(closingOffer(ctx, ['Want it more formal, more casual, or shorter still?', 'Tell me the audience and I can adjust the tone.']))
-    return { blocks, noPadding: true, approach: { format: 'a tightened rewrite of your text', structure: 'keep your meaning, remove filler and flag long sentences' } }
+    return { blocks, noPadding: true, approach: { format: 'a tightened rewrite of your text', structure: 'keep your meaning, remove filler and flag long sentences', material: 'your text' } }
   }
 
   const intro = rng.pick([
@@ -203,7 +212,8 @@ export function composeWriting(ctx: ComposeContext): ComposedParts {
   ])
   blocks.push({ md: intro, priority: Infinity })
 
-  const pts = points(evidence, deep ? 4 : 3)
+  const external = /\b(customers?|clients?|users?|public|press|subscribers|partners?|prospects?)\b/i.test(audience ?? '') || ['social', 'press-release', 'blog', 'tagline'].includes(format)
+  const pts = points(evidence, deep ? 4 : 3, external)
   let draft: string
   switch (format) {
     case 'email': {
@@ -308,22 +318,36 @@ export function composeWriting(ctx: ComposeContext): ComposedParts {
   }
   blocks.push({ md: draft, priority: Infinity })
 
-  if (evidence.length) {
-    const used = evidence.slice(0, deep ? 4 : 3)
-    const refs = [...new Set(used.map((e) => `*${e.title}*${marker(e)}`))]
+  const statements = evidence.filter((e) => e.kind === 'statement' && pts.includes(ensurePeriod(truncateWords(e.sentence, 30))))
+  if (statements.length) {
+    const refs = [...new Set(statements.map((e) => `*${e.title}*${marker(e)}`))]
     blocks.push({ md: `I pulled the key points from ${joinList(refs)} — double-check them before sending.`, priority: Infinity })
   }
-  if (deep) {
-    blocks.push({
-      md: `**Before you send**\n\n${bullets(['Fill every [bracket] or cut the line.', 'Read it aloud once; trim anything you would not say in person.', audience ? `Check it answers the first question ${audience} will have.` : 'Check it answers the first question your reader will have.'])}`,
-      priority: 2,
-    })
+  const guidance = evidence.find((e) => e.kind === 'guidance')
+  if (guidance) {
+    blocks.push({ md: `Worth applying from *${guidance.title}*${marker(guidance)} as you edit: “${ensurePeriod(stripTrailingPunctuation(truncateWords(guidance.sentence, 24)))}”`, priority: 3 })
   }
+  const beforeSend: Block = {
+    md: `**Before you send**\n\n${bullets(['Fill every [bracket] or cut the line.', 'Read it aloud once; trim anything you would not say in person.', audience ? `Check it answers the first question ${audience} will have.` : 'Check it answers the first question your reader will have.'])}`,
+    priority: 2,
+  }
+  if (deep) blocks.push(beforeSend)
   blocks.push(closingOffer(ctx, ['Want a shorter version, or a different tone?', 'I can draft a variation for a different audience if useful.']))
+
+  const extras: Block[] = []
+  if (format === 'email') {
+    const alternatives = [`${capitalize(about)}: what changes for you`, `A quick note on ${about}`, `${capitalize(about)} — [the one benefit that matters most]`]
+    extras.push({ md: `**Alternative subject lines**\n\n${bullets(alternatives)}`, priority: 1 })
+  }
+  if (format === 'message' || format === 'email') {
+    extras.push({ md: `**Even shorter (for chat)**\n\n> ${stripTrailingPunctuation(OPENINGS[purpose](about))}. ${CTAS[purpose]}`, priority: 1 })
+  }
+  if (!deep) extras.push(beforeSend)
+  extras.push({ md: `**Tone notes**\n\n${bullets([tone === 'formal' ? 'Formal register: complete sentences, no slang.' : 'Plain, direct sentences with concrete verbs.', 'One idea per paragraph; the ask comes last.'])}`, priority: 1 })
 
   return {
     blocks,
-    noPadding: true,
+    extras,
     approach: {
       format: `a draft ${formatLabel(format)}`,
       structure: evidence.length

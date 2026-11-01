@@ -34,11 +34,14 @@ export function identifierWords(request: string): string[] {
   const ws = words(request).map((w) => w.replace(/[^a-z0-9]/g, '')).filter(Boolean)
   const clauseStart = ws.findIndex((w) => w === 'that' || w === 'which' || w === 'to' || w === 'for')
   const candidates = clauseStart >= 0 ? ws.slice(clauseStart + 1) : ws
+  // "that parses…" / "to parse…" / "for parsing…" introduce a verb; "for a pricing card" a noun.
+  const keyword = clauseStart >= 0 ? ws[clauseStart] : ''
+  const verbFirst = keyword === 'that' || keyword === 'which' || keyword === 'to' || (keyword === 'for' && /ing$/.test(candidates[0] ?? ''))
   const out: string[] = []
   for (const raw of candidates) {
     if (out.length && STOP_AT.has(raw)) break
     if (CODE_NOUNS.has(raw) || STOPWORDS.has(raw) || /^\d+$/.test(raw)) continue
-    const w = out.length === 0 ? fromGerund(baseVerb(raw)) : raw
+    const w = out.length === 0 && verbFirst ? fromGerund(baseVerb(raw)) : raw
     out.push(w)
     if (out.length >= 3) break
   }

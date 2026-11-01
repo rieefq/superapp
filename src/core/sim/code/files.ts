@@ -61,29 +61,43 @@ export function stemName(path: string): string {
   return basename(path).replace(/\.[^.]+$/, '').replace(/\.(test|spec|e2e)$/i, '')
 }
 
-/** Keyword stems used for fuzzy matching against paths and contents. */
+/** Keyword stems used for fuzzy matching against paths and contents (prompt order is kept). */
 export function keywordStems(keywords: readonly string[]): string[] {
   return [...new Set(keywords.map((k) => stem(k)).filter((s) => s.length >= 3))]
+}
+
+/** Language keywords that match nearly every source file, so they are useless for content search. */
+const CODE_WORDS = new Set(['export', 'import', 'function', 'const', 'return', 'class', 'default', 'async', 'await', 'type', 'interface', 'static', 'public', 'private'])
+
+/** Stems worth searching for inside file contents. */
+export function contentStems(stems: readonly string[]): string[] {
+  return stems.filter((s) => !CODE_WORDS.has(s))
+}
+
+/** Earlier keywords carry the subject of the prompt ("session expiry …"), so they weigh more. */
+function weight(i: number): number {
+  return 1 / (1 + 0.35 * i)
 }
 
 function pathScore(path: string, stems: readonly string[]): number {
   const lower = path.toLowerCase()
   const base = basename(lower)
   let score = 0
-  for (const s of stems) {
-    if (base.includes(s)) score += 4
-    else if (lower.includes(s)) score += 2
-  }
+  stems.forEach((s, i) => {
+    if (base.includes(s)) score += 4 * weight(i)
+    else if (lower.includes(s)) score += 2 * weight(i)
+  })
   return score
 }
 
 function contentScore(content: string | undefined, stems: readonly string[]): number {
   if (!content || !stems.length) return 0
   let score = 0
-  for (const s of stems) {
+  stems.forEach((s, i) => {
+    if (CODE_WORDS.has(s)) return
     const matches = content.match(new RegExp(escapeRegExp(s), 'gi'))
-    if (matches) score += Math.min(matches.length, 8) * 0.5
-  }
+    if (matches) score += Math.min(matches.length, 8) * 0.5 * weight(i)
+  })
   return score
 }
 
@@ -122,15 +136,18 @@ export interface GrepMatch {
   text: string
 }
 
-/** Case-insensitive line search over file contents (like `rg -n -i`). */
-export function grepContents(files: readonly WorkingFile[], pattern: RegExp, max = 12): GrepMatch[] {
+/** Case-insensitive line search over file contents (like `rg -n -i`), source files first, a few hits per file. */
+export function grepContents(files: readonly WorkingFile[], pattern: RegExp, max = 12, perFile = 3): GrepMatch[] {
   const out: GrepMatch[] = []
   const re = new RegExp(pattern.source, pattern.flags.replace('g', ''))
-  for (const f of files) {
+  const ordered = [...files].sort((a, b) => Number(!isCodePath(a.path)) - Number(!isCodePath(b.path)) || a.path.localeCompare(b.path))
+  for (const f of ordered) {
     if (!f.content || isIgnoredPath(f.path)) continue
     const lines = f.content.split('\n')
-    for (let i = 0; i < lines.length; i++) {
+    let hits = 0
+    for (let i = 0; i < lines.length && hits < perFile; i++) {
       if (re.test(lines[i])) {
+        hits++
         out.push({ path: f.path, line: i + 1, text: lines[i].trim().slice(0, 140) })
         if (out.length >= max) return out
       }
@@ -141,7 +158,7 @@ export function grepContents(files: readonly WorkingFile[], pattern: RegExp, max
 
 /** A grep-style pattern for the keyword stems: `session|expir`. */
 export function grepPattern(keywords: readonly string[]): { source: string; regex: RegExp } {
-  const stems = keywordStems(keywords).slice(0, 3)
+  const stems = contentStems(keywordStems(keywords)).slice(0, 3)
   const source = stems.length ? stems.join('|') : keywords[0]?.toLowerCase() ?? 'TODO'
   return { source, regex: new RegExp(stems.map(escapeRegExp).join('|') || escapeRegExp(source), 'i') }
 }

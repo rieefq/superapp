@@ -1,6 +1,6 @@
 import type { TableName, Tables } from '@/core/db'
 import type { EntityKind, EntityRef, ID } from '@/core/types'
-import { toPlainText } from './text'
+import { indexableText, toPlainText } from './text'
 
 /** Title tokens count three times (BM25 title boost); tags/labels twice. */
 export const TITLE_WEIGHT = 3
@@ -28,8 +28,14 @@ export const TABLE_KIND = {
 export type IndexedTable = keyof typeof TABLE_KIND
 export const INDEXED_TABLES = Object.keys(TABLE_KIND) as IndexedTable[]
 
+/**
+ * 'display' strips markdown fully (snippets shown to people); 'index' only drops link targets —
+ * the tokenizer ignores markdown punctuation anyway, and building stays fast.
+ */
+export type DocMode = 'index' | 'display'
+
 export interface DocField {
-  /** Plain text (markdown stripped). */
+  /** Field text: plain text in 'display' mode, lightly cleaned markdown in 'index' mode. */
   text: string
   weight: number
   /** A more specific entity the text belongs to (the message within a thread). */
@@ -47,15 +53,17 @@ export interface SearchDoc {
   updatedAt: number
 }
 
-function plain(text: string | undefined): string {
-  if (!text) return ''
-  return toPlainText(text.length > MAX_FIELD_CHARS ? text.slice(0, MAX_FIELD_CHARS) : text)
+type FieldFn = (text: string | undefined, weight?: number, anchor?: EntityRef) => DocField[]
+
+function fieldMaker(clean: (text: string) => string): FieldFn {
+  return (text, weight = 1, anchor) => {
+    if (!text) return []
+    const t = clean(text.length > MAX_FIELD_CHARS ? text.slice(0, MAX_FIELD_CHARS) : text).trim()
+    return t ? [anchor ? { text: t, weight, anchor } : { text: t, weight }] : []
+  }
 }
 
-function field(text: string | undefined, weight = 1, anchor?: EntityRef): DocField[] {
-  const t = plain(text)
-  return t ? [anchor ? { text: t, weight, anchor } : { text: t, weight }] : []
-}
+const FIELD: Record<DocMode, FieldFn> = { index: fieldMaker(indexableText), display: fieldMaker(toPlainText) }
 
 function tags(list: readonly string[] | undefined): DocField[] {
   return list?.length ? [{ text: list.join(' · '), weight: TAG_WEIGHT }] : []
@@ -64,8 +72,9 @@ function tags(list: readonly string[] | undefined): DocField[] {
 const projectOf = (id: ID | null | undefined): ID[] => (id ? [id] : [])
 
 /** The searchable document for one row, read from `t` (null when the row does not exist). */
-export function buildDoc(table: IndexedTable, id: ID, t: Tables): SearchDoc | null {
+export function buildDoc(table: IndexedTable, id: ID, t: Tables, mode: DocMode = 'display'): SearchDoc | null {
   const ref: EntityRef = { kind: TABLE_KIND[table], id }
+  const field = FIELD[mode]
   switch (table) {
     case 'projects': {
       const r = t.projects[id]

@@ -85,14 +85,13 @@ export function composeCompare(ctx: ComposeContext): ComposedParts {
   let rows: string[][]
   let header: string[]
   if (items.length >= 2) {
-    const showWhy = items.length === 2
-    header = ['Criterion', ...(showWhy ? ['Why it matters'] : []), ...items.map(tableCell)]
+    header = ['Criterion', 'What to check', ...items.map(tableCell)]
     rows = criteria.map((crit) => [
       `**${crit.name}**`,
-      ...(showWhy ? [crit.why] : []),
+      rng.pick(crit.checks),
       ...items.map((item) => {
         const hit = takeEvidence((e) => mentions(e, item) && matchesCriterion(e, crit))
-        return tableCell(hit ? quoteShort(hit) : rng.pick(crit.checks))
+        return tableCell(hit ? quoteShort(hit) : '—')
       }),
     ])
   } else {
@@ -104,10 +103,9 @@ export function composeCompare(ctx: ComposeContext): ComposedParts {
   }
   blocks.push({ md: table(header, rows), priority: Infinity })
 
-  if (!used.size && evidence.length === 0) {
-    const what = items.length ? joinList(items) : 'the options'
+  if (items.length >= 2 && !used.size) {
     blocks.push({
-      md: `_I haven't filled the cells with specifics because I don't have verified details on ${what} — they're the checks I'd run. Pin vendor notes or a comparison doc and I'll fill the table from them._`,
+      md: `_The ${joinList(items)} columns are blank on purpose: I don't have verified details on them, so I won't guess. Score each option 1–5 as you check the rows, or pin vendor notes or a comparison doc and I'll fill the table from them._`,
       priority: Infinity,
     })
   }
@@ -138,6 +136,7 @@ export function composeCompare(ctx: ComposeContext): ComposedParts {
   return {
     blocks,
     extras: [
+      { md: heading('Why these criteria') + bullets(criteria.slice(0, 4).map((crit) => `**${crit.name}** — ${crit.why}`)), priority: 1 },
       {
         md: heading('Questions to settle first') + bullets(take(ctx, ['Which criterion would make you walk away from an option?', 'When do you need to decide?', 'Who needs to agree with the choice?', 'What would you do if neither option works out?'], 3)),
         priority: 1,

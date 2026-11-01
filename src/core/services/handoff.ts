@@ -35,6 +35,11 @@ export interface HandoffResult {
 
 const done = (ref: EntityRef): HandoffResult => ({ ref, route: entityRoute(ref) })
 
+/** Handoffs need a live source: never create work linked to something that was deleted. */
+function requireSource(source: EntityRef): void {
+  if (!resolveEntity(source).exists) throw new Error('The item you started from no longer exists.')
+}
+
 /** Explicit project › the source's project › the active scope › none. */
 function projectFor(source: EntityRef, explicit: ID | null | undefined): ID | null {
   if (explicit !== undefined) return explicit
@@ -69,6 +74,7 @@ export interface ToTaskInput {
 }
 
 export function toTask(source: EntityRef, input: ToTaskInput): HandoffResult {
+  requireSource(source)
   // createTask links the origin, records message.derived and logs “Created task … from …”.
   const task = createTask({
     title: input.title,
@@ -93,6 +99,7 @@ export interface ToKnowledgeInput {
 }
 
 export function toKnowledge(source: EntityRef, input: ToKnowledgeInput = {}): HandoffResult {
+  requireSource(source)
   const derived = deriveSourceContent(source)
   const projectId = projectFor(source, input.projectId)
   const item = createKnowledge(
@@ -123,6 +130,7 @@ export interface ToInvestigationInput {
 }
 
 export function toInvestigation(source: EntityRef, input: ToInvestigationInput): HandoffResult {
+  requireSource(source)
   const projectId = projectFor(source, input.projectId)
   const inv = createInvestigation({
     question: input.question,
@@ -145,14 +153,20 @@ export interface ToAgentInput {
 }
 
 export function toAgent(source: EntityRef, input: ToAgentInput): HandoffResult {
-  // runAgent links the run to its origin and logs the delegation.
+  requireSource(source)
+  const projectId = projectFor(source, input.projectId)
+  // runAgent links the run to its origin (and attaches it when the source is a task).
   const run = runAgent(input.agentId, {
     instruction: input.instruction,
-    projectId: projectFor(source, input.projectId),
+    projectId,
     taskId: source.kind === 'task' ? source.id : undefined,
     origin: source,
   })
-  return done({ kind: 'run', id: run.id })
+  const ref: EntityRef = { kind: 'run', id: run.id }
+  markDerived(ref, source)
+  const agentName = db.get('agents', input.agentId)?.name ?? 'an agent'
+  logHandoff(ref, source, `Asked ${agentName} to “${run.title}”`, projectId)
+  return done(ref)
 }
 
 export interface ToCodeSessionInput {
@@ -163,6 +177,7 @@ export interface ToCodeSessionInput {
 }
 
 export function toCodeSession(source: EntityRef, input: ToCodeSessionInput): HandoffResult {
+  requireSource(source)
   const projectId = projectFor(source, input.projectId)
   const session = createSession({
     repoId: input.repoId,
@@ -187,6 +202,7 @@ export interface ToStudioInput {
 }
 
 export function toStudio(source: EntityRef, input: ToStudioInput): HandoffResult {
+  requireSource(source)
   const projectId = projectFor(source, input.projectId)
   const asset = generateAsset({
     kind: input.kind,
@@ -207,6 +223,7 @@ export interface ToWorkflowRunInput {
 }
 
 export function toWorkflowRun(source: EntityRef, input: ToWorkflowRunInput): HandoffResult {
+  requireSource(source)
   const run = runWorkflow(input.workflowId, { trigger: 'manual', origin: source })
   const ref: EntityRef = { kind: 'run', id: run.id }
   markDerived(ref, source)

@@ -250,16 +250,17 @@ export interface ConnectionTestResult {
 export async function testConnection(id: string): Promise<ConnectionTestResult> {
   const def = requireDef(id)
   const cur = db.get('connections', id)
+  const live = (check: CheckResult): ConnectionTestResult => ({ ok: check.ok, message: check.message, live: true })
   let result: ConnectionTestResult
   if (id === 'anthropic') {
     const key = getSecret(id, 'apiKey')
-    result = key ? { ...(await checkAnthropic(key)), live: true } : { ok: false, message: 'Add an Anthropic API key first.', live: false }
+    result = key ? live(await checkAnthropic(key)) : { ok: false, message: 'Add an Anthropic API key first.', live: false }
   } else if (id === 'github') {
-    result = { ...(await checkGitHub(getSecret(id, 'token'))), live: true }
+    result = live(await checkGitHub(getSecret(id, 'token')))
   } else if (id === 'openai-compatible') {
     const baseUrl = cur?.config.baseUrl
     result = baseUrl
-      ? { ...(await checkOpenAiCompatible(baseUrl, cur?.config.model, getSecret(id, 'apiKey'))), live: true }
+      ? live(await checkOpenAiCompatible(baseUrl, cur?.config.model, getSecret(id, 'apiKey')))
       : { ok: false, message: 'Add a base URL first.', live: false }
   } else if (cur?.status === 'connected' || cur?.status === 'error') {
     await sleep(between(500, 900))

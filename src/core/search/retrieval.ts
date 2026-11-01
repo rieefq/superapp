@@ -2,7 +2,7 @@ import type { Tables } from '@/core/db'
 import type { ID, KnowledgeItem } from '@/core/types'
 import { Bm25Index, type IndexTerm } from './bm25'
 import { parseQuery } from './query'
-import { analyze, toPlainText } from './text'
+import { forEachTerm, indexableText } from './text'
 import type { RetrievedPassage, RetrieveOptions } from './types'
 
 export const PASSAGE_TARGET_CHARS = 700
@@ -80,11 +80,11 @@ export function splitPassages(content: string, target = PASSAGE_TARGET_CHARS): s
 }
 
 function addTerms(into: Map<string, IndexTerm>, text: string, weight: number): void {
-  for (const t of analyze(text)) {
+  forEachTerm(text, (t) => {
     const cur = into.get(t.surface)
     if (cur) cur.weight += weight
     else into.set(t.surface, { stem: t.stem, surface: t.surface, weight })
-  }
+  })
 }
 
 /**
@@ -96,6 +96,7 @@ export class PassageIndex {
   private readonly passages = new Map<string, { itemId: ID; text: string }>()
   private readonly itemKeys = new Map<ID, string[]>()
   private synced: Tables['knowledge'] | null = null
+  private pending: { knowledge: Tables['knowledge']; ids: ID[]; next: number } | null = null
 
   get built(): boolean {
     return this.synced !== null
@@ -109,9 +110,29 @@ export class PassageIndex {
     return this.synced !== knowledge
   }
 
+  /** Start an initial build that `continueBuild` performs in slices. */
+  beginBuild(knowledge: Tables['knowledge']): void {
+    if (this.synced || this.pending) return
+    this.pending = { knowledge, ids: Object.keys(knowledge), next: 0 }
+  }
+
+  /** Index pending items until `deadline` (a performance.now() time). Returns true once built. */
+  continueBuild(deadline = Infinity): boolean {
+    const p = this.pending
+    if (!p) return this.built
+    while (p.next < p.ids.length) {
+      this.indexItem(p.knowledge[p.ids[p.next++]])
+      if ((p.next & 7) === 0 && performance.now() >= deadline) return false
+    }
+    this.synced = p.knowledge
+    this.pending = null
+    return true
+  }
+
   sync(knowledge: Tables['knowledge']): boolean {
+    const finishedBuild = this.pending !== null && this.continueBuild()
     const prev = this.synced
-    if (prev === knowledge) return false
+    if (prev === knowledge) return finishedBuild
     if (prev) for (const id in prev) if (!(id in knowledge)) this.removeItem(id)
     for (const id in knowledge) if (!prev || prev[id] !== knowledge[id]) this.indexItem(knowledge[id])
     this.synced = knowledge
@@ -137,7 +158,7 @@ export class PassageIndex {
     const keys = texts.map((text, i) => {
       const key = `${item.id}#${i}`
       const terms = new Map<string, IndexTerm>()
-      addTerms(terms, toPlainText(text), 1)
+      addTerms(terms, indexableText(text), 1)
       for (const t of shared.values()) {
         const cur = terms.get(t.surface)
         if (cur) cur.weight += t.weight

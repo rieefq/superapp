@@ -5,7 +5,7 @@ import type { RetrievedPassage, RetrieveOptions, SearchOptions, SearchResult } f
 
 /**
  * Runtime owner of the search indexes.
- * - Built lazily: synchronously on the first query, or in the background via `warmSearchIndex`.
+ * - Built lazily: synchronously on the first query, or in the background (time-sliced) via `warmSearchIndex`.
  * - Kept fresh incrementally: one store subscription, debounced (250ms, at most 1s behind),
  *   re-indexes only rows whose reference changed. Queries also sync first, so a result
  *   never misses a change made just before it.
@@ -13,6 +13,7 @@ import type { RetrievedPassage, RetrieveOptions, SearchOptions, SearchResult } f
  */
 const DEBOUNCE_MS = 250
 const MAX_WAIT_MS = 1000
+const WARM_SLICE_MS = 12
 
 type Timer = ReturnType<typeof setTimeout>
 
@@ -87,17 +88,38 @@ export function retrieveKnowledge(query: string, opts: RetrieveOptions = {}): Re
   return passages.retrieve(query, opts, knowledge)
 }
 
-/** Build the entity index soon, off the current call stack (e.g. when the command palette mounts). */
-export function warmSearchIndex(): void {
-  if (entities.built || warmTimer) return
-  warmTimer = setTimeout(() => {
-    warmTimer = null
-    const state = useDB.getState()
-    if (!entities.isStale(state)) return
-    entities.sync(state)
+function warmStep(): void {
+  warmTimer = null
+  const deadline = performance.now() + WARM_SLICE_MS
+  if (!entities.built) {
+    if (!entities.continueBuild(deadline)) {
+      warmTimer = setTimeout(warmStep, 0)
+      return
+    }
+    entities.sync(useDB.getState()) // catch up with changes made while building
     ensureSubscribed()
     emit()
-  }, 0)
+  }
+  if (!passages.built) {
+    if (!passages.continueBuild(deadline)) {
+      warmTimer = setTimeout(warmStep, 0)
+      return
+    }
+    passages.sync(useDB.getState().knowledge)
+    ensureSubscribed()
+  }
+}
+
+/**
+ * Build both indexes in the background, in ~12ms slices so the UI stays responsive
+ * (call when search UI mounts). A query arriving mid-build finishes it synchronously.
+ */
+export function warmSearchIndex(): void {
+  if (warmTimer || (entities.built && passages.built)) return
+  const state = useDB.getState()
+  entities.beginBuild(state)
+  passages.beginBuild(state.knowledge)
+  warmTimer = setTimeout(warmStep, 0)
 }
 
 export function isSearchReady(): boolean {
