@@ -45,7 +45,7 @@ export const KIND_META: Record<EntityKind, EntityMeta> = {
   source: { label: 'Source', plural: 'Sources', icon: 'Globe', workspace: 'research' },
   repo: { label: 'Repository', plural: 'Repositories', icon: 'FolderGit2', workspace: 'code' },
   session: { label: 'Coding session', plural: 'Coding sessions', icon: 'SquareTerminal', workspace: 'code' },
-  asset: { label: 'Asset', plural: 'Assets', icon: 'Sparkles', workspace: 'studio' },
+  asset: { label: 'Asset', plural: 'Assets', icon: 'Palette', workspace: 'studio' },
   board: { label: 'Board', plural: 'Boards', icon: 'LayoutGrid', workspace: 'studio' },
   integration: { label: 'Integration', plural: 'Integrations', icon: 'Plug', workspace: 'integrations' },
 }

@@ -132,7 +132,7 @@ export function BarChart({
   const valueLabelRoom = valueLabels ? 44 : 10
   const M = horizontal
     ? { top: 4, right: valueLabelRoom, bottom: 24, left: catLabelW }
-    : { top: valueLabels ? 18 : 10, right: 8, bottom: 26, left: Math.ceil(Math.max(...vt.ticks.map((t) => approxTextWidth(tickFmt(t), 10.5, true)))) + 12 }
+    : { top: valueLabels ? 18 : 10, right: 8, bottom: 26, left: Math.ceil(Math.max(...vt.ticks.map((t) => approxTextWidth(tickFmt(t), 11, true)))) + 12 }
   const innerW = Math.max(10, width - M.left - M.right)
   const innerH = Math.max(10, height - M.top - M.bottom)
   const bandLen = (horizontal ? innerH : innerW) / Math.max(1, nC)
@@ -330,14 +330,14 @@ export function BarChart({
                   horizontal ? (
                     <g key={tk}>
                       <line x1={v(tk)} x2={v(tk)} y1={0} y2={innerH} stroke={tk === 0 ? 'var(--line-strong)' : 'var(--line)'} shapeRendering="crispEdges" />
-                      <text x={v(tk)} y={innerH + 17} textAnchor={tk === vt.min ? 'start' : 'middle'} className="fill-ink-3 font-mono text-[10.5px] tabular">
+                      <text x={v(tk)} y={innerH + 17} textAnchor={tk === vt.min ? 'start' : 'middle'} className="fill-ink-3 font-mono text-2xs tabular">
                         {tickFmt(tk)}
                       </text>
                     </g>
                   ) : (
                     <g key={tk}>
                       <line x1={0} x2={innerW} y1={v(tk)} y2={v(tk)} stroke={tk === 0 ? 'var(--line-strong)' : 'var(--line)'} shapeRendering="crispEdges" />
-                      <text x={-10} y={v(tk)} dy="0.32em" textAnchor="end" className="fill-ink-3 font-mono text-[10.5px] tabular">
+                      <text x={-10} y={v(tk)} dy="0.32em" textAnchor="end" className="fill-ink-3 font-mono text-2xs tabular">
                         {tickFmt(tk)}
                       </text>
                     </g>
@@ -346,12 +346,12 @@ export function BarChart({
                 {/* category labels */}
                 {categories.map((cat, c) =>
                   c % catStep !== 0 ? null : horizontal ? (
-                    <text key={cat + c} x={-12} y={c * bandLen + bandLen / 2} dy="0.32em" textAnchor="end" className="fill-ink-2 text-[12px]">
+                    <text key={cat + c} x={-12} y={c * bandLen + bandLen / 2} dy="0.32em" textAnchor="end" className="fill-ink-2 text-xs">
                       <title>{cat}</title>
                       {clip(cat, maxCatChars)}
                     </text>
                   ) : (
-                    <text key={cat + c} x={c * bandLen + bandLen / 2} y={innerH + 18} textAnchor="middle" className="fill-ink-3 text-[11px]">
+                    <text key={cat + c} x={c * bandLen + bandLen / 2} y={innerH + 18} textAnchor="middle" className="fill-ink-3 text-2xs">
                       <title>{cat}</title>
                       {clip(cat, maxCatChars)}
                     </text>
@@ -376,22 +376,22 @@ export function BarChart({
                     ? categories.map((_, c) => {
                         if (!totals[c]) return null
                         return horizontal ? (
-                          <text key={`vl${c}`} x={v(totals[c]) + 6} y={c * bandLen + bandLen / 2} dy="0.32em" className="fill-ink-2 text-[11px] tabular">
+                          <text key={`vl${c}`} x={v(totals[c]) + 6} y={c * bandLen + bandLen / 2} dy="0.32em" className="fill-ink-2 text-2xs tabular">
                             {format(totals[c])}
                           </text>
                         ) : (
-                          <text key={`vl${c}`} x={c * bandLen + bandLen / 2} y={v(totals[c]) - 6} textAnchor="middle" className="fill-ink-2 text-[11px] tabular">
+                          <text key={`vl${c}`} x={c * bandLen + bandLen / 2} y={v(totals[c]) - 6} textAnchor="middle" className="fill-ink-2 text-2xs tabular">
                             {format(totals[c])}
                           </text>
                         )
                       })
                     : marks.map((m) =>
                         horizontal ? (
-                          <text key={`vl${m.key}`} x={m.value >= 0 ? m.ax + 6 : m.ax - 6} y={m.ay} dy="0.32em" textAnchor={m.value >= 0 ? 'start' : 'end'} className="fill-ink-2 text-[11px] tabular">
+                          <text key={`vl${m.key}`} x={m.value >= 0 ? m.ax + 6 : m.ax - 6} y={m.ay} dy="0.32em" textAnchor={m.value >= 0 ? 'start' : 'end'} className="fill-ink-2 text-2xs tabular">
                             {format(m.value)}
                           </text>
                         ) : thick >= 16 || vis.length === 1 ? (
-                          <text key={`vl${m.key}`} x={m.ax} y={m.value >= 0 ? m.ay - 6 : m.ay + 14} textAnchor="middle" className="fill-ink-2 text-[11px] tabular">
+                          <text key={`vl${m.key}`} x={m.ax} y={m.value >= 0 ? m.ay - 6 : m.ay + 14} textAnchor="middle" className="fill-ink-2 text-2xs tabular">
                             {format(m.value)}
                           </text>
                         ) : null,

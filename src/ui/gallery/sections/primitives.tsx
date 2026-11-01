@@ -584,7 +584,7 @@ function MenusBlock() {
                   key={f.name}
                   data-file={f.name}
                   tabIndex={0}
-                  className="flex h-8 items-center gap-2.5 rounded-sm px-2 text-sm text-ink-2 outline-none hover:bg-hover hover:text-ink focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+                  className="flex h-8 items-center gap-2.5 rounded-sm px-2 text-sm text-ink-2 hover:bg-hover hover:text-ink focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
                 >
                   <f.icon aria-hidden className="size-4 text-ink-3" strokeWidth={1.75} />
                   <span className="flex-1 truncate font-mono text-xs">{f.name}</span>

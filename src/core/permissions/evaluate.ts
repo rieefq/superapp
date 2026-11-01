@@ -12,6 +12,8 @@ export interface PermissionRequest {
   risk?: RiskLevel
   agentId?: ID
   integrationId?: string
+  /** Overrides the agent's autonomy (e.g. a coding session's approval policy). */
+  autonomy?: Autonomy
 }
 
 /**
@@ -126,7 +128,7 @@ export function evaluatePermission(req: PermissionRequest, env?: Partial<Permiss
   if (asks.length) return ask(asks[0])
 
   // (d) autonomy vs risk
-  const autonomy = agent?.autonomy ?? safety.defaultAutonomy
+  const autonomy = req.autonomy ?? agent?.autonomy ?? safety.defaultAutonomy
   const risk = req.risk ?? info.risk
   if (autonomyAsks(autonomy, risk, capability)) return ask(autonomyReason(autonomy, risk, verb, agent))
 

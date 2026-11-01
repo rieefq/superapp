@@ -64,6 +64,8 @@ export interface Settings {
     theme: ThemePreference
     density: 'comfortable' | 'compact'
     reduceMotion: 'system' | 'reduce' | 'full'
+    /** Single-key shortcuts (G-chords, N, P, !, [, ] …) outside text fields. */
+    singleKeyShortcuts: boolean
   }
   ai: {
     defaultModelId: string
@@ -78,12 +80,18 @@ export interface Settings {
     alwaysAsk: Capability[]
     confirmDestructive: boolean
     monthlyBudgetUsd: number
+    /** Count simulated estimates toward spend and budget (default off). */
+    countSimulatedSpend: boolean
   }
   notifications: {
     runCompleted: boolean
     runFailed: boolean
     approvals: boolean
     toasts: boolean
+    /** Focus mode: no toasts for approvals (badges still update). */
+    focusMode: boolean
+    /** Browser notifications for approvals while the tab is hidden. */
+    browser: boolean
   }
   simulation: {
     /** Multiplier on simulated step durations (1 = realistic, 4 = fast). */

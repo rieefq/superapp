@@ -256,7 +256,7 @@ export function TabPanel({ value, keepMounted, className, children, ...props }: 
       aria-labelledby={tabId(ctx.baseId, value)}
       hidden={!active}
       tabIndex={0}
-      className={cn('outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent', className)}
+      className={cn('focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent', className)}
       {...props}
     >
       {children}

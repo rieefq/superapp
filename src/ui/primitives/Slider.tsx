@@ -51,8 +51,16 @@ export function Slider({
       <PrimitiveStyles />
       {(label || showValue) && (
         <div className="flex items-baseline justify-between gap-3">
-          {label && <span className="text-sm text-ink-2">{label}</span>}
-          {showValue && <output className="ml-auto font-mono text-xs text-ink-2 tabular">{formatted}</output>}
+          {label && (
+            <label htmlFor={field.id} className="text-sm text-ink-2">
+              {label}
+            </label>
+          )}
+          {showValue && (
+            <output htmlFor={field.id} className="ml-auto font-mono text-xs text-ink-2 tabular">
+              {formatted}
+            </output>
+          )}
         </div>
       )}
       <input

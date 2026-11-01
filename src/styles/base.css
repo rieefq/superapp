@@ -16,6 +16,10 @@
     line-height: 20px;
     font-feature-settings: 'cv11', 'ss01';
   }
+  html[data-density='compact'] body {
+    font-size: 13px;
+    line-height: 18px;
+  }
   #root {
     min-height: 100dvh;
   }

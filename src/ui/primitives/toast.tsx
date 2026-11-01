@@ -329,7 +329,7 @@ function ToastItem({ toast: t, desktop, reduced }: { toast: ToastRecord; desktop
       }}
       className={cn(
         'pointer-events-auto relative flex w-full items-start gap-3 rounded-md border border-line bg-overlay py-3 pr-10 pl-3.5 text-ink shadow-e2',
-        'outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
         t.tone === 'loading' && 'pr-4',
       )}
     >

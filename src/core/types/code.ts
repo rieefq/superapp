@@ -1,4 +1,5 @@
 import type { ID, Timestamp } from './common'
+import type { Autonomy } from './permissions'
 import type { FileChange } from './runs'
 
 export interface RepoFile {
@@ -68,6 +69,8 @@ export interface CodeSession {
   branch: string
   baseBranch: string
   status: SessionStatus
+  /** Approval policy for this session; overrides the agent's autonomy for its runs. */
+  autonomy?: Autonomy
   turns: CodeTurn[]
   /** The current proposed change set, aggregated across turns. */
   changes: FileChange[]

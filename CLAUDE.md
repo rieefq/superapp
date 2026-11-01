@@ -26,10 +26,15 @@ src/
     integrations/      integration catalog (honest live/simulated support flags)
     settings.ts        user settings store      context.ts  scope (active project) + pinned context
     secrets.ts         local API-key vault (never in DB exports)
+    analytics/         run/spend/reliability aggregation for Insights and Home
+    assist/            rule-based heuristics (next actions, agent/repo picking, workflow drafts) — not AI
+    github/            GitHub REST client (live reads)      sim/  simulation corpora/generators
     seed/              realistic first-run data
-  ui/                  design system components (import from `@/ui`)
-  app/                 app entry, router, global shell (rail, top bar, command center, live runs, inbox, context)
-  workspaces/<id>/     one directory per workspace: manifest.ts (eager), index.tsx (lazy route), components
+  ui/                  design system (import from `@/ui`): primitives, hooks, display, charts, art, signature
+  app/                 entry, router, boot, registry, shell (src/app/shell/**, useShellStore), command center,
+                       lens registry (src/app/lens), shared connected components (src/app/components/**:
+                       Composer, ContextLine, StartSheet, pickers, HandoffMenu, DerivedRow, LandedCard…)
+  workspaces/<id>/     one directory per workspace: manifest.ts (eager), index.tsx (lazy route), lens.tsx (lazy)
 ```
 
 ## Data rules
@@ -53,10 +58,35 @@ src/
   reads, local file reading, local search/retrieval.
 - Costs computed for simulated runs are labeled as estimates.
 
+## Product vocabulary (docs/DESIGN.md is the source of truth — read the sections you need)
+
+- **Run**: every AI execution. Drawn only with the shared run components (StatusGlyph, StepTape, RunPill/RunRow,
+  RunTimeline, Colophon/Receipt). Never a bare spinner for AI work.
+- **Scope**: the active project (`useScope()`), a working directory — not in the URL. Lists filter to it with a
+  `Filtered to <Project> · Show all` row.
+- **Hold** (not "pin"): `useContextStore.pinned` — held items ride along in every new AI action.
+- **Context Line**: above every composer — Project → Held → Attached → Likely, each toggleable; ContextMeter shows tokens.
+- **Start sheet**: the one surface for starting delegated work and every "Turn into…" (`openStartSheet(kind, {source})`).
+- **Inspector**: right panel with tabs Run · Item · Context (`useShellStore`, `?inspect=<kind>:<id>`).
+- **Run Line**: bottom strip of run pills. **Needs you**: approvals + reviews (interrupts). **Updates**: quiet notifications.
+- **Colophon**: the provenance line under every AI output (`ProvenanceLine`). **Receipt**: the expanded version.
+- **Lens**: per-kind renderers in `src/workspaces/<owner>/lens.tsx` (`lenses[kind] = { panel, card }`), loaded lazily.
+- **Templates** (§6.0): Page, Session, Board, Canvas, Library — every workspace is one of these inside the shell frame.
+
 ## UI rules
 
 - Use `@/ui` components and design tokens. Do not hard-code colors, font families, shadows or radii;
-  use the Tailwind theme tokens defined in `src/styles/tokens.css` (see docs/DESIGN.md).
+  use the Tailwind theme tokens defined in `src/styles/tokens.css` (see docs/DESIGN.md §4).
+- Typography through the type-role utilities: `type-display`, `type-title-1/2/3`, `type-body-lg/body/body-sm`,
+  `type-caption`, `type-micro`, `type-label`, `type-meta`, `type-meta-caps`, `type-mono-sm`, `type-mono`,
+  `type-figure`, `type-doc-h1/h2/h3`, `type-doc`.
+- Color means state only: live (working), attn (needs you), done, fail. Identity hues only inside entity marks and chart
+  series. Accent = ink. No gradients, glows, glass, blur, emoji, sparkle/wand icons (`Sparkles` is banned).
+- Shape grammar for entity marks: circle = actors, capsule = runs/happenings, rounded square = things that last,
+  dashed edge = simulated.
+- Simulated = `SIM` tag + hatch (`.sim-hatch`) or dashed `--line-input` edge, always visible (never hover-only).
+  Exact strings: "Simulated terminal — nothing was executed", "Simulated web result", "No model was called".
+  Estimates always say `est.`.
 - Every interactive control must work. If a capability is simulated, it still behaves realistically and is labeled.
 - Every data view needs loading, empty and error states where they can occur.
 - Keyboard accessible: real `<button>`/`<a>`, visible focus ring, Escape closes overlays, labels on icon buttons.

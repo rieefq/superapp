@@ -245,13 +245,13 @@ export function Heatmap(props: HeatmapProps) {
                 >
                   {DAYS.map((d, r) =>
                     mode === 'calendar' && r % 2 === 1 ? null : (
-                      <text key={d} x={0} y={topH + r * (cell + GAP) + cell / 2} dy="0.32em" className="fill-ink-3 font-mono text-[10px]">
+                      <text key={d} x={0} y={topH + r * (cell + GAP) + cell / 2} dy="0.32em" className="fill-ink-3 font-mono text-2xs">
                         {d}
                       </text>
                     ),
                   )}
                   {grid.colLabels.map((l) => (
-                    <text key={l.col} x={labelW + l.col * (cell + GAP)} y={11} className="fill-ink-3 font-mono text-[10px]">
+                    <text key={l.col} x={labelW + l.col * (cell + GAP)} y={11} className="fill-ink-3 font-mono text-2xs">
                       {l.text}
                     </text>
                   ))}

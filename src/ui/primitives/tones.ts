@@ -1,7 +1,10 @@
 /**
  * Static class maps for semantic tones and identity hues (Tailwind needs literal class names).
- * Semantic: live = AI working, attn = needs a human, done = success, fail = failed/destructive,
- * sim = simulated (hatched), accent = focus/links/selection, neutral = everything else.
+ * Semantic (DESIGN §4.3): live = AI working, attn = needs a human, done = success, fail = failed/destructive,
+ * sim = simulated (hatched), accent = ink (selection, checked controls, links), neutral = everything else.
+ *
+ * Solid fills behind text are limited to the contrast-verified pairs: inverse/inverse-ink, live/live-on and
+ * fail/fail-on. Other tones asked for 'solid' fall back to their tint (never text on solid attn).
  */
 import type { Hue } from '@/core/types'
 
@@ -18,17 +21,6 @@ export const HUE_SUBTLE: Record<Hue, string> = {
   mint: 'bg-hue-mint/15 text-hue-mint',
   rose: 'bg-hue-rose/15 text-hue-rose',
   cyan: 'bg-hue-cyan/15 text-hue-cyan',
-}
-
-export const HUE_SOLID: Record<Hue, string> = {
-  volt: 'bg-hue-volt text-inverse-ink',
-  sky: 'bg-hue-sky text-inverse-ink',
-  violet: 'bg-hue-violet text-inverse-ink',
-  coral: 'bg-hue-coral text-inverse-ink',
-  amber: 'bg-hue-amber text-inverse-ink',
-  mint: 'bg-hue-mint text-inverse-ink',
-  rose: 'bg-hue-rose text-inverse-ink',
-  cyan: 'bg-hue-cyan text-inverse-ink',
 }
 
 export const HUE_OUTLINE: Record<Hue, string> = {
@@ -78,13 +70,13 @@ export const SIGNAL_SUBTLE: Record<SignalTone, string> = {
 
 export const SIGNAL_SOLID: Record<SignalTone, string> = {
   neutral: 'bg-inverse text-inverse-ink',
-  accent: 'bg-accent text-inverse-ink',
-  live: 'bg-live text-inverse-ink',
-  // Light-theme attn is a mid-tone: dark ink reads better on it.
-  attn: 'bg-attn text-inverse-ink light:text-ink',
-  done: 'bg-done text-inverse-ink',
-  fail: 'bg-fail text-inverse-ink',
-  sim: 'sim-hatch text-ink shadow-[inset_0_0_0_1px_var(--line-strong)]',
+  accent: 'bg-inverse text-inverse-ink',
+  live: 'bg-live text-live-on',
+  // No text on solid attn/done (contrast): these stay tinted, with a firmer edge.
+  attn: 'bg-attn-tint text-attn-ink shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--attn)_45%,transparent)]',
+  done: 'bg-done-tint text-done-ink shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--done)_45%,transparent)]',
+  fail: 'bg-fail text-fail-on',
+  sim: 'sim-hatch text-ink shadow-[inset_0_0_0_1px_var(--line-input)]',
 }
 
 export const SIGNAL_OUTLINE: Record<SignalTone, string> = {
@@ -94,7 +86,7 @@ export const SIGNAL_OUTLINE: Record<SignalTone, string> = {
   attn: 'border border-attn/50 text-attn-ink',
   done: 'border border-done/45 text-done-ink',
   fail: 'border border-fail/45 text-fail-ink',
-  sim: 'sim-hatch border border-line-strong text-sim-ink',
+  sim: 'sim-hatch border border-dashed border-line-input text-sim-ink',
 }
 
 /** Dot/mark fill for each signal. */
@@ -131,8 +123,9 @@ export type ToneVariant = 'subtle' | 'solid' | 'outline'
 /** Background + text classes for a tone in a variant. */
 export function toneClasses(tone: Tone, variant: ToneVariant = 'subtle'): string {
   if (isHueTone(tone)) {
+    // Identity hues never fill behind text: 'solid' renders as the 15% tint.
     const hue = hueOf(tone)
-    return variant === 'solid' ? HUE_SOLID[hue] : variant === 'outline' ? HUE_OUTLINE[hue] : HUE_SUBTLE[hue]
+    return variant === 'outline' ? HUE_OUTLINE[hue] : HUE_SUBTLE[hue]
   }
   return variant === 'solid' ? SIGNAL_SOLID[tone] : variant === 'outline' ? SIGNAL_OUTLINE[tone] : SIGNAL_SUBTLE[tone]
 }

@@ -26,12 +26,9 @@ const CSS = `
 }
 .atrium-indeterminate { animation: atrium-indeterminate 1.5s var(--ease-standard) infinite; }
 @keyframes atrium-soft-pulse { 0%, 100% { opacity: 0.35 } 50% { opacity: 1 } }
-@keyframes atrium-breathe {
-  0% { box-shadow: 0 0 0 0 var(--live-glow) }
-  70% { box-shadow: 0 0 0 5px transparent }
-  100% { box-shadow: 0 0 0 0 transparent }
-}
-.atrium-breathe { animation: atrium-breathe 2s var(--ease-standard) infinite; }
+/* Live breathing (DESIGN §8.2): opacity 0.55 ↔ 1 at --dur-breathe. No glows. */
+@keyframes atrium-breathe { 0%, 100% { opacity: 1 } 50% { opacity: 0.55 } }
+.atrium-breathe { animation: atrium-breathe var(--dur-breathe, 1600ms) ease-in-out infinite; }
 
 /*
  * Clickable surfaces with nested controls (cards, list rows): a full-size overlay <button> sits behind the
@@ -57,16 +54,17 @@ const CSS = `
 .atrium-range::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--ink-2); }
 .atrium-range::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%;
-  background: var(--surface-raised); border: 1px solid var(--line-strong);
+  background: var(--surface-raised); border: 1px solid var(--line-input);
   box-shadow: var(--shadow-e1);
-  transition: transform var(--dur-1) var(--ease-standard), border-color var(--dur-1) var(--ease-standard);
+  transition: border-color var(--dur-1) var(--ease-standard), background-color var(--dur-1) var(--ease-standard);
 }
 .atrium-range::-moz-range-thumb {
   width: 16px; height: 16px; border-radius: 50%; box-sizing: border-box;
-  background: var(--surface-raised); border: 1px solid var(--line-strong); box-shadow: var(--shadow-e1);
+  background: var(--surface-raised); border: 1px solid var(--line-input); box-shadow: var(--shadow-e1);
 }
-.atrium-range:not(:disabled):hover::-webkit-slider-thumb { border-color: var(--ink-4); transform: scale(1.06); }
-.atrium-range:not(:disabled):active::-webkit-slider-thumb { transform: scale(1.12); }
+.atrium-range:not(:disabled):hover::-webkit-slider-thumb { border-color: var(--ink-3); }
+.atrium-range:not(:disabled):active::-webkit-slider-thumb { border-color: var(--ink-2); background: var(--surface-press); }
+.atrium-range:not(:disabled):hover::-moz-range-thumb { border-color: var(--ink-3); }
 .atrium-range:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .atrium-range:focus-visible::-moz-range-thumb { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 @media (pointer: coarse) {
@@ -76,13 +74,15 @@ const CSS = `
 }
 
 @media (prefers-reduced-motion: reduce) {
-  ${OS_REDUCED} .atrium-shimmer, ${OS_REDUCED} .atrium-breathe { animation: none !important; }
+  ${OS_REDUCED} .atrium-shimmer { animation: none !important; }
+  ${OS_REDUCED} .atrium-breathe { animation: none !important; outline: 1px solid var(--live); outline-offset: 1px; }
   ${OS_REDUCED} .atrium-spin { animation-duration: 2.4s !important; animation-iteration-count: infinite !important; }
   ${OS_REDUCED} .atrium-indeterminate {
     animation: atrium-soft-pulse 2.4s ease-in-out infinite !important; transform: none; left: 0; width: 100% !important;
   }
 }
-${REDUCED} .atrium-shimmer, ${REDUCED} .atrium-breathe { animation: none !important; }
+${REDUCED} .atrium-shimmer { animation: none !important; }
+${REDUCED} .atrium-breathe { animation: none !important; outline: 1px solid var(--live); outline-offset: 1px; }
 ${REDUCED} .atrium-spin { animation-duration: 2.4s !important; animation-iteration-count: infinite !important; }
 ${REDUCED} .atrium-indeterminate {
   animation: atrium-soft-pulse 2.4s ease-in-out infinite !important; transform: none; left: 0; width: 100% !important;

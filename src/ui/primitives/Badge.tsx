@@ -18,14 +18,14 @@ export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   dot?: boolean
   /** Breathing dot — only for things happening right now (live). */
   pulse?: boolean
-  /** Mono uppercase kicker style (system labels like SIMULATED, BETA). */
+  /** meta-caps tag (SIM, LIVE, BETA): mono uppercase, 16px tall. */
   mono?: boolean
   children?: ReactNode
 }
 
 const SIZE = {
   sm: 'h-[18px] gap-1 px-1.5 text-2xs',
-  md: 'h-5 gap-1.5 px-2 text-xs',
+  md: 'h-[22px] gap-1.5 px-2 text-xs',
 }
 
 /** Compact status/identity label. Color is never the only signal — always pair with text. */
@@ -45,9 +45,7 @@ export function Badge({
     <span
       className={cn(
         'inline-flex max-w-full shrink-0 items-center rounded-xs leading-none font-medium whitespace-nowrap select-none',
-        SIZE[size],
-        mono && 'font-mono tracking-[0.06em] uppercase',
-        mono && size === 'sm' && 'text-[10px]',
+        mono ? 'type-meta-caps h-4 gap-1 px-1' : SIZE[size],
         toneClasses(tone, variant),
         className,
       )}

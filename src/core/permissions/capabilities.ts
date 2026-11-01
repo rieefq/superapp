@@ -15,7 +15,7 @@ export const CAPABILITIES: Record<Capability, CapabilityInfo> = {
   'calendar.manage': { id: 'calendar.manage', label: 'Manage calendar', description: 'Read availability and create or move events.', risk: 'medium', icon: 'CalendarClock' },
   'files.read': { id: 'files.read', label: 'Read files', description: 'Read files from connected storage.', risk: 'low', icon: 'FileText' },
   'files.write': { id: 'files.write', label: 'Write files', description: 'Create or modify files in connected storage.', risk: 'medium', icon: 'FilePen' },
-  'media.generate': { id: 'media.generate', label: 'Generate media', description: 'Create images, video, audio and slides.', risk: 'low', icon: 'Sparkles' },
+  'media.generate': { id: 'media.generate', label: 'Generate media', description: 'Create images, video, audio and slides.', risk: 'low', icon: 'ImagePlus' },
   'workflows.run': { id: 'workflows.run', label: 'Run workflows', description: 'Trigger automations.', risk: 'medium', icon: 'Workflow' },
   'data.query': { id: 'data.query', label: 'Query data', description: 'Run read-only queries against connected databases.', risk: 'medium', icon: 'Database' },
   'payments.spend': { id: 'payments.spend', label: 'Spend money', description: 'Make purchases or issue refunds.', risk: 'high', icon: 'CreditCard' },

@@ -139,6 +139,7 @@ function planFor(run: Run): RunPlan | undefined {
   try {
     const plan = factory(script.params, createRng(script.seed))
     plans.set(run.id, { key, plan })
+    if (run.plannedSteps !== plan.steps.length) db.update('runs', run.id, { plannedSteps: plan.steps.length })
     return plan
   } catch (error) {
     console.error(`[runs] could not re-plan ${run.id} with "${script.factory}"`, error)
@@ -239,7 +240,14 @@ function advance(exec: Execution): void {
   }
   if (sp.approval) {
     const capability = sp.capability ?? 'shell.execute'
-    const decision = evaluatePermission({ capability, risk: sp.approval.risk, agentId: run.agentId, integrationId: sp.integrationId })
+    const sessionAutonomy = run.origin?.kind === 'session' ? db.get('sessions', run.origin.id)?.autonomy : undefined
+    const decision = evaluatePermission({
+      capability,
+      risk: sp.approval.risk,
+      agentId: run.agentId,
+      integrationId: sp.integrationId,
+      autonomy: sessionAutonomy,
+    })
     if (decision.outcome === 'ask') return requestApproval(run, step.id, sp, decision.reason)
     if (decision.outcome === 'deny') return denyStep(exec, run, index, step.id, decision.reason)
   }
@@ -446,8 +454,9 @@ function start(input: StartRunInput): Run {
     script,
   })
   plans.set(run.id, { key: scriptKeyOf(script), plan })
+  const planned = db.update('runs', run.id, { plannedSteps: plan.steps.length }) ?? run
   drive(run.id)
-  return run
+  return planned
 }
 
 function cancel(runId: ID, reason?: string): void {

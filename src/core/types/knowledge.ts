@@ -41,6 +41,11 @@ export interface KnowledgeItem {
   pinned?: boolean
   /** True when the content was produced by the local simulator (e.g. notes from a simulated agent run). */
   simulated?: boolean
+  /**
+   * Whether AI may read this item: 'always' (default) — retrieval may surface it;
+   * 'cited' — only when explicitly attached or mentioned; 'never' — never sent to a model.
+   */
+  aiAvailability?: 'always' | 'cited' | 'never'
   createdAt: Timestamp
   updatedAt: Timestamp
 }

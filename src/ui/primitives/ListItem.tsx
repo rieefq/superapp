@@ -50,7 +50,7 @@ function renderIcon(icon: ListItemProps['icon'], className: string) {
 function rowClasses({ selected, disabled, interactive, twoLine }: { selected?: boolean; disabled?: boolean; interactive: boolean; twoLine: boolean }) {
   return cn(
     'group/row relative flex w-full min-w-0 items-center gap-2.5 rounded-sm px-2 text-left text-sm',
-    'transition-colors duration-(--dur-1) ease-standard outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
+    'transition-colors duration-(--dur-1) ease-standard focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
     twoLine ? 'py-1.5' : ROW,
     selected ? 'bg-press text-ink' : 'text-ink-2',
     interactive && !disabled && !selected && 'cursor-pointer hover:bg-hover hover:text-ink',
@@ -140,7 +140,7 @@ export function ListItem(props: ListItemProps) {
           aria-describedby={description ? descriptionId : undefined}
           aria-current={props['aria-current'] ?? (selected ? 'true' : undefined)}
           onClick={onClick}
-          className="absolute inset-0 -z-10 cursor-pointer rounded-[inherit] outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed"
+          className="absolute inset-0 -z-10 cursor-pointer rounded-[inherit] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed"
         />
         <RowContent {...props} labelId={labelId} descriptionId={descriptionId} />
       </div>

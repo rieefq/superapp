@@ -232,6 +232,12 @@ export function runDurationMs(run: Pick<Run, 'status' | 'startedAt' | 'endedAt'>
 
 const finite = (n: unknown): number => (typeof n === 'number' && Number.isFinite(n) ? n : 0)
 
+/** USD outputs are rounded to a billionth of a dollar: no float noise, sub-cent estimates intact. */
+const usd = (n: number): number => Math.round(n * 1e9) / 1e9
+
+/** Durations are reported in whole milliseconds. */
+const wholeMs = (n: number | null): number | null => (n === null ? null : Math.round(n))
+
 function usageOf(run: Run): Usage {
   const u = run.usage as Usage | undefined
   return { inputTokens: finite(u?.inputTokens), outputTokens: finite(u?.outputTokens), costUsd: finite(u?.costUsd) }
@@ -310,15 +316,15 @@ function finishTotals(acc: TotalsAcc): InsightsTotals {
     inputTokens: acc.inputTokens,
     outputTokens: acc.outputTokens,
     tokens: acc.inputTokens + acc.outputTokens,
-    costUsd: acc.liveCostUsd + acc.simulatedCostUsd,
-    liveCostUsd: acc.liveCostUsd,
-    simulatedCostUsd: acc.simulatedCostUsd,
-    medianDurationMs: percentileSorted(durations, 0.5),
-    p90DurationMs: percentileSorted(durations, 0.9),
+    costUsd: usd(acc.liveCostUsd + acc.simulatedCostUsd),
+    liveCostUsd: usd(acc.liveCostUsd),
+    simulatedCostUsd: usd(acc.simulatedCostUsd),
+    medianDurationMs: wholeMs(percentileSorted(durations, 0.5)),
+    p90DurationMs: wholeMs(percentileSorted(durations, 0.9)),
     tasksCompleted: acc.tasksCompleted,
     approvalsPending: acc.approvalsPending,
     approvalsResolved: acc.approvalsResolved,
-    medianApprovalWaitMs: median(acc.approvalWaits),
+    medianApprovalWaitMs: wholeMs(median(acc.approvalWaits)),
   }
 }
 
@@ -462,7 +468,9 @@ export function computeInsights(input: InsightsInput): Insights {
   let liveSpentUsd = 0
   let simulatedSpentUsd = 0
 
-  for (const run of input.runs) {
+  // Canonical order: float cost sums then never depend on the order rows arrive in.
+  const runs = [...input.runs].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+  for (const run of runs) {
     runsById.set(run.id, run)
     const at = runTime(run)
     const usage = usageOf(run)
@@ -509,6 +517,8 @@ export function computeInsights(input: InsightsInput): Insights {
     if (run.status === 'failed') addFailure(failures, run, at)
   }
 
+  for (const d of daily) d.costUsd = usd(d.costUsd)
+
   // Approvals follow their run's project/kind; an approval whose run is gone only counts unfiltered.
   for (const a of input.approvals) {
     if (filtered) {
@@ -551,8 +561,8 @@ export function computeInsights(input: InsightsInput): Insights {
       succeeded: g.succeeded,
       failed: g.failed,
       successRate: ratio(g.succeeded, g.succeeded + g.failed),
-      avgDurationMs: g.durationCount ? g.durationTotal / g.durationCount : null,
-      costUsd: g.costUsd,
+      avgDurationMs: g.durationCount ? Math.round(g.durationTotal / g.durationCount) : null,
+      costUsd: usd(g.costUsd),
       costIsEstimate: g.simulatedRuns > 0,
       tokens: g.tokens,
       lastRunAt: agentLastRun.get(id) ?? null,
@@ -578,8 +588,8 @@ export function computeInsights(input: InsightsInput): Insights {
       succeeded: g.succeeded,
       failed: g.failed,
       failureRate: ratio(g.failed, g.succeeded + g.failed),
-      avgDurationMs: g.durationCount ? g.durationTotal / g.durationCount : null,
-      costUsd: g.costUsd,
+      avgDurationMs: g.durationCount ? Math.round(g.durationTotal / g.durationCount) : null,
+      costUsd: usd(g.costUsd),
       costIsEstimate: g.simulatedRuns > 0,
       lastRunAt: workflowLastRun.get(id) ?? null,
       daily: g.daily,
@@ -597,11 +607,15 @@ export function computeInsights(input: InsightsInput): Insights {
     inputTokens: m.inputTokens,
     outputTokens: m.outputTokens,
     tokens: m.inputTokens + m.outputTokens,
-    costUsd: m.costUsd,
+    costUsd: usd(m.costUsd),
   }))
   byModel.sort(
     (a, b) =>
-      b.costUsd - a.costUsd || b.runs - a.runs || a.label.localeCompare(b.label) || Number(a.simulated) - Number(b.simulated),
+      b.costUsd - a.costUsd ||
+      b.runs - a.runs ||
+      a.label.localeCompare(b.label) ||
+      Number(a.simulated) - Number(b.simulated) ||
+      a.key.localeCompare(b.key),
   )
 
   // ---- failure reasons
@@ -614,18 +628,20 @@ export function computeInsights(input: InsightsInput): Insights {
     runIds: f.runs.sort((a, b) => b.at - a.at || b.id.localeCompare(a.id)).map((r) => r.id),
     simulated: f.allSimulated,
   }))
-  failureReasons.sort((a, b) => b.count - a.count || b.lastAt - a.lastAt || a.reason.localeCompare(b.reason))
+  failureReasons.sort(
+    (a, b) => b.count - a.count || b.lastAt - a.lastAt || a.reason.localeCompare(b.reason) || a.key.localeCompare(b.key),
+  )
 
   // ---- budget (account-wide)
   const monthlyUsd = Math.max(0, finite(input.monthlyBudgetUsd))
-  const spentThisMonthUsd = liveSpentUsd + simulatedSpentUsd
+  const spentThisMonthUsd = usd(liveSpentUsd + simulatedSpentUsd)
   const elapsed = Math.max(now - monthStart, TIME.DAY)
-  const projectedUsd = spentThisMonthUsd > 0 ? Math.max(spentThisMonthUsd, (spentThisMonthUsd * (monthEnd - monthStart)) / elapsed) : 0
+  const projectedUsd = usd(spentThisMonthUsd > 0 ? Math.max(spentThisMonthUsd, (spentThisMonthUsd * (monthEnd - monthStart)) / elapsed) : 0)
   const budget: BudgetSummary = {
     monthlyUsd,
     spentThisMonthUsd,
-    liveSpentUsd,
-    simulatedSpentUsd,
+    liveSpentUsd: usd(liveSpentUsd),
+    simulatedSpentUsd: usd(simulatedSpentUsd),
     estimated: simulatedSpentUsd > 0,
     projectedUsd,
     usedRatio: ratio(spentThisMonthUsd, monthlyUsd),

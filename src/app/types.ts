@@ -44,6 +44,18 @@ export interface Command {
   run: (ctx: CommandContext) => void | Promise<void>
 }
 
+/** A `/` command offered by a workspace composer. Execution is handled by the host composer. */
+export interface SlashCommand {
+  /** Without the slash, e.g. "research". */
+  name: string
+  /** Argument hint, e.g. "<question>". */
+  args?: string
+  description: string
+  icon?: LucideIcon
+}
+
+export type InspectorTab = 'run' | 'item' | 'context'
+
 export interface WorkspaceManifest {
   id: WorkspaceId
   label: string
@@ -57,6 +69,16 @@ export interface WorkspaceManifest {
   chord?: [string, string]
   /** Static commands contributed to the command center (keep this module light — it loads eagerly). */
   commands?: (ctx: CommandContext) => Command[]
+  /** What `N` (and the list pane's "+ New") does in this workspace. */
+  newAction?: { label: string; run: (ctx: CommandContext) => void }
+  /** Docked composer defaults for this workspace. */
+  composer?: { placeholder: string; slashCommands?: SlashCommand[] }
+  /** Workspace-specific shortcuts, listed in the `?` sheet. */
+  shortcuts?: { keys: string; label: string }[]
+  /** Inspector tab used when the workspace opens. */
+  defaultInspectorTab?: InspectorTab
+  /** Whether the Inspector starts open in this workspace. */
+  inspectorDefaultOpen?: boolean
 }
 
 export interface WorkspaceModule {

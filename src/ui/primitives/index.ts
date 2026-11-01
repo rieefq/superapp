@@ -91,7 +91,7 @@ export type { MotionPreset } from './motion'
 // Feedback & data marks
 export { Badge } from './Badge'
 export type { BadgeProps, BadgeTone, BadgeVariant } from './Badge'
-export { toneClasses, toneFill, HUE_SUBTLE, HUE_SOLID, HUE_OUTLINE, HUE_TEXT, HUE_FILL } from './tones'
+export { toneClasses, toneFill, HUE_SUBTLE, HUE_OUTLINE, HUE_TEXT, HUE_FILL } from './tones'
 export { Tag, Chip } from './Tag'
 export type { TagProps, ChipProps } from './Tag'
 export { Kbd, KbdCombo } from './Kbd'

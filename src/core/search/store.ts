@@ -85,7 +85,16 @@ export function retrieveKnowledge(query: string, opts: RetrieveOptions = {}): Re
     passages.sync(knowledge)
     ensureSubscribed()
   }
-  return passages.retrieve(query, opts, knowledge)
+  // Respect each item's "Available to AI" setting: 'never' is never retrieved;
+  // 'cited' only when explicitly requested via opts.ids (attached / mentioned).
+  const limit = opts.limit ?? 5
+  const explicit = new Set(opts.ids ?? [])
+  const allowed = (r: RetrievedPassage) => {
+    const a = r.item.aiAvailability ?? 'always'
+    return a === 'always' || (a === 'cited' && explicit.has(r.item.id))
+  }
+  const results = passages.retrieve(query, { ...opts, limit: limit * 3 }, knowledge)
+  return results.filter(allowed).slice(0, limit)
 }
 
 function warmStep(): void {

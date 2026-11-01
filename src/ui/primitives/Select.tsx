@@ -296,9 +296,9 @@ export function Select<T extends string = string>({
           })
         }}
         className={cn(
-          'flex min-w-0 items-center text-left outline-none',
+          'flex min-w-0 items-center text-left',
           variant === 'field'
-            ? cn(CONTROL_SURFACE, controlStateClasses({ invalid: field.invalid, disabled: field.disabled, focusWithin: false }), 'w-full')
+            ? cn(CONTROL_SURFACE, controlStateClasses({ invalid: field.invalid, disabled: field.disabled, focusWithin: false }), 'w-full outline-none')
             : cn(
                 'rounded-sm text-ink-2 transition-colors duration-(--dur-1) hover:bg-hover hover:text-ink',
                 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',

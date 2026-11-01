@@ -110,6 +110,8 @@ export interface Run {
   usage: Usage
   /** 0..1 */
   progress: number
+  /** Number of steps the plan expects (set by the engine; drives the Step Tape). */
+  plannedSteps?: number
   summary?: string
   error?: string
   script?: RunScriptState

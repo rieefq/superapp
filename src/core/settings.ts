@@ -5,15 +5,16 @@ import { DEFAULT_MODEL_ID } from '@/core/ai/models'
 
 export const DEFAULT_SETTINGS: Settings = {
   profile: { name: 'Morgan Lee', hue: 'volt' },
-  appearance: { theme: 'dark', density: 'comfortable', reduceMotion: 'system' },
+  appearance: { theme: 'dark', density: 'comfortable', reduceMotion: 'system', singleKeyShortcuts: true },
   ai: { defaultModelId: DEFAULT_MODEL_ID, effort: 'medium', showReasoning: true, autoRetrieve: true },
   safety: {
     defaultAutonomy: 'balanced',
     alwaysAsk: ['messages.send', 'repo.pull_request', 'payments.spend'],
     confirmDestructive: true,
     monthlyBudgetUsd: 50,
+    countSimulatedSpend: false,
   },
-  notifications: { runCompleted: true, runFailed: true, approvals: true, toasts: true },
+  notifications: { runCompleted: true, runFailed: true, approvals: true, toasts: true, focusMode: false, browser: false },
   simulation: { speed: 1 },
   onboarded: false,
 }
@@ -65,4 +66,10 @@ export function getSettings(): Settings {
   return useSettingsStore.getState().settings
 }
 
-export const updateSettings = (...args: Parameters<SettingsStore['update']>) => useSettingsStore.getState().update(...args)
+/** Patch one settings section: `updateSettings('appearance', { theme: 'light' })`. */
+export function updateSettings<K extends keyof Settings>(
+  section: K,
+  patch: Settings[K] extends object ? Partial<Settings[K]> : Settings[K],
+): void {
+  useSettingsStore.getState().update(section, patch)
+}

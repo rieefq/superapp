@@ -30,7 +30,7 @@
   /* Ink (text) */
   --ink: #edebe5;
   --ink-2: #b4b1a7;
-  --ink-3: #8b887f;
+  --ink-3: #959289;
   --ink-4: #5b5953;
 
   /* Inverted (primary buttons) */
@@ -38,9 +38,9 @@
   --inverse-ink: #121211;
 
   /* Semantic signals: base (marks/dots), ink (text on canvas), tint (washes) */
-  --accent: #8fb1e6;
-  --accent-ink: #a8c3ee;
-  --accent-tint: #1a2433;
+  --accent: #edebe5;
+  --accent-ink: #edebe5;
+  --accent-tint: #282825;
   --live: #8fb1e6;
   --live-ink: #a8c3ee;
   --live-tint: #18222f;
@@ -54,7 +54,7 @@
   --fail: #f07a60;
   --fail-ink: #f59580;
   --fail-tint: #351812;
-  --sim-hatch: #4a4842;
+  --sim-hatch: #5b5953;
   --sim-tint: #1b1b19;
   --sim-ink: #b4b1a7;
 
@@ -77,10 +77,10 @@
   --diff-del-mark: #7a2e26;
 
   /* Misc */
-  --selection: rgb(143 177 230 / 0.24);
-  --scrim: rgb(4 4 3 / 0.6);
-  --focus-ring: #8fb1e6;
-  --highlight: rgb(226 173 69 / 0.28);
+  --selection: rgb(237 235 229 / 0.16);
+  --scrim: rgb(4 4 3 / 0.5);
+  --focus-ring: #edebe5;
+  --highlight: rgb(237 235 229 / 0.18);
   --inset-highlight: inset 0 1px 0 rgb(255 255 255 / 0.04);
   --shadow-e1: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -8px rgb(0 0 0 / 0.55), inset 0 1px 0 rgb(255 255 255 / 0.04);
   --shadow-e2: 0 24px 64px -16px rgb(0 0 0 / 0.7), 0 2px 6px rgb(0 0 0 / 0.35), inset 0 1px 0 rgb(255 255 255 / 0.05);
@@ -95,6 +95,11 @@
   --syn-type: #e8cf86;
   --syn-punct: #8b887f;
   --syn-plain: #e0ddd5;
+  --line-input: #6f6c64;
+  --live-on: #0c0c0b;
+  --fail-on: #121211;
+  --info: #b4b1a7;
+  --info-tint: #1f1f1d;
 }
 
 :root[data-theme='light'] {
@@ -113,20 +118,20 @@
 
   --ink: #1c1b18;
   --ink-2: #55524a;
-  --ink-3: #6e6a60;
+  --ink-3: #65615a;
   --ink-4: #a39f94;
 
   --inverse: #1c1b18;
   --inverse-ink: #f7f6f2;
 
-  --accent: #2d5b9a;
-  --accent-ink: #2d5b9a;
-  --accent-tint: #e3eaf4;
+  --accent: #1c1b18;
+  --accent-ink: #1c1b18;
+  --accent-tint: #e5e3dc;
   --live: #2d5b9a;
   --live-ink: #2d5b9a;
   --live-tint: #e3eaf4;
   --live-glow: rgb(45 91 154 / 0.25);
-  --attn: #c98a10;
+  --attn: #a56d00;
   --attn-ink: #8c5e00;
   --attn-tint: #f7ebc6;
   --done: #2a7259;
@@ -135,7 +140,7 @@
   --fail: #c23b22;
   --fail-ink: #b8361e;
   --fail-tint: #f8e4de;
-  --sim-hatch: #c9c4b8;
+  --sim-hatch: #aaa496;
   --sim-tint: #f0ede6;
   --sim-ink: #55524a;
 
@@ -155,10 +160,10 @@
   --diff-del-ink: #a3291a;
   --diff-del-mark: #f0bdb4;
 
-  --selection: rgb(45 91 154 / 0.16);
-  --scrim: rgb(28 27 24 / 0.32);
-  --focus-ring: #2d5b9a;
-  --highlight: rgb(229 181 58 / 0.32);
+  --selection: rgb(28 27 24 / 0.12);
+  --scrim: rgb(28 27 24 / 0.24);
+  --focus-ring: #1c1b18;
+  --highlight: rgb(28 27 24 / 0.10);
   --inset-highlight: inset 0 1px 0 rgb(255 255 255 / 0.6);
   --shadow-e1: 0 1px 2px rgb(28 27 24 / 0.06), 0 8px 24px -8px rgb(28 27 24 / 0.18);
   --shadow-e2: 0 24px 64px -16px rgb(28 27 24 / 0.28), 0 2px 6px rgb(28 27 24 / 0.08);
@@ -172,6 +177,11 @@
   --syn-type: #7a5a0f;
   --syn-punct: #6e6a60;
   --syn-plain: #1c1b18;
+  --line-input: #857f74;
+  --live-on: #ffffff;
+  --fail-on: #ffffff;
+  --info: #55524a;
+  --info-tint: #efeee9;
 }
 
 :root {
@@ -187,8 +197,12 @@
   --dur-4: 360ms; /* command center, dialogs */
   --ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --dur-breathe: 1600ms; /* live glyph halo, mark capsule, running tape cell */
+  --dur-develop: 600ms; /* studio preview develop fade */
 
   /* Layers */
+  --z-sticky: 10;
   --z-rail: 30;
   --z-topbar: 40;
   --z-panel: 50;
@@ -198,8 +212,24 @@
   --z-tooltip: 90;
 
   /* Shell dimensions */
-  --rail-w: 60px;
-  --rail-w-expanded: 232px;
   --topbar-h: 48px;
-  --panel-w: 360px;
+  --runline-h: 28px;
+  --rail-w: 72px;
+  --rail-w-compact: 56px;
+  --bezel: 6px;
+  --list-w: 280px;
+  --panel-w: 360px; /* Inspector */
+  --stage-min: 640px;
+  --composer-max: 40vh;
+
+  /* Density (comfortable default) */
+  --row-h: 36px;
+  --row-h-2: 56px;
+  --control-h: 32px;
+}
+
+:root[data-density='compact'] {
+  --row-h: 28px;
+  --row-h-2: 48px;
+  --control-h: 28px;
 }

@@ -139,7 +139,7 @@ export function TimeSeriesChart({
   const tickCount = Math.max(2, Math.min(6, Math.round((height - 32) / 46)))
   const yt = niceTicks(yMin, yMax, tickCount)
   const tickFmt = tickFormat ?? axisNumberFormatter(yt.ticks)
-  const yLabelW = Math.max(...yt.ticks.map((t) => approxTextWidth(tickFmt(t), 10.5, true)))
+  const yLabelW = Math.max(...yt.ticks.map((t) => approxTextWidth(tickFmt(t), 11, true)))
   const M = { top: 10, bottom: 26, left: Math.ceil(yLabelW) + 12 }
   const innerH = Math.max(10, height - M.top - M.bottom)
   const y = linearScale([yt.min, yt.max], [innerH, 0])
@@ -272,7 +272,7 @@ export function TimeSeriesChart({
   const xLabel = (t: number) => {
     const px = x(t)
     const text = xt.format(t)
-    const w = approxTextWidth(text, 10.5, true)
+    const w = approxTextWidth(text, 11, true)
     const anchor: 'start' | 'end' | 'middle' = px - w / 2 < -M.left + 2 ? 'start' : px + w / 2 > innerW + right - 2 ? 'end' : 'middle'
     return { px, text, anchor }
   }
@@ -334,7 +334,7 @@ export function TimeSeriesChart({
                 {yt.ticks.map((tk) => (
                   <g key={tk}>
                     <line x1={0} x2={innerW} y1={y(tk)} y2={y(tk)} stroke={tk === 0 ? 'var(--line-strong)' : 'var(--line)'} strokeWidth={1} shapeRendering="crispEdges" />
-                    <text x={-10} y={y(tk)} dy="0.32em" textAnchor="end" className="fill-ink-3 font-mono text-[10.5px] tabular">
+                    <text x={-10} y={y(tk)} dy="0.32em" textAnchor="end" className="fill-ink-3 font-mono text-2xs tabular">
                       {tickFmt(tk)}
                     </text>
                   </g>
@@ -343,7 +343,7 @@ export function TimeSeriesChart({
                 {xt.ticks.map((t) => {
                   const l = xLabel(t)
                   return (
-                    <text key={t} x={l.px} y={innerH + 18} textAnchor={l.anchor} className="fill-ink-3 font-mono text-[10.5px]">
+                    <text key={t} x={l.px} y={innerH + 18} textAnchor={l.anchor} className="fill-ink-3 font-mono text-2xs">
                       {l.text}
                     </text>
                   )
@@ -362,7 +362,7 @@ export function TimeSeriesChart({
                   <g key={`e${e.i}`}>
                     <circle cx={x(e.t)} cy={e.y} r={4} fill={colors[e.i]} stroke={CHART_SURFACE} strokeWidth={2} />
                     {showEnds && (
-                      <text x={x(e.t) + 10} y={e.y} dy="0.32em" className="fill-ink-2 text-[11px] font-medium">
+                      <text x={x(e.t) + 10} y={e.y} dy="0.32em" className="fill-ink-2 text-2xs font-medium">
                         {e.text}
                       </text>
                     )}
