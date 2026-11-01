@@ -74,7 +74,10 @@ export function GeneratorExplainer({ kind, children }: { kind: AssetKind; childr
 
 /** The prompt bar's generator chip: `SIM Procedural preview ▾` → what runs, and what would change. */
 export function GeneratorChip({ kind, projectId, className }: { kind: AssetKind; projectId: ID | null; className?: string }) {
-  const readBack = useReadBack({ kind: 'studio', studioKind: kind, projectId })
+  const raw = useReadBack({ kind: 'studio', studioKind: kind, projectId })
+  // Images and storyboards are drawn from the prompt alone: their runs never read knowledge.
+  const visual = kind === 'image' || kind === 'video'
+  const readBack = visual ? { ...raw, capabilities: raw.capabilities.filter((c) => c.capability !== 'knowledge.read') } : raw
   return (
     <Popover
       placement="top-start"

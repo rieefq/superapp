@@ -9,19 +9,12 @@ import type { Agent, ID } from '@/core/types'
 import { cn } from '@/lib/cn'
 import { timeAgo, truncate } from '@/lib/format'
 import { EmptyState, KindTile, SimBadge } from '@/ui'
+import { useAgentMemoryIds } from '../shared'
 
 /** Memory (§6.4): knowledge items the agent wrote, newest first. */
 export default function MemoryTab({ agent }: { agent: Agent }) {
   const navigate = useNavigate()
-  const ids = useDB(
-    useShallow((s: Tables) => {
-      const runIds = new Set(Object.values(s.runs).filter((r) => r.agentId === agent.id).map((r) => r.id))
-      return Object.values(s.knowledge)
-        .filter((k) => (k.author?.type === 'agent' && k.author.id === agent.id) || (k.source.type === 'agent' && k.source.ref?.kind === 'run' && runIds.has(k.source.ref.id)))
-        .sort((a, b) => b.updatedAt - a.updatedAt)
-        .map((k) => k.id)
-    }),
-  )
+  const ids = useAgentMemoryIds(agent.id)
   const canWrite = agent.capabilities.some((g) => g.capability === 'knowledge.write' && g.mode !== 'deny')
   if (!ids.length) {
     return (

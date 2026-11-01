@@ -25,6 +25,12 @@ async function persisted<T>(page: Page, table: string): Promise<T[]> {
   return page.evaluate((t) => Object.values(JSON.parse(localStorage.getItem(`atrium.db.${t}`) ?? '{}')) as never[], table) as Promise<T[]>
 }
 
+/** Open a Knowledge route and wait for its stage (the workspace loads lazily after the shell is ready). */
+async function openK(page: Page, path: string) {
+  await open(page, path)
+  await page.locator('#main [data-region="stage"] > header').first().waitFor({ timeout: 30_000 })
+}
+
 async function uploadRunbook(page: Page) {
   await page.locator('input[data-knowledge-upload]').setInputFiles({ name: 'quokka-escalation-runbook.md', mimeType: 'text/markdown', buffer: Buffer.from(RUNBOOK) })
   await expect(row(page, 'Quokka escalation runbook')).toBeVisible()
@@ -32,7 +38,7 @@ async function uploadRunbook(page: Page) {
 
 test.describe('Knowledge', () => {
   test('upload → search with highlight → open → hold → a new chat answer cites it', async ({ page }) => {
-    await open(page, '/knowledge')
+    await openK(page, '/knowledge')
     await expect(page.getByRole('heading', { name: 'All knowledge' })).toBeVisible()
     await expect(results(page).getByRole('listitem')).toHaveCount(31)
 
@@ -79,7 +85,7 @@ test.describe('Knowledge', () => {
     expect((await persisted<Link>(page, 'links')).some((l) => l.rel === 'cites' && l.from.kind === 'message' && l.to.id === id)).toBe(true)
 
     // Back in Knowledge, the item shows who used it: the chat run that read it and the answer that cited it.
-    await open(page, `/knowledge/${id}`)
+    await openK(page, `/knowledge/${id}`)
     const connections = page.locator('section[aria-labelledby="kn-connections"]')
     await connections.scrollIntoViewIfNeeded()
     await expect(connections.getByRole('heading', { name: 'Used by' })).toBeVisible()
@@ -89,7 +95,7 @@ test.describe('Knowledge', () => {
   })
 
   test('edit a note: autosaves, one History line per session, persists after reload', async ({ page }) => {
-    await open(page, '/knowledge/kno_rust_plan')
+    await openK(page, '/knowledge/kno_rust_plan')
     await expect(stageTitle(page)).toHaveText('Rust learning plan')
     await page.keyboard.press('e')
     await expect(page).toHaveURL(/edit=1/)
@@ -115,7 +121,7 @@ test.describe('Knowledge', () => {
   })
 
   test('N starts a draft that becomes a note on its first words, filed in the collection in view', async ({ page }) => {
-    await open(page, '/knowledge?collection=col_engineering')
+    await openK(page, '/knowledge?collection=col_engineering')
     await expect(page.getByRole('heading', { name: 'Engineering' })).toBeVisible()
     await page.keyboard.press('n')
     await expect(page).toHaveURL(/\/knowledge\/new\?collection=col_engineering/)
@@ -136,7 +142,7 @@ test.describe('Knowledge', () => {
   })
 
   test('bulk: select with X, move to a collection and tag in one go', async ({ page }) => {
-    await open(page, '/knowledge?collection=col_notes')
+    await openK(page, '/knowledge?collection=col_notes')
     await expect(results(page).getByRole('listitem')).toHaveCount(4)
     // Keyboard: focus the first row, X selects, ↓ then X selects the next.
     await results(page).locator('[data-row-link]').first().focus()
@@ -157,13 +163,13 @@ test.describe('Knowledge', () => {
     await expect(results(page).getByRole('listitem')).toHaveCount(2)
 
     // The tag is a real section of the library now.
-    await open(page, '/knowledge?tag=reading-list')
+    await openK(page, '/knowledge?tag=reading-list')
     await expect(page.locator('[data-region="stage"] > header h1').first()).toHaveText('#reading-list')
     await expect(results(page).getByRole('listitem')).toHaveCount(2)
   })
 
   test('retrieval lab: real passages with scores; Available to AI: Never takes an item out', async ({ page }) => {
-    await open(page, '/knowledge/retrieval')
+    await openK(page, '/knowledge/retrieval')
     await expect(page.getByRole('heading', { name: 'What would the AI retrieve?' })).toBeVisible()
     await page.getByRole('textbox', { name: 'Question' }).fill('What is the support SLA for severity one tickets?')
     const read = page.locator('section[aria-labelledby="lab-read"]')
@@ -173,17 +179,17 @@ test.describe('Knowledge', () => {
     await expect(read.locator('mark').first()).toBeVisible()
 
     // Set the SLA policy to Never: the lab stops reading it and says why.
-    await open(page, '/knowledge/kno_sla_policy')
+    await openK(page, '/knowledge/kno_sla_policy')
     await page.getByRole('article').getByRole('radio', { name: 'Never' }).click()
     await expect(page.getByText('Available to AI: Never').first()).toBeVisible()
-    await open(page, '/knowledge/retrieval?q=What+is+the+support+SLA+for+severity+one+tickets%3F')
+    await openK(page, '/knowledge/retrieval?q=What+is+the+support+SLA+for+severity+one+tickets%3F')
     await expect(read.getByRole('listitem').first()).toBeVisible()
     await expect(read).not.toContainText('Support SLA policy')
     await expect(page.locator('section[aria-labelledby="lab-withheld"]')).toContainText('Support SLA policy')
   })
 
   test('add a link (not fetched), then delete it with a confirm', async ({ page }) => {
-    await open(page, '/knowledge')
+    await openK(page, '/knowledge')
     await page.getByRole('button', { name: 'Add link' }).click()
     const dialog = page.getByRole('dialog', { name: 'Add a link' })
     await expect(dialog).toContainText('isn’t fetched')

@@ -32,7 +32,8 @@ async function startInvestigation(page: Page): Promise<string> {
   await expect(page.getByText('One combined search and a short synthesis')).toBeVisible()
   await page.getByRole('radio', { name: 'Standard', exact: true }).click()
   await expect(page.getByText('A search per angle, then a cited report')).toBeVisible()
-  await expect(page.getByRole('group', { name: 'Angles' }).or(page.getByRole('list', { name: 'Angles' }))).toBeVisible()
+  // Angles are suggested from the question (and stay editable).
+  await expect(page.getByRole('list', { name: 'Angles' }).getByRole('textbox').first()).not.toHaveValue('')
   await expect(page.getByText('Web results are simulated in this build.').first()).toBeVisible()
   await question.press('Enter')
   await expect(page).toHaveURL(/\/research\/inv_[a-z0-9]+$/)

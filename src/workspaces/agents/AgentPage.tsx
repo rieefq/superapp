@@ -19,7 +19,7 @@ import { BoardBoundary } from './boundary'
 import { GiveWorkHost, openGiveWork, useAgentReadBack } from './GiveWork'
 import { AUTONOMY_COPY, AUTONOMY_ORDER, formatWhen } from './logic'
 import { RunDetail } from './RunDetail'
-import { AgentStatusChip } from './shared'
+import { AgentStatusChip, useAgentMemoryIds } from './shared'
 import { RowsSkeleton } from './skeleton'
 import { NowTab } from './agent/NowTab'
 
@@ -70,7 +70,7 @@ function AgentScreen({ agent, tab, runParam }: { agent: Agent; tab: AgentTab; ru
   const status = useAgentLiveStatus(agent.id)
   const bodyRef = useRef<HTMLDivElement>(null)
   const base = `/agents/${encodeURIComponent(agent.id)}`
-  const memoryCount = useDB((s: Tables) => Object.values(s.knowledge).filter((k) => k.author?.type === 'agent' && k.author.id === agent.id).length)
+  const memoryCount = useAgentMemoryIds(agent.id).length
   const unavailable = agent.status !== 'active'
   const menu: MenuItem[] = agentMenuItems(agent, navigate, { onPage: true })
   const showComposer = tab === 'now' && !runParam && agent.status !== 'archived'

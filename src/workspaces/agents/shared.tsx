@@ -110,6 +110,19 @@ export function useAgentIdsInScope(opts: { includeArchived?: boolean } = {}): ID
   )
 }
 
+/** Knowledge an agent wrote (authored by it, or saved by one of its runs), newest first. */
+export function useAgentMemoryIds(agentId: ID): ID[] {
+  return useDB(
+    useShallow((s: Tables) => {
+      const runIds = new Set((runsByAgent(s.runs).get(agentId) ?? NO_RUNS).map((r) => r.id))
+      return Object.values(s.knowledge)
+        .filter((k) => (k.author?.type === 'agent' && k.author.id === agentId) || (k.source.type === 'agent' && k.source.ref?.kind === 'run' && runIds.has(k.source.ref.id)))
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .map((k) => k.id)
+    }),
+  )
+}
+
 /** Number of archived agents (for the list pane footer). */
 export function useArchivedCount(): number {
   return useDB((s: Tables) => Object.values(s.agents).filter((a) => a.status === 'archived').length)

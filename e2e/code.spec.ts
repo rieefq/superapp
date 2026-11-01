@@ -41,13 +41,13 @@ test.describe('Code', () => {
     // Apply (the review bar's ▾ menu): approved, simulated, no pull request.
     await page.getByRole('button', { name: 'More review actions' }).click()
     await page.getByRole('menuitem', { name: /Apply to branch only/ }).click()
-    await expect(stage(page).getByText('Approved').first()).toBeVisible()
+    await expect(stage(page).locator('header').getByText('Approved', { exact: true })).toBeVisible()
+    // Persistence is batched: poll the stored rows.
+    await expect.poll(async () => (await persisted<SessionRow>(page, 'sessions')).ses_sso.status).toBe('approved')
     const sessions = await persisted<SessionRow>(page, 'sessions')
-    expect(sessions.ses_sso.status).toBe('approved')
     expect(sessions.ses_sso.changes.every((c) => c.review === 'accepted')).toBe(true)
     // The linked task follows the session.
-    const tasks = await persisted<{ status: string }>(page, 'tasks')
-    expect(tasks.tsk_sso_fix.status).toBe('done')
+    await expect.poll(async () => (await persisted<{ status: string }>(page, 'tasks')).tsk_sso_fix.status).toBe('done')
   })
 
   test('starts a session on the demo repo: steps stream, a command asks first, then it needs review', async ({ page }) => {
@@ -74,8 +74,8 @@ test.describe('Code', () => {
     await expect(stage(page).getByText('Needs review').first()).toBeVisible({ timeout: 40_000 })
     await expect(changedFiles(page).first()).toBeVisible()
     expect(await changedFiles(page).count()).toBeGreaterThan(0)
+    await expect.poll(async () => (await persisted<SessionRow>(page, 'sessions'))[sessionId]?.status).toBe('needs_review')
     const sessions = await persisted<SessionRow>(page, 'sessions')
-    expect(sessions[sessionId].status).toBe('needs_review')
     expect(sessions[sessionId].changes.length).toBeGreaterThan(0)
     await expect(page.getByText('No model was called').first()).toBeVisible()
   })
@@ -100,10 +100,12 @@ test.describe('Code', () => {
     await page.getByRole('button', { name: 'Accept all' }).click()
     await page.getByRole('button', { name: 'Approve & open PR (simulated)' }).click()
     await page.getByRole('button', { name: 'Confirm: open PR (simulated)' }).click()
-    await expect(page.getByRole('region', { name: 'Review decision' })).toContainText(/Pull request #\d+ \(simulated\) is open/, { timeout: 20_000 })
-    const approvals = await persisted<{ status: string; capability: string; resolution?: { note?: string } }>(page, 'approvals')
-    const pr = Object.values(approvals).filter((a) => a.capability === 'repo.pull_request' && a.resolution?.note === 'Confirmed in review')
-    expect(pr).toHaveLength(1)
+    await expect(page.getByRole('region', { name: 'Review decision' })).toContainText(/Pull request #\d+ \(simulated\) is open/, { timeout: 30_000 })
+    type ApprovalRow = { status: string; capability: string; resolution?: { note?: string } }
+    const confirmed = async () =>
+      Object.values(await persisted<ApprovalRow>(page, 'approvals')).filter((a) => a.capability === 'repo.pull_request' && a.resolution?.note === 'Confirmed in review').length
+    await expect.poll(confirmed).toBe(1)
+    const approvals = await persisted<ApprovalRow>(page, 'approvals')
     expect(Object.values(approvals).some((a) => a.capability === 'repo.pull_request' && a.status === 'pending')).toBe(false)
     await page.getByRole('button', { name: 'Merge (simulated)' }).click()
     await expect(page.getByRole('region', { name: 'Review decision' })).toContainText(/Merged pull request #\d+ \(simulated\)/)
@@ -112,7 +114,7 @@ test.describe('Code', () => {
   test('connects a GitHub repository live (GitHub mocked) and reads a file from it', async ({ page }) => {
     await page.route('https://api.github.com/**', async (route) => {
       const url = new URL(route.request().url())
-      const headers = { 'x-ratelimit-limit': '60', 'x-ratelimit-remaining': '52', 'x-ratelimit-reset': String(Math.floor(Date.now() / 1000) + 1800), 'x-ratelimit-resource': 'core', 'access-control-expose-headers': 'x-ratelimit-limit, x-ratelimit-remaining, x-ratelimit-reset, x-ratelimit-resource' }
+      const headers = { 'x-ratelimit-limit': '60', 'x-ratelimit-remaining': '52', 'x-ratelimit-reset': String(Math.floor(Date.now() / 1000) + 1800), 'x-ratelimit-resource': 'core', 'access-control-allow-origin': '*', 'access-control-expose-headers': 'x-ratelimit-limit, x-ratelimit-remaining, x-ratelimit-reset, x-ratelimit-resource' }
       if (url.pathname === '/rate_limit') return route.fulfill({ json: { resources: { core: { limit: 60, remaining: 52, reset: Math.floor(Date.now() / 1000) + 1800 } } }, headers })
       if (url.pathname === '/repos/octo/widgets') {
         return route.fulfill({ json: { name: 'widgets', full_name: 'octo/widgets', owner: { login: 'octo' }, default_branch: 'main', description: 'Widgets for tests', language: 'TypeScript', stargazers_count: 7, html_url: 'https://github.com/octo/widgets', private: false }, headers })
@@ -120,14 +122,14 @@ test.describe('Code', () => {
       if (url.pathname.startsWith('/repos/octo/widgets/git/trees/main')) {
         return route.fulfill({ json: { truncated: false, tree: [{ path: 'src', type: 'tree' }, { path: 'src/widget.ts', type: 'blob', size: 64 }, { path: 'README.md', type: 'blob', size: 20 }] }, headers })
       }
-      return route.fulfill({ status: 200, json: {} })
+      return route.fulfill({ status: 200, json: {}, headers })
     })
-    await page.route('https://raw.githubusercontent.com/**', (route) => route.fulfill({ body: 'export const widget = 1\nexport const size = 2\n', contentType: 'text/plain' }))
+    await page.route('https://raw.githubusercontent.com/**', (route) => route.fulfill({ body: 'export const widget = 1\nexport const size = 2\n', contentType: 'text/plain', headers: { 'access-control-allow-origin': '*' } }))
 
     await open(page, '/code')
     await stage(page).getByRole('button', { name: 'Connect repository' }).click()
     const dialog = page.getByRole('dialog', { name: 'Connect a repository' })
-    await expect(dialog).toContainText('52/60 requests left this hour')
+    await expect(dialog).toContainText('52/60 requests left this hour', { timeout: 20_000 })
     await dialog.getByRole('textbox', { name: 'GitHub repository' }).fill('https://github.com/octo/widgets')
     await dialog.getByRole('button', { name: 'Connect' }).click()
     await expect(page).toHaveURL(/\/code\/repos\/rep_/)

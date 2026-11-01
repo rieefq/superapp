@@ -205,18 +205,31 @@ export function PromptBar({ initialKind, boardId, scope, onGenerated, handleRef,
         onFocus={ctx.activate}
         className="type-body-lg block max-h-(--composer-max) min-h-11 w-full resize-none overflow-y-auto bg-transparent px-0.5 py-1 text-ink outline-none placeholder:text-ink-3 pointer-coarse:text-[16px]"
       />
+      {(safeKind === 'image' || safeKind === 'video') && (
+        <div className="mt-2 flex min-w-0 items-center gap-2">
+          <span className="type-caption shrink-0 text-ink-3" aria-hidden>
+            Style
+          </span>
+          <div className="no-scrollbar -my-1 min-w-0 overflow-x-auto py-1">
+            {/* Natural width: on narrow screens the chips scroll instead of truncating. */}
+            <div className="w-max">
+              <SegmentedControl<string>
+                size="sm"
+                aria-label="Style"
+                value={params.style ?? AUTO}
+                onValueChange={(v) => setParam('style', v)}
+                options={[{ value: AUTO, label: 'Auto' }, ...STYLE_OPTIONS]}
+              />
+            </div>
+          </div>
+        </div>
+      )}
       <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5" aria-label="Options" role="group">
-        {safeKind === 'image' && (
-          <>
-            {select('aspect', 'Aspect', ASPECT_OPTIONS.image, true)}
-            {select('style', 'Style', STYLE_OPTIONS, true)}
-          </>
-        )}
+        {safeKind === 'image' && select('aspect', 'Aspect', ASPECT_OPTIONS.image, true)}
         {safeKind === 'video' && (
           <>
             {select('aspect', 'Aspect', ASPECT_OPTIONS.video)}
             {select('durationSec', 'Length', VIDEO_DURATIONS)}
-            {select('style', 'Style', STYLE_OPTIONS, true)}
           </>
         )}
         {safeKind === 'presentation' && (

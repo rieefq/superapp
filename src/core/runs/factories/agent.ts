@@ -281,7 +281,7 @@ export function buildAgentTaskPlan(params: AgentTaskParams | null, rng: Rng): Ru
         refs: context,
         ...timing(rng),
       },
-      { did: `Read ${plural(context.length, 'item')} from your context`, highlight: `read ${plural(context.length, 'item')} you attached` },
+      { did: `Read ${plural(context.length, 'item')} from your context`, highlight: `read ${plural(context.length, 'item')} from your context` },
     )
   }
 

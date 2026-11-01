@@ -59,7 +59,6 @@ function contextParts(ctx: ComposerContext): string[] {
 export function NewBrief({ draft, initialQuestion, autoFocus, examples, dropTarget }: NewBriefProps) {
   const navigate = useNavigate()
   const scope = useScope()
-  const formId = useId()
   const [question, setQuestion] = useState(draft?.question ?? initialQuestion ?? '')
   const [depth, setDepth] = useState<ResearchDepth>(draft?.depth ?? 'standard')
   const [projectId, setProjectId] = useState<ID | null>(draft ? draft.projectId : scope)
@@ -162,10 +161,10 @@ export function NewBrief({ draft, initialQuestion, autoFocus, examples, dropTarg
 
   const settings = (
     <div className="mt-3 flex flex-col gap-3.5 border-t border-line pt-3.5" aria-label="Research settings" role="group">
-      <BriefRow label="Depth" htmlFor={`${formId}-depth`}>
+      <BriefRow label="Depth">
         <div className="flex min-w-0 flex-col gap-1.5">
           <SegmentedControl<ResearchDepth> size="sm" value={depth} onValueChange={setDepth} options={DEPTHS} aria-label="Depth" className="self-start" />
-          <p className="type-caption text-ink-3" id={`${formId}-depth`}>
+          <p className="type-caption text-ink-3" aria-live="polite">
             <span className="text-ink-2">{DEPTH_DESCRIPTION[depth]}</span>
             <span className="type-meta tabular">
               {' · '}
@@ -273,10 +272,11 @@ export function NewBrief({ draft, initialQuestion, autoFocus, examples, dropTarg
 
 // ------------------------------------------------------------------------------------------------ parts
 
-function BriefRow({ label, children, htmlFor }: { label: string; children: ReactNode; htmlFor?: string }) {
+function BriefRow({ label, children }: { label: string; children: ReactNode }) {
+  const id = useId()
   return (
-    <div className="grid min-w-0 grid-cols-1 gap-x-3 gap-y-1.5 sm:grid-cols-[64px_minmax(0,1fr)]">
-      <span className="type-label pt-0 text-ink-3 sm:pt-[7px]" aria-describedby={htmlFor}>
+    <div role="group" aria-labelledby={id} className="grid min-w-0 grid-cols-1 gap-x-3 gap-y-1.5 sm:grid-cols-[64px_minmax(0,1fr)]">
+      <span id={id} className="type-label pt-0 text-ink-3 sm:pt-[7px]">
         {label}
       </span>
       <div className="min-w-0">{children}</div>

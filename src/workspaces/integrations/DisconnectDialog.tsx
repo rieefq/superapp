@@ -21,7 +21,7 @@ function Leader() {
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[76px_minmax(0,1fr)] items-baseline gap-x-3">
+    <div className="grid grid-cols-1 items-baseline gap-x-3 gap-y-1 sm:grid-cols-[76px_minmax(0,1fr)]">
       <dt className="type-label pt-px text-ink-3">{label}</dt>
       <dd className="flex min-w-0 flex-col gap-1">{children}</dd>
     </div>
