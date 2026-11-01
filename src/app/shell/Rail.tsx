@@ -140,7 +140,7 @@ export function Rail() {
         {groups.map((g, gi) => (
           <li key={g.id} className="contents">
             {gi > 0 && (
-              <span role="separator" aria-hidden className="my-1.5 flex justify-center">
+              <span role="separator" aria-hidden className="my-1 flex justify-center">
                 <span className="h-px w-6 bg-line" />
               </span>
             )}
