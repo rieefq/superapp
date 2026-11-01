@@ -2,6 +2,7 @@ import type {
   ActorRef, Attachment, Citation, EntityKind, EntityRef, ID, Message, Thread, ToolTrace, Usage,
 } from '@/core/types'
 import { ME } from '@/core/types'
+import { buildAnchors, type Anchors } from './anchors'
 
 /**
  * Shared helpers for the seed content part. Everything here is pure and deterministic:
@@ -21,54 +22,90 @@ export interface Clock {
   ago(n: number, unit: Unit): number
   /** `n` units after now — only for due dates and milestones. */
   ahead(n: number, unit: Unit): number
-  /** `d` days, `h` hours and `m` minutes before now. */
+  /** `d` days, `h` hours and `m` minutes before now (use for "today" moments). */
   back(d: number, h?: number, m?: number): number
+  /** The k-th most recent weekday (Mon–Fri) before today, at hh:mm local time. */
+  wd(k: number, hh: number, mm?: number): number
+  /** k calendar days before today (k ≥ 1), at hh:mm local time. */
+  day(k: number, hh: number, mm?: number): number
+  /** The most recent `count` occurrences of a weekday (0 = Sunday … 6 = Saturday) before today. */
+  last(dow: number, count: number, hh: number, mm?: number): number[]
 }
 
+/**
+ * History is placed on local working hours, with the same weekday arithmetic as the
+ * operations part (`../ops/time.ts`), so both halves of the seed agree on when things
+ * happened. Everything from `wd`/`day`/`last` is before today's midnight.
+ */
 export function createClock(now: number): Clock {
+  const midnight = new Date(now)
+  midnight.setHours(0, 0, 0, 0)
+  const base = midnight.getTime()
+  const at = (daysBack: number, hh: number, mm: number): number => {
+    const d = new Date(base)
+    d.setDate(d.getDate() - Math.max(1, daysBack))
+    d.setHours(hh, mm, 0, 0)
+    return d.getTime()
+  }
+  const dowOf = (daysBack: number) => new Date(at(daysBack, 12, 0)).getDay()
+  const weekdays: number[] = []
+  for (let k = 1; weekdays.length < 45; k++) {
+    const dow = dowOf(k)
+    if (dow !== 0 && dow !== 6) weekdays.push(k)
+  }
   return {
     now,
     ago: (n, unit) => now - n * UNIT_MS[unit],
     ahead: (n, unit) => now + n * UNIT_MS[unit],
     back: (d, h = 0, m = 0) => now - d * DAY - h * HOUR - m * MINUTE,
+    wd: (k, hh, mm = 0) => at(weekdays[Math.min(weekdays.length, Math.max(1, k)) - 1], hh, mm),
+    day: (k, hh, mm = 0) => at(k, hh, mm),
+    last: (dow, count, hh, mm = 0) => {
+      const out: number[] = []
+      for (let k = 1; out.length < count; k++) if (dowOf(k) === dow) out.push(at(k, hh, mm))
+      return out
+    },
   }
 }
 
-/** Key story dates, all relative to `now`. Shared so every document agrees on them. */
+/** Key story dates. Future ones are relative to now; past ones follow `anchors.ts`. */
 export interface StoryDates {
   /** Atlas Lumen public launch. */
   launch: number
   /** Lumen pricing & packaging lock. */
   pricingLock: number
-  /** Stripe Billing cutover. */
+  /** First Stripe Billing cutover cohort. */
   cutover: number
   /** Portal v2 general availability. */
   ga: number
   /** Checkout latency incident. */
   incident: number
-  /** Weekly product sync meeting (notes imported from Notion). */
+  /** Weekly product sync meeting. */
   sync: number
-  /** Customer call with Meridian Freight (meeting recorder transcript). */
+  /** Customer call with Meridian Freight. */
   meridianCall: number
 }
 
 export interface SeedCtx {
   clock: Clock
   dates: StoryDates
+  at: Anchors
 }
 
 export function createCtx(now: number): SeedCtx {
   const clock = createClock(now)
+  const at = buildAnchors(clock)
   return {
     clock,
+    at,
     dates: {
       launch: clock.ahead(24, 'd'),
       pricingLock: clock.ahead(5, 'd'),
       cutover: clock.ahead(9, 'd'),
       ga: clock.ahead(34, 'd'),
-      incident: clock.back(11, 6),
-      sync: clock.back(4, 2),
-      meridianCall: clock.back(9, 4),
+      incident: at.incident,
+      sync: at.productSync,
+      meridianCall: at.meridianCall,
     },
   }
 }
@@ -76,15 +113,15 @@ export function createCtx(now: number): SeedCtx {
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
-/** "Oct 21" — computed in UTC so the seed is identical on every machine. */
+/** "Oct 21" in local time, matching how the app displays dates. */
 export function dayLabel(ts: number): string {
   const d = new Date(ts)
-  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`
+  return `${MONTHS[d.getMonth()]} ${d.getDate()}`
 }
 
-/** "Wednesday" (UTC). */
+/** "Wednesday" (local time). */
 export function weekdayLabel(ts: number): string {
-  return WEEKDAYS[new Date(ts).getUTCDay()]
+  return WEEKDAYS[new Date(ts).getDay()]
 }
 
 // ---------------------------------------------------------------- refs & actors

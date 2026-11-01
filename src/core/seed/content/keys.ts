@@ -14,23 +14,22 @@ export const KNO = {
 
 /** Messages that other entities were derived from (task/investigation/knowledge/asset origins). */
 export const MSG = {
-  ssoTask: 'msg_sso_06', // → TASK.ssoFix
+  ssoTask: 'msg_sso_06', // → TASK.ssoFix (handed to Forge)
   stripeTasks: 'msg_stripe_06', // → runbook + invoice numbering tasks
   tokensTask: 'msg_tokens_06', // → token rename task
-  retroTasks: 'msg_retro_04', // → review SLA trial + flaky quarantine tasks
   retroUpload: 'msg_retro_01', // → retro CSV saved to knowledge
+  retroTasks: 'msg_retro_04', // → PR size limit, same-day flaky tickets, focus mornings
   portbaseStart: 'msg_portbase_04', // → INVESTIGATION.portbase
   battlecardTask: 'msg_portbase_08', // → battlecard task
   pricingScenarios: 'msg_pricing_04', // → Ledger revenue scenarios task
   pricingResearch: 'msg_pricing_08', // → INVESTIGATION.pricingTrends (in-flight run)
   launchTasks: 'msg_launch_06', // → sales brief + webinar tasks
   heroSaved: 'msg_hero_06', // → hero copy asset
-  triageDoc: 'msg_triage_06', // → KNOWLEDGE.triageRubric
-  triageTask: 'msg_triage_08', // → TASK.triageRubric
-  incidentSaved: 'msg_incident_06', // → incident report + two reliability tasks
+  triageHandoff: 'msg_triage_06', // → TASK.triageRubric (Sentinel drafts, Morgan reviews)
+  incidentTasks: 'msg_incident_06', // → two reliability tasks
   agentsTalk: 'msg_agents_06', // → all-hands talk task
   rustSaved: 'msg_rust_06', // → KNOWLEDGE.rustPlan + week-1 task
-  okrsSaved: 'msg_okrs_06', // → KNOWLEDGE.okrsDraft + review task
+  okrsTask: 'msg_okrs_06', // → OKR review task
   hiringTask: 'msg_hiring_06', // → job post task
 } as const
 
@@ -67,8 +66,9 @@ export const TSK = {
   rateLimits: 'tsk_rate_limit_audit',
   scim: 'tsk_scim_spike',
   canvasCharts: 'tsk_canvas_charts',
-  reviewSla: 'tsk_review_sla',
-  flakyQuarantine: 'tsk_quarantine_lane',
+  prLimit: 'tsk_pr_size_limit',
+  sameDayTickets: 'tsk_same_day_tickets',
+  focusMornings: 'tsk_focus_mornings',
   battlecard: 'tsk_battlecard',
   freightlyPricing: 'tsk_freightly_pricing',
   shiploomInterviews: 'tsk_shiploom_interviews',
@@ -84,7 +84,7 @@ export const TSK = {
   betaFixes: 'tsk_alert_threshold_fixes',
   keynoteReview: 'tsk_keynote_review',
   helpCenter: 'tsk_help_center',
-  socialCutdowns: 'tsk_social_cutdowns',
+  videoCutdowns: 'tsk_video_cutdowns',
   launchDate: 'tsk_date_confirmation',
   revenueModel: 'tsk_revenue_model',
   betaUsage: 'tsk_beta_usage',
@@ -92,7 +92,7 @@ export const TSK = {
   slaUpdate: 'tsk_sla_update',
   incidentSummaries: 'tsk_incident_summaries',
   supportInbox: 'tsk_support_inbox',
-  haldenFollowUp: 'tsk_halden_follow_up',
+  customerFollowUp: 'tsk_customer_follow_up',
   postmortem: 'tsk_postmortem',
   rustWeek1: 'tsk_ownership_exercises',
   rustWeek3: 'tsk_log_parser',
@@ -105,19 +105,20 @@ export const TSK = {
 } as const
 
 export const ASSET = {
-  heroImage: 'ast_night_port',
+  keyArt: 'ast_key_art',
   scorecardVisual: 'ast_scorecard_visual',
-  warehouseIso: 'ast_warehouse_iso',
-  socialSquare: 'ast_exceptions_card',
-  socialVertical: 'ast_route_teaser',
-  socialQuote: 'ast_quote_card',
-  brandIcon: 'ast_app_icon',
-  brandPattern: 'ast_line_pattern',
+  gradients: 'ast_gradient_studies',
+  isometric: 'ast_isometric_yard',
+  appIcon: 'ast_app_icon',
+  backgrounds: 'ast_screenshot_backgrounds',
+  cutdownTracking: 'ast_tracking_cutdowns',
+  cutdownDock: 'ast_dock_cutdowns',
+  cutdownQuote: 'ast_quote_cutdowns',
   keynote: 'ast_keynote',
   storyboard: 'ast_storyboard',
   narration: 'ast_narration',
   heroCopy: 'ast_hero_copy',
   launchEmail: 'ast_launch_email',
   socialPosts: 'ast_social_posts',
-  salesOnePager: 'ast_one_pager',
+  onePager: 'ast_one_pager',
 } as const

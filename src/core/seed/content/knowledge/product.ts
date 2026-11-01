@@ -1,29 +1,29 @@
 import type { KnowledgeItem } from '@/core/types'
 import { AGENT, COLLECTION, KNOWLEDGE, PROJECT } from '../../ids'
 import { agentActor, dayLabel, type SeedCtx } from '../helpers'
-import { KNO, MSG } from '../keys'
+import { KNO } from '../keys'
 import { item } from './build'
 
 /** CSV export of the top 15 accounts. Also the source of the beta volumes used in pricing threads. */
 export const ACCOUNTS_CSV = `account,segment,region,plan,arr_usd,seats,active_shipments_mo,lumen_beta,health,renewal_in_days,csm
-Meridian Freight,Enterprise,NA,Enterprise,186000,140,18400,yes,green,203,Nadia Rahman
-Tidewell Intermodal,Enterprise,EU,Enterprise,142000,96,9800,yes,green,151,Tom Becker
-Halden Logistics,Enterprise,EU,Enterprise,128500,88,7700,no,red,112,Tom Becker
-Brightwater Haulage,Mid-market,NA,Growth,96000,64,6900,yes,green,265,Nadia Rahman
-Coastal Cargo,Mid-market,NA,Growth,88800,58,5400,no,red,47,Nadia Rahman
-Vantor Freight Systems,Mid-market,EU,Growth,74400,47,5000,yes,yellow,88,Tom Becker
-Rookwood Logistics,Mid-market,NA,Growth,61200,41,4200,yes,green,312,Nadia Rahman
-Kestrelway Air Freight,Mid-market,APAC,Growth,57600,35,3900,no,green,190,Tom Becker
-Pinecrest Forwarding,Mid-market,NA,Growth,52800,33,3100,yes,green,134,Nadia Rahman
-Saltmarsh Shipping Co.,Mid-market,EU,Growth,43200,29,2600,yes,yellow,76,Tom Becker
-Ashgrove Cold Chain,SMB,NA,Starter,18000,10,1450,yes,green,221,Nadia Rahman
+Meridian Freight,Enterprise,NA,Enterprise,186000,140,18400,design_partner,green,203,Nadia Rahman
+Tidewell Intermodal,Enterprise,EU,Enterprise,142000,96,9800,design_partner,green,151,Tom Becker
+Brightwater Haulage,Mid-market,NA,Growth,96000,64,6900,design_partner,green,265,Nadia Rahman
+Vantor Freight Systems,Mid-market,EU,Growth,74400,47,5000,design_partner,yellow,88,Tom Becker
+Halden Logistics,Mid-market,EU,Growth,69000,46,7700,no,red,112,Tom Becker
+Rookwood Logistics,Mid-market,NA,Growth,61200,41,4200,design_partner,green,312,Nadia Rahman
+Kestrelway Air Freight,Mid-market,APAC,Growth,57600,35,3900,open_beta,green,190,Tom Becker
+Pinecrest Forwarding,Mid-market,NA,Growth,52800,33,3100,design_partner,green,134,Nadia Rahman
+Saltmarsh Shipping Co.,Mid-market,EU,Growth,43200,29,2600,design_partner,yellow,76,Tom Becker
+Coastal Cargo,SMB,UK,Starter,21600,12,2300,open_beta,red,47,Tom Becker
+Ashgrove Cold Chain,SMB,NA,Starter,18000,10,1450,design_partner,green,221,Nadia Rahman
 Quarrystone Haulage,SMB,EU,Starter,16200,9,1800,no,yellow,58,Tom Becker
-Ferncliff Couriers,SMB,NA,Starter,14400,8,1200,no,green,287,Nadia Rahman
+Ferncliff Couriers,SMB,NA,Starter,14400,8,1200,open_beta,green,287,Nadia Rahman
 Marlowe Bay Logistics,SMB,APAC,Starter,12600,7,950,no,yellow,102,Tom Becker
 Driftwood Freightways,SMB,NA,Starter,10800,6,700,no,green,175,Nadia Rahman`
 
-export function productKnowledge({ clock, dates }: SeedCtx): KnowledgeItem[] {
-  const { back } = clock
+export function productKnowledge({ clock, dates, at }: SeedCtx): KnowledgeItem[] {
+  const { back, wd, day } = clock
   return [
     item({
       id: KNOWLEDGE.lumenPrd,
@@ -35,8 +35,8 @@ export function productKnowledge({ clock, dates }: SeedCtx): KnowledgeItem[] {
       projectIds: [PROJECT.lumen],
       source: { type: 'integration', integrationId: 'notion' },
       pinned: true,
-      createdAt: back(52, 3),
-      updatedAt: back(6, 4),
+      createdAt: day(52, 11, 20),
+      updatedAt: wd(4, 15, 10),
       content: `
 # Atlas Lumen — product requirements
 
@@ -87,11 +87,12 @@ Lumen is priced on active shipments (a shipment with at least one tracking event
 
 ## 8. Rollout
 1. **Private beta (complete):** eight design partners, including Meridian Freight and Tidewell Intermodal.
-2. **Customer preview:** existing customers can turn on Lumen two weeks before launch, free until launch day.
-3. **Public launch (${dayLabel(dates.launch)}):** landing page, keynote video and launch email.
+2. **Open beta (running):** 23 accounts in total, the design partners plus 15 customers who asked to join, such as Coastal Cargo.
+3. **Customer preview:** existing customers can turn on Lumen two weeks before launch, free until launch day.
+4. **Public launch (${dayLabel(dates.launch)}):** landing page, keynote video and launch email.
 
 ## 9. Risks and open questions
-- **Pricing confidence:** willingness to pay is untested because the beta was free. Mitigation: design-partner pricing (50% off year one) and a bill-shock guardrail.
+- **Pricing confidence:** willingness to pay is untested because the beta is free. Portbase now prices its Insights tier per tracked shipment, so buyers will compare unit prices. Mitigation: design-partner pricing (50% off year one) and a bill-shock guardrail.
 - **Alert noise:** early beta alerts were too noisy; thresholds now default to the account's 30-day baseline.
 - **Data scoping:** SSO-scoped dashboards depend on the session model from ADR-012 being stable.
 - **Open:** do we gate carrier scorecards out of Core? Decided with the pricing lock.
@@ -108,8 +109,8 @@ Lumen is priced on active shipments (a shipment with at least one tracking event
       projectIds: [PROJECT.lumen, PROJECT.landscape],
       source: { type: 'manual' },
       pinned: true,
-      createdAt: back(18, 5),
-      updatedAt: back(3, 4),
+      createdAt: wd(13, 11, 0),
+      updatedAt: wd(3, 15, 30),
       content: `
 # Pricing strategy memo: Atlas Lumen (draft)
 
@@ -119,7 +120,7 @@ Lumen is priced on active shipments (a shipment with at least one tracking event
 Price Lumen as a hybrid: a monthly platform fee per tier that includes a block of active shipments, plus a per-shipment overage. Three tiers: Core, Pro and Enterprise. Gate on features and volume, protect customers from bill shock, and discount design partners in year one.
 
 ## Why not seats?
-Atlas core is priced per seat, and two of six churn interviews named per-seat pricing as a reason to leave: occasional users such as warehouse leads and customers' own staff made seats expensive. Analytics value scales with shipment volume, not with the number of people looking at a chart. Seat pricing would also discourage exactly the behaviour we want, which is sharing dashboards widely.
+Atlas core is priced per seat, and two of six churn interviews named per-seat pricing as a reason to leave: occasional users such as warehouse leads and customers' own staff made seats expensive. Analytics value scales with shipment volume, not with the number of people looking at a chart. Seat pricing would also discourage exactly the behaviour we want, which is sharing dashboards widely. The market is moving the same way: the competitor radar picked up that Portbase now prices its Insights analytics tier per tracked shipment, so buyers will compare Lumen against a per-shipment price.
 
 ## Why not pure usage?
 Pure per-shipment pricing is the most direct but the least predictable. In the Meridian Freight call, Dana Whitfield said predictability matters more than the unit price because their budget is set once a year. Freightly moved to per-load pricing this year and added spend caps a few weeks later, which we read as a sign of bill-shock complaints (our inference, not confirmed).
@@ -141,7 +142,7 @@ Pure per-shipment pricing is the most direct but the least predictable. In the M
 3. Enterprise contracts true up once a year at renewal, never mid-term.
 
 ## Expected impact
-At list price, the eight design partners would generate roughly $8,000 in monthly recurring revenue before the design-partner discount, and seven of the eight would be cheapest on Core. That is the main weakness of this draft (see open question 1).
+At list price, the eight design partners would generate roughly $8,000 in monthly recurring revenue before the design-partner discount, and seven of the eight would be cheapest on Core. Across all 23 open-beta accounts, Ledger found that the top three accounts make up 61% of tracked shipments and the median account sits well inside Core's included volume. That is the main weakness of this draft (see open question 1).
 
 ## Open questions
 1. **Core and Pro break-even.** Core plus overage stays cheaper than Pro until about 10,300 active shipments a month, so volume alone never pushes anyone to Pro. Option B caps Core at 6,000 active shipments and raises Core overage to $0.15.
@@ -164,8 +165,8 @@ At list price, the eight design partners would generate roughly $8,000 in monthl
       collectionId: COLLECTION.product,
       projectIds: [PROJECT.lumen, PROJECT.atlas],
       source: { type: 'manual' },
-      createdAt: back(58, 2),
-      updatedAt: back(30, 6),
+      createdAt: day(58, 14, 0),
+      updatedAt: day(30, 11, 30),
       content: `
 # Persona: Olivia, operations manager
 
@@ -217,14 +218,14 @@ A composite from 14 discovery interviews and the eight Lumen design partners. Ol
       id: KNOWLEDGE.glossary,
       kind: 'doc',
       title: 'Atlas glossary',
-      summary: 'Shared definitions for logistics and Atlas terms: active shipment, lane, dwell time, exception, scorecard, TTFV, GRR and more.',
+      summary: 'Shared definitions for logistics and Atlas terms: active shipment, lane, dwell time, exception, scorecard, session policy, TTFV, GRR, NRR and more.',
       tags: ['glossary', 'onboarding', 'logistics', 'definitions'],
       collectionId: COLLECTION.product,
       projectIds: [PROJECT.atlas, PROJECT.lumen, PROJECT.ops],
       source: { type: 'agent' },
       author: agentActor(AGENT.archivist),
-      createdAt: back(55, 1),
-      updatedAt: back(9, 23),
+      createdAt: day(55, 9, 40),
+      updatedAt: day(7, 2, 14),
       content: `
 # Atlas glossary
 
@@ -236,17 +237,18 @@ Shared definitions used across product, support and sales. Maintained by Archivi
 | **Add-on** | A paid module on top of an Atlas plan. Lumen is the first one. |
 | **BOL (bill of lading)** | The carrier-issued document listing goods, origin and destination. Stored as a shipment document in Atlas. |
 | **Carrier scorecard** | A Lumen report rating carriers on on-time rate, damage rate and invoice accuracy. |
-| **Design partner** | One of the eight customers in the Lumen private beta. |
+| **Design partner** | One of the eight customers in the Lumen private beta. The open beta added 15 more accounts. |
 | **Dwell time** | Time a shipment spends stationary at a facility between two milestones. |
 | **EDI** | Electronic data interchange: structured messages many carriers and TMSs use instead of APIs. |
 | **Exception** | A shipment event outside expectation: late pickup, missed milestone, damage, or no tracking update for 24 hours. |
 | **GRR (gross revenue retention)** | Revenue kept from existing customers over a period, excluding expansion. |
+| **NRR (net revenue retention)** | (starting MRR + expansion − contraction − churn) ÷ starting MRR, per cohort. |
 | **Lane** | An origin and destination pair, for example a port to a regional distribution center. |
 | **Milestone (shipment)** | A tracked step: booked, picked up, departed, arrived, delivered. |
 | **OTIF** | On time, in full: delivered by the promised date with the full quantity. |
 | **POD (proof of delivery)** | Signed confirmation that a shipment was delivered. |
 | **Seat** | A named Atlas user licence. Atlas core plans are priced per seat. |
-| **SP-initiated / IdP-initiated SSO** | Sign-in that starts at the Atlas login page (SP) or at the customer's identity provider dashboard (IdP). |
+| **Session policy** | A customer's identity-provider rules for how long tokens live at sign-in and on refresh. Stricter policies issue shorter tokens on refresh. |
 | **Tenant** | One customer's isolated Atlas environment. SSO is configured per tenant. |
 | **TMS** | Transportation management system, the system of record most customers connect to Atlas by API or EDI. |
 | **TTFV (time to first value)** | Days from contract signature to the customer's first live shipment tracked in Atlas. |
@@ -266,8 +268,9 @@ Shared definitions used across product, support and sales. Maintained by Archivi
       tags: ['okrs', 'planning', 'strategy', 'q1'],
       collectionId: COLLECTION.product,
       projectIds: [],
-      source: { type: 'chat', ref: { kind: 'message', id: MSG.okrsSaved } },
-      createdAt: back(0, 4, 57),
+      source: { type: 'manual' },
+      createdAt: wd(4, 16, 0),
+      updatedAt: back(0, 4, 57),
       content: `
 # Q1 product OKRs (draft)
 
@@ -298,6 +301,8 @@ Draft for leadership review with Grace Holloway. Three objectives; baselines are
 - O1 is the first step toward the PRD goal of 25% attach within two quarters of launch.
 - O2 targets the top churn theme: slow onboarding (4 of 6 churn interviews).
 - No uptime KR on purpose: uptime is a standing SLA, not a quarterly bet.
+- Two KRs from the first draft were really tasks (publish the help center, finish the Stripe cutover) and moved to the task list.
+- O2 KR2 is a stretch goal and is labeled as one.
 - Not yet aligned with Sales targets; Ravi to review O1 before the leadership offsite.
 `,
     }),
@@ -311,8 +316,8 @@ Draft for leadership review with Grace Holloway. Three objectives; baselines are
       collectionId: COLLECTION.product,
       projectIds: [PROJECT.ops],
       source: { type: 'manual' },
-      createdAt: back(50, 4),
-      updatedAt: back(19, 2),
+      createdAt: day(50, 10, 0),
+      updatedAt: day(19, 15, 40),
       content: `
 # Support SLA policy
 
@@ -352,7 +357,7 @@ If monthly uptime falls below 99.9%, the customer receives a 10% credit; below 9
 Attainment is reported monthly. Last quarter, 91% of S1 and S2 tickets met the first-response target.
 
 ## Under review
-Enterprise renewals are asking for a 30-minute S1 response, 24/7. Severity definitions will be aligned with the triage rubric v2 once it is approved.
+Enterprise renewals are asking for a 30-minute S1 response, 24/7. Triage rubric v2 uses priorities instead of severities; once it is approved this policy maps them one to one (urgent = S1, high = S2, medium = S3, low = S4).
 `,
     }),
 
@@ -360,68 +365,56 @@ Enterprise renewals are asking for a 30-minute S1 response, 24/7. Severity defin
       id: KNOWLEDGE.triageRubric,
       kind: 'doc',
       title: 'Support triage rubric v2',
-      summary: 'How Sentinel and the support team categorize and prioritize tickets: seven categories, an impact × urgency severity matrix, capped account modifiers, a billing urgency rule and routing.',
+      summary: 'How Sentinel and the support team set priority (urgent, high, medium, low) and category for every ticket, with real examples, a tie-break rule, a billing rule and routing. Drafted by Sentinel; in review.',
       tags: ['support', 'triage', 'rubric', 'sentinel', 'automation'],
       collectionId: COLLECTION.product,
       projectIds: [PROJECT.ops],
-      source: { type: 'chat', ref: { kind: 'message', id: MSG.triageDoc } },
-      createdAt: back(9, 5, 57),
-      updatedAt: back(4, 3, 30),
+      source: { type: 'agent' },
+      author: agentActor(AGENT.sentinel),
+      createdAt: at.sentinelRubric + 12 * 60_000,
+      updatedAt: wd(2, 11, 30),
       content: `
 # Support triage rubric v2
 
-Used by Sentinel, the autonomous triage agent, and by the support team to categorize and prioritize every inbound ticket. **Status: in review with Theo Brandt.** Replaces v1 once approved.
+Used by Sentinel in the *Support triage* workflow, and by the support team, to set the priority and category of every inbound ticket. Drafted by Sentinel from the last 60 days of resolved SUP issues and the rubric discussion in chat. **Status: in review with Morgan and Theo.** The workflow has classified with this draft since its v4 update; approval makes it official.
 
-## What changed from v1
-- Severity comes from impact × urgency, not from the category alone. (v1 filed an enterprise SSO lockout as "how-to".)
-- Account modifiers can raise severity by at most one level.
-- Below a confidence of 0.7, Sentinel routes the ticket to the human queue instead of guessing.
-- New billing urgency rule, added after the shadow week.
+## Why v2
+Re-scoring last month's tickets showed what v1 got wrong: login failures affecting several users were filed as high instead of urgent, and two invoice errors that hit every invoice on an account were filed as medium. Under v2, seven of those past tickets would change priority.
 
-## Step 1: category
+## Priorities
+| Priority | Definition | Real examples |
+|---|---|---|
+| **Urgent** | Outages, data not syncing, or login failures for more than one user. Someone is blocked right now. | Meridian Freight: dispatchers signed out about an hour after SSO login. Meridian Freight: ocean shipments not updating since 05:00 UTC. |
+| **High** | A core workflow is broken for one account, or money is at risk. There is a workaround, but it hurts. | Coastal Cargo: invoice PDFs return 404 before month-end close. Halden Logistics: nightly sync failing with HTTP 429. |
+| **Medium** | Something is wrong, but work continues. | Halden Logistics: ETAs a day off for overnight arrivals. A report export that fails now and then. |
+| **Low** | Questions, admin requests and preferences. | Halden Logistics: add a second admin. Coastal Cargo: how will Lumen be priced after the beta? |
+
+**Tie-break:** when two priorities seem to fit, choose the higher one and say why in the summary.
+
+## Categories
 | Category | Includes | Default owner |
 |---|---|---|
-| Access & SSO | login failures, SSO, sessions, permissions | Tier 2 |
-| Billing | invoices, payments, plan changes, tax | Tier 2 (billing) |
-| Tracking accuracy | missing or wrong shipment events | Tier 1, then Data |
-| Integrations | TMS, EDI, API, webhooks | Tier 2 (integrations) |
-| Performance | slowness, timeouts | Tier 1; engineering on-call for S1/S2 |
-| How-to | questions about using Atlas or Lumen | Tier 1 |
-| Feature request | ideas and missing capabilities | Product (weekly review) |
+| auth | sign-in, SSO, sessions, permissions | Tier 2 |
+| billing | invoices, payments, plan changes, tax, currency | Tier 2 (billing) |
+| shipments | tracking events, ETAs, documents | Tier 1, then Data |
+| sync-outage | data not updating across an account | Engineering on-call |
+| api | API errors, rate limits, webhooks, EDI | Tier 2 (integrations) |
+| notifications | emails and alerts we send | Tier 1 |
+| account-admin | users, roles, settings | Tier 1 |
+| sales | pricing, plans, contracts, beta questions | Account manager |
 
-## Step 2: severity from impact × urgency
-| Impact | Urgent (blocking work now) | Soon (today or this week) | Whenever |
-|---|---|---|---|
-| Many users or all tenants | S1 | S2 | S3 |
-| One team or one tenant | S2 | S3 | S4 |
-| One user | S3 | S4 | S4 |
+## Billing rule (added after the comparison week)
+Failed payments, duplicate charges and overdue notices are at least **high**, even when only one person writes in, because they block the customer's own payment run. This matters most around the Stripe cutover.
 
-## Step 3: modifiers (at most +1 level in total)
-- Enterprise plan: +1
-- Renewal within 90 days: +1
-- Repeat issue (same account and category, 3 or more tickets in 30 days): +1
+## What Sentinel returns
+Priority, category, the affected account and a two-sentence summary that quotes the customer. Below a confidence of 0.7, Sentinel routes the ticket to the human queue instead of guessing.
 
-Modifiers never raise a ticket to S1 unless the impact is "many users", or the account is Enterprise and its users cannot log in at all.
-
-## Billing urgency rule
-Treat a ticket as urgent when it mentions a failed payment, an overdue notice or a duplicate charge. This matters most during the Stripe cutover window.
-
-## Step 4: route
-- **S1:** page engineering on-call and alert #support-urgent in Slack. Sentinel asks for approval before posting.
-- **S2:** tier 2 queue plus a Slack alert.
-- **S3 and S4:** normal queue.
-- **Feature requests:** create a task in the product backlog.
-
-## Worked examples
-| Ticket | Category | Severity | Why |
-|---|---|---|---|
-| Dispatchers logged out 15 minutes after SSO sign-in (Halden, Enterprise) | Access & SSO | S2 | One tenant, urgent: S2. Users can sign back in, so the Enterprise modifier cannot lift it to S1. |
-| Checkout timing out during the latency incident | Performance | S1 | Many tenants, urgent |
-| Invoice shows the wrong VAT (Growth, renews in 40 days) | Billing | S2 | One account, soon: S3, plus the renewal modifier |
-| How do I share a dashboard? | How-to | S4 | One user, whenever |
+## Routing
+- **Urgent:** alert #support-urgent in Slack (Sentinel asks for approval before posting); page on-call for sync outages.
+- **High, medium and low:** file a Linear issue in the SUP team, with the category as a label.
 
 ## Calibration
-In the shadow week Sentinel agreed with Theo on 41 of 46 tickets (89%). Three of the five misses were billing tickets rated S3 that Theo rated S2, which led to the billing urgency rule. Re-check agreement weekly for the first month; Theo owns the label set.
+For one week Theo labeled tickets on his own and compared them with Sentinel's: 41 of 46 agreed (89%). Three of the five misses were billing tickets Sentinel rated medium and Theo rated high, which led to the billing rule. Check agreement weekly for the first month; Theo owns the label set.
 `,
     }),
 
@@ -429,13 +422,13 @@ In the shadow week Sentinel agreed with Theo on 41 of 46 tickets (89%). Three of
       id: KNOWLEDGE.csvAccounts,
       kind: 'dataset',
       title: 'Top accounts by ARR.csv',
-      summary: 'Top 15 Atlas accounts with segment, plan, ARR, seats, monthly active shipments, Lumen beta flag, health and days to renewal.',
+      summary: 'Top 15 Atlas accounts with segment, plan, ARR, seats, monthly active shipments, Lumen beta status (design partner or open beta), health and days to renewal.',
       tags: ['accounts', 'arr', 'customers', 'dataset'],
       collectionId: COLLECTION.product,
       projectIds: [PROJECT.lumen, PROJECT.landscape],
       source: { type: 'upload' },
       file: { name: 'top-accounts-by-arr.csv', mime: 'text/csv', size: ACCOUNTS_CSV.length },
-      createdAt: back(13, 4),
+      createdAt: day(13, 11, 5),
       content: ACCOUNTS_CSV,
     }),
 
@@ -449,8 +442,8 @@ In the shadow week Sentinel agreed with Theo on 41 of 46 tickets (89%). Three of
       projectIds: [PROJECT.lumen],
       source: { type: 'integration', integrationId: 'notion' },
       author: agentActor(AGENT.archivist),
-      createdAt: back(36, 2),
-      updatedAt: back(10, 4),
+      createdAt: day(36, 16, 0),
+      updatedAt: day(10, 2, 14),
       content: `
 # Lumen beta feedback log
 
@@ -476,6 +469,9 @@ Compiled from design-partner calls, shared Slack channels and in-app feedback. S
 
 ## Requests we declined for v1
 Custom SQL, predictive ETAs and temperature monitoring.
+
+## Open beta
+The 15 open-beta accounts (23 beta accounts in total) send feedback through support, so it lands in Linear as SUP issues rather than in this log.
 `,
     }),
   ]

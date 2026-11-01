@@ -163,7 +163,7 @@ type Message = ReactNode
 type ToneOptions = Omit<ToastOptions, 'tone' | 'title'>
 
 interface ToastFn {
-  (input: Message | ToastOptions): string
+  (input: Message | ToastOptions, opts?: Omit<ToastOptions, 'title'>): string
   success: (title: Message, opts?: ToneOptions) => string
   error: (title: Message, opts?: ToneOptions) => string
   info: (title: Message, opts?: ToneOptions) => string
@@ -187,12 +187,14 @@ function isOptions(input: unknown): input is ToastOptions {
 }
 
 /**
- * Show a toast: `toast('Saved')`, `toast.success('Deployed', { description })`,
+ * Show a toast: `toast('Saved')`, `toast('Saved', { description })`, `toast.success('Deployed', { description })`,
  * `const id = toast.loading('Exporting…'); toast.update(id, { tone: 'success', title: 'Exported' })`,
  * `toast.promise(save(), { loading: 'Saving…', success: 'Saved', error: 'Could not save' })`.
  * Returns the toast id. Needs a mounted <ToastHost/>.
  */
-export const toast: ToastFn = Object.assign((input: Message | ToastOptions) => upsert(isOptions(input) ? input : { title: input }), {
+export const toast: ToastFn = Object.assign(
+  (input: Message | ToastOptions, opts?: Omit<ToastOptions, 'title'>) => upsert(isOptions(input) ? { ...opts, ...input } : { ...opts, title: input }),
+  {
   success: (title: Message, opts?: ToneOptions) => upsert({ ...opts, title, tone: 'success' }),
   error: (title: Message, opts?: ToneOptions) => upsert({ ...opts, title, tone: 'error' }),
   info: (title: Message, opts?: ToneOptions) => upsert({ ...opts, title, tone: 'info' }),
@@ -233,7 +235,8 @@ export const toast: ToastFn = Object.assign((input: Message | ToastOptions) => u
     )
     return p
   },
-})
+  },
+)
 
 // ------------------------------------------------------------------------------------------------ host
 
