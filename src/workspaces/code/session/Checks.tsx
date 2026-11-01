@@ -14,7 +14,7 @@ import { PaneHeader, SIM_TERMINAL } from './Activity'
 export function ChecksPane({ session, header = true }: { session: CodeSession; header?: boolean }) {
   const summary = checksSummary(session.checks)
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       {header && (
         <PaneHeader title="Checks">
           <span className="type-meta text-ink-3 tabular">{checksClause(summary)}</span>

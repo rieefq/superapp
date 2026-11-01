@@ -240,7 +240,7 @@ function Stepper({ step, onStep }: { step: Step; onStep: (s: Step) => void }) {
           const current = i === index
           return (
             <li key={s.id} className="flex items-center gap-1">
-              {i > 0 && <span aria-hidden className="mx-1 h-px w-5 bg-line-strong" />}
+              {i > 0 && <span aria-hidden className="mx-1 hidden h-px w-5 bg-line-strong sm:block" />}
               <button
                 type="button"
                 aria-current={current ? 'step' : undefined}

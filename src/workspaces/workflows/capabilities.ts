@@ -77,7 +77,7 @@ export function workflowCapabilities(wf: Pick<Workflow, 'nodes' | 'edges'>): Wor
         integrationId: n.integrationId,
         simulated: !LOCAL.has(n.capability) || def?.support === 'simulated',
         label: def ? `${label} · ${def.name}` : label,
-        short: label,
+        short: def ? `${label} · ${def.name}` : label,
         decision: { outcome: 'allow', reason: n.type === 'agent' ? 'Agent steps work within the agent’s own permissions and don’t ask' : 'Reads and reshaping steps don’t ask' },
         word: 'allowed',
         nodeIds: [n.id],

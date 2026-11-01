@@ -5,7 +5,7 @@ import { getModelInfo, useModelAvailability, unavailableMessage } from '@/core/a
 import { useHasSecret } from '@/core/secrets'
 import { useSettings } from '@/core/settings'
 import type { Effort } from '@/core/types'
-import { LiveBadge, MonogramMark, SegmentedControl, SimBadge, Switch, useBreakpointUp } from '@/ui'
+import { LiveBadge, MonogramMark, SegmentedControl, SimBadge, Switch, useBreakpointUp, useFieldContext } from '@/ui'
 import { Group, InlineLink, Row, SectionBody, SettingRow, useSaveSetting } from '../parts'
 import { getSection } from '../sections'
 
@@ -39,11 +39,7 @@ export default function ModelsSection() {
     <SectionBody lead={getSection('models')!.lead}>
       <Group label="Default">
         <SettingRow id="default-model" label="Default model" hint={modelHint}>
-          <ModelPicker
-            value={ai.defaultModelId}
-            onChange={(defaultModelId) => save('default-model', 'Default model', 'ai', { defaultModelId })}
-            className="w-64 max-sm:w-full"
-          />
+          <FieldModelPicker value={ai.defaultModelId} onChange={(defaultModelId) => save('default-model', 'Default model', 'ai', { defaultModelId })} />
         </SettingRow>
         <SettingRow id="effort" label="Effort" hint={effortHint}>
           <SegmentedControl options={EFFORTS} value={ai.effort} onValueChange={(effort) => save('effort', 'Effort', 'ai', { effort })} fullWidth={narrow} />
@@ -82,6 +78,20 @@ export default function ModelsSection() {
 
       <Providers />
     </SectionBody>
+  )
+}
+
+/** The shared ModelPicker, named by its row: "Default model, Simulator · Swift". */
+function FieldModelPicker({ value, onChange }: { value: string; onChange: (modelId: string) => void }) {
+  const field = useFieldContext()
+  return (
+    <ModelPicker
+      value={value}
+      onChange={onChange}
+      id={field?.id}
+      aria-labelledby={field ? `${field.labelId} ${field.id}` : undefined}
+      className="w-64 max-sm:w-full"
+    />
   )
 }
 

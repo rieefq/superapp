@@ -300,7 +300,7 @@ const ResultRow = memo(function ResultRow({ entry, isCurrent, checked, selecting
               isCurrent={isCurrent}
               menu={menu}
               wash={checked ? 'bg-accent-tint' : 'bg-hover'}
-              className="absolute top-1/2 right-0 -translate-y-1/2 pl-1.5"
+              className="absolute top-1/2 right-0 min-w-[88px] -translate-y-1/2 justify-end pl-2"
             />
           </span>
         </div>

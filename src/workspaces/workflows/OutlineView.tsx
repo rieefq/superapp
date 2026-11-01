@@ -131,16 +131,16 @@ const OutlineRow = memo(function OutlineRow({ wf, item, agent, state, issues, se
           </span>
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="type-body-sm text-pretty text-ink">{sentence(node, wf)}</span>
-            <span className="type-meta flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-ink-3">
-              <span>{meta.label.toLowerCase()}</span>
-              {summary && <span className="min-w-0 truncate">· {summary}</span>}
-              {tag === 'live' && <LiveBadge size="xs" noTooltip />}
-              {tag === 'sim' && <SimBadge size="xs" noTooltip />}
+            <span className="type-meta flex min-w-0 items-center gap-1.5 text-ink-3">
+              <span className="shrink-0">{meta.label.toLowerCase()}</span>
+              {tag === 'live' && <LiveBadge size="xs" noTooltip className="shrink-0" />}
+              {tag === 'sim' && <SimBadge size="xs" noTooltip className="shrink-0" />}
               {runState && (
-                <span className={cn('inline-flex items-center gap-1', runState === 'failed' && 'text-fail-ink', runState === 'waiting' && 'text-attn-ink', runState === 'running' && 'text-live-ink')}>
+                <span className={cn('inline-flex shrink-0 items-center gap-1', runState === 'failed' && 'text-fail-ink', runState === 'waiting' && 'text-attn-ink', runState === 'running' && 'text-live-ink')}>
                   · <StepStatusGlyph status={runState} size={12} decorative /> {NODE_STATE_WORD[runState]}
                 </span>
               )}
+              {summary && <span className="min-w-0 truncate">· {summary}</span>}
             </span>
             {issues.length > 0 && (
               <span className="flex flex-col gap-0.5 pt-0.5">

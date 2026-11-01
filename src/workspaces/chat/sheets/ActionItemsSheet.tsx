@@ -6,7 +6,7 @@ import { db } from '@/core/db'
 import { toTask } from '@/core/services'
 import type { ID, Thread } from '@/core/types'
 import { cn } from '@/lib/cn'
-import { Button, Checkbox, EmptyState, Field, Sheet, toast, useBreakpointUp } from '@/ui'
+import { Button, Checkbox, EmptyState, Field, Sheet, Textarea, toast, useBreakpointUp } from '@/ui'
 import { turnInto } from '../actions'
 import { actionItemsFor } from '../logic/actionItems'
 
@@ -112,18 +112,30 @@ function Review({ thread, onClose }: { thread: Thread; onClose: () => void }) {
                 </button>
               </legend>
               {rows.map((r, i) => (
-                <div key={r.key} className="flex min-h-10 items-center gap-2.5 rounded-sm px-1 hover:bg-hover">
-                  <Checkbox
-                    checked={r.on}
-                    onCheckedChange={(on) => setRows((rs) => rs.map((x) => (x.key === r.key ? { ...x, on } : x)))}
-                    aria-label={`Create a task for item ${i + 1}`}
-                  />
-                  <input
+                <div key={r.key} className="flex min-h-10 items-start gap-2.5 rounded-sm px-1 py-1 hover:bg-hover">
+                  <span className="flex h-8 shrink-0 items-center">
+                    <Checkbox
+                      checked={r.on}
+                      onCheckedChange={(on) => setRows((rs) => rs.map((x) => (x.key === r.key ? { ...x, on } : x)))}
+                      aria-label={`Create a task for item ${i + 1}`}
+                    />
+                  </span>
+                  <Textarea
                     value={r.title}
-                    onChange={(e) => setRows((rs) => rs.map((x) => (x.key === r.key ? { ...x, title: e.target.value } : x)))}
+                    onValueChange={(title) => setRows((rs) => rs.map((x) => (x.key === r.key ? { ...x, title: title.replace(/\n/g, ' ') } : x)))}
+                    onKeyDown={(e) => {
+                      // One line per task: Enter creates (the form submits), it never adds a line.
+                      if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                        e.preventDefault()
+                        e.currentTarget.form?.requestSubmit()
+                      }
+                    }}
+                    autosize
+                    minRows={1}
+                    maxRows={4}
                     aria-label={`Title of item ${i + 1}`}
                     className={cn(
-                      'type-body-sm h-8 min-w-0 flex-1 rounded-sm border border-transparent bg-transparent px-1.5 text-ink outline-none hover:border-line focus:border-line-input focus:bg-raised',
+                      'type-body-sm min-h-8 min-w-0 flex-1 resize-none rounded-sm border-transparent bg-transparent px-1.5 py-1.5 text-ink shadow-none hover:border-line focus:border-line-input focus:bg-raised',
                       !r.on && 'text-ink-3 line-through decoration-ink-4',
                     )}
                   />

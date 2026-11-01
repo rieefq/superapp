@@ -68,6 +68,7 @@ import {
   type Section,
   type SortKey,
 } from './model'
+import { FILTER_ICON } from './parts'
 import { Results } from './results'
 import { rememberLibrary } from './nav'
 import { BrowseButton, KnowledgeScreen, useNewNote, usePhone } from './screen'
@@ -347,6 +348,11 @@ function LibraryHeader({
       <MonogramMark text={collection.name} hue={collection.hue} size={20} />
     ) : section.type === 'tag' ? (
       <Hash aria-hidden className="size-4 text-ink-3" strokeWidth={1.75} />
+    ) : section.type === 'filter' ? (
+      (() => {
+        const Icon = FILTER_ICON[section.id]
+        return <Icon aria-hidden className="size-4 text-ink-3" strokeWidth={1.75} />
+      })()
     ) : undefined
 
   const menu: MenuItem[] = []
@@ -885,7 +891,7 @@ function SectionEmpty({ section, collection, onUpload, onNewNote }: { section: S
   }
   if (section.type === 'filter') {
     const meta = SMART_FILTER_META[section.id]
-    return <EmptyState icon={ListFilter} title={`Nothing in ${meta.label}`} description={meta.empty} />
+    return <EmptyState icon={FILTER_ICON[section.id]} title={`Nothing in ${meta.label}`} description={meta.empty} />
   }
   if (section.type === 'tag') {
     return <EmptyState icon={Hash} title={`No items are tagged #${section.tag}`} description="Tags come from the items themselves. Add tags on an item, or tag several at once with X." />

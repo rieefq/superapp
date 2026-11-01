@@ -97,14 +97,14 @@ export function StudioListPane({ activePlace, onNew }: { activePlace: Place | nu
             selected={isPlace({ type: 'all' })}
             leading={<Library aria-hidden className="size-4 text-ink-3" strokeWidth={1.75} />}
             title="All assets"
-            meta={visible.length}
+            meta={String(visible.length)}
           />
           <ListRow
             to={toPlace({ type: 'favorites' })}
             selected={isPlace({ type: 'favorites' })}
             leading={<Star aria-hidden className="size-4 text-ink-3" strokeWidth={1.75} />}
             title="Favorites"
-            meta={count((a) => !!a.favorite)}
+            meta={String(count((a) => !!a.favorite))}
           />
         </ListGroup>
         <ListGroup label="Kinds">
@@ -114,12 +114,12 @@ export function StudioListPane({ activePlace, onNew }: { activePlace: Place | nu
             return (
               <ListRow
                 key={k}
-                to={view.href({ kind: on ? null : k, place: activePlace ? undefined : { type: 'all' } })}
+                to={view.href({ kind: on ? null : k, place: activePlace ?? { type: 'all' } })}
                 selected={on}
                 aria-label={`${KINDS[k].plural}${on ? ' (filter on — select to clear)' : ''}`}
                 leading={<Icon aria-hidden className="size-4 text-ink-3" strokeWidth={1.75} />}
                 title={KINDS[k].plural}
-                meta={kindCounts[k]}
+                meta={String(kindCounts[k])}
               />
             )
           })}
@@ -147,10 +147,11 @@ export function StudioListPane({ activePlace, onNew }: { activePlace: Place | nu
                   entity={{ kind: 'board', id: b.id }}
                   leading={<LayoutGrid aria-hidden className="size-4 text-ink-3" strokeWidth={1.75} />}
                   title={b.name}
-                  meta={<span className="group-focus-within/board:invisible group-hover/board:invisible pointer-coarse:invisible">{count((a) => a.boardId === b.id)}</span>}
+                  meta={<span className="pointer-fine:group-focus-within/board:invisible pointer-fine:group-hover/board:invisible">{count((a) => a.boardId === b.id)}</span>}
+                  className="pointer-coarse:pr-11"
                 />
                 {/* A sibling of the row (never nested in its link); keyboard users rename and delete from the stage header. */}
-                <span className="absolute top-1/2 right-3 -translate-y-1/2 opacity-0 transition-opacity duration-(--dur-1) group-focus-within/board:opacity-100 group-hover/board:opacity-100 pointer-coarse:opacity-100">
+                <span className="absolute top-1/2 right-3 -translate-y-1/2 opacity-0 transition-opacity duration-(--dur-1) group-focus-within/board:opacity-100 group-hover/board:opacity-100 pointer-coarse:right-1.5 pointer-coarse:opacity-100">
                   <Menu
                     aria-label={`Board “${b.name}”`}
                     placement="bottom-end"
@@ -170,7 +171,7 @@ export function StudioListPane({ activePlace, onNew }: { activePlace: Place | nu
               selected={isPlace({ type: 'unfiled' })}
               leading={<FolderOpen aria-hidden className="size-4 text-ink-3" strokeWidth={1.75} />}
               title="No board"
-              meta={unfiled}
+              meta={String(unfiled)}
             />
           )}
           {creating ? (

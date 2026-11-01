@@ -10,7 +10,7 @@ function focusSearch() {
   const tick = () => {
     const input = window.location.pathname === '/integrations' ? document.querySelector<HTMLElement>('#main input[data-search-input]') : null
     if (input) input.focus()
-    else if (Date.now() - started < 2000) requestAnimationFrame(tick)
+    else if (Date.now() - started < 8000) requestAnimationFrame(tick)
   }
   requestAnimationFrame(tick)
 }

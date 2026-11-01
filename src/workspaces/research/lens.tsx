@@ -25,7 +25,7 @@ import { ConfidenceMeter, CredibilityMeter, InvestigationStatusChip, SOURCE_KIND
 
 function summaryOf(inv: Investigation): string | undefined {
   const section = /##\s+(?:Executive summary|Summary)\s+([\s\S]*?)(\n## |$)/.exec(inv.report ?? '')?.[1]
-  return section ? excerpt(section, 320) : undefined
+  return section ? excerpt(section.replace(/\s*\[\d{1,3}(?:\s*,\s*\d{1,3})*\](?!\()/g, ''), 320) : undefined
 }
 
 function InvestigationPanel({ entity }: LensProps) {

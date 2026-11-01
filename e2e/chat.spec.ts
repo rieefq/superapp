@@ -95,10 +95,14 @@ test.describe('Chat', () => {
     await expect(page).toHaveURL(/\/chat\/thr_stripe_risks/)
     const chip = answer.getByRole('link', { name: 'Task: Rehearse the backfill on a production-sized copy' })
     await expect(chip).toBeVisible()
-    const tasks = await persisted<{ title: string; projectId: string | null; origin?: { kind: string } }>(page, 'tasks')
-    const task = tasks.find((t) => t.title === 'Rehearse the backfill on a production-sized copy')
-    expect(task?.projectId).toBe('prj_atlas')
-    expect(task?.origin?.kind).toBe('message')
+    // Filed in the conversation's project, with the message as its origin (as persisted on this device).
+    await expect
+      .poll(async () => {
+        const tasks = await persisted<{ title: string; projectId: string | null; origin?: { kind: string } }>(page, 'tasks')
+        const task = tasks.find((t) => t.title === 'Rehearse the backfill on a production-sized copy')
+        return task && `${task.projectId} · ${task.origin?.kind}`
+      })
+      .toBe('prj_atlas · message')
     // The chip opens it in Inspector › Item, in its project.
     await chip.click()
     const inspector = page.locator('[data-inspector-tab="item"]')
@@ -117,9 +121,12 @@ test.describe('Chat', () => {
     await sheet.getByLabel('Question').fill('How does Tidewell price usage-based plans for mid-market freight?')
     await sheet.getByRole('button', { name: 'Start', exact: true }).click()
     await expect(page).toHaveURL(/\/research\/inv_[a-z0-9]+/)
-    const investigations = await persisted<{ question: string; origin?: { kind: string } }>(page, 'investigations')
-    const inv = investigations.find((i) => i.question.startsWith('How does Tidewell price usage-based plans'))
-    expect(inv?.origin?.kind).toBe('message')
+    await expect
+      .poll(async () => {
+        const investigations = await persisted<{ question: string; origin?: { kind: string } }>(page, 'investigations')
+        return investigations.find((i) => i.question.startsWith('How does Tidewell price usage-based plans'))?.origin?.kind
+      })
+      .toBe('message')
   })
 
   test('rename a conversation inline, then delete it after confirming', async ({ page }) => {
@@ -158,8 +165,9 @@ test.describe('Chat', () => {
     await expectAnswered(answer)
     await expect(answer).toContainText('beta-notes.txt')
     await expect(answer).toContainText('five customers')
-    const items = await persisted<{ title: string; source: { type: string } }>(page, 'knowledge')
-    expect(items.some((k) => k.source.type === 'upload' && k.title === 'Beta notes')).toBe(true)
+    await expect
+      .poll(async () => (await persisted<{ title: string; source: { type: string } }>(page, 'knowledge')).some((k) => k.source.type === 'upload' && k.title === 'Beta notes'))
+      .toBe(true)
   })
 
   test('the list searches messages, and the thread menu is keyboard reachable', async ({ page }) => {

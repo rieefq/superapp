@@ -138,7 +138,8 @@ export function CatalogView({ items, counts }: { items: IntegrationListItem[]; c
     <Stage
       header={<StageHeader title={title} menu={menu} />}
       toolbar={
-        <div className="flex min-w-0 flex-1 items-center gap-3">
+        // Aligned with the catalog column below (1280 cap minus the body's 24px gutters).
+        <div className="mx-auto flex w-full max-w-[1232px] min-w-0 items-center gap-3">
           <SearchField
             size="sm"
             value={query}

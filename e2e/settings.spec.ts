@@ -174,12 +174,17 @@ test.describe('Settings', () => {
     await expect(page.locator('#setting-month')).toContainText('of $80')
   })
 
-  test('every section opens from the list with its own form', async ({ page }) => {
+  test('every section opens from the list, by keyboard (↓ then ⏎), with its own form', async ({ page }) => {
     await open(page, '/settings')
     const sections = ['Profile', 'Appearance', 'Models', 'Permissions & safety', 'Budgets', 'Notifications', 'Keyboard', 'Simulator', 'Data', 'About']
-    for (const name of sections) {
-      await sectionRow(page, name).click()
+    await press(sectionRow(page, 'Profile'))
+    await expect(page.getByRole('heading', { level: 1, name: 'Profile' })).toBeVisible()
+    for (const name of sections.slice(1)) {
+      await page.keyboard.press('ArrowDown')
+      await expect(sectionRow(page, name)).toBeFocused()
+      await page.keyboard.press('Enter')
       await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
+      await expect(page).toHaveURL(new RegExp(`/settings/${name === 'Permissions & safety' ? 'permissions' : name.toLowerCase()}$`))
     }
     await expect(page.getByRole('table', { name: 'What’s real in this build' })).toBeVisible()
     // Old names still lead somewhere.

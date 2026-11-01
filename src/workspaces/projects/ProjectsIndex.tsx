@@ -1,5 +1,5 @@
 import { memo, useMemo } from 'react'
-import { useNavigate, useSearchParams } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { useShallow } from 'zustand/react/shallow'
 import { ArchiveRestore, ArrowUpRight, Check, Ellipsis, FolderPlus, Link2, Plus, Star } from 'lucide-react'
 import { useRegisterCommands } from '@/app/commands/registry'
@@ -221,7 +221,9 @@ function MyTasksCard({ onOpenAll }: { onOpenAll: () => void }) {
       <div className="flex items-start gap-3 px-4 pt-4 pb-2">
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <h2 id="my-tasks-card" className="type-title-3 text-ink">
-            My tasks
+            <Link to="/projects/my-tasks" className="rounded-xs hover:underline hover:decoration-line-input hover:underline-offset-4">
+              My tasks
+            </Link>
           </h2>
           <p className="type-meta text-ink-3 tabular">
             {overdue.length} overdue · {today.length} due today{scopeName ? ` · in ${scopeName}` : ''}
@@ -375,7 +377,7 @@ const ProjectCard = memo(function ProjectCard({ project }: { project: Project })
               label={project.starred ? `Unstar ${project.name}` : `Star ${project.name}`}
               active={!!project.starred}
               onClick={() => toggleStar(project.id)}
-              className={cn(project.starred ? 'text-ink [&_svg]:fill-current' : 'text-ink-3')}
+              className={cn(project.starred ? 'bg-transparent text-ink shadow-none hover:bg-hover [&_svg]:fill-current' : 'text-ink-3')}
             />
             <Menu items={menu} aria-label={`${project.name} actions`} placement="bottom-end" trigger={<IconButton icon={Ellipsis} size="sm" label={`More actions for ${project.name}`} />} />
           </div>

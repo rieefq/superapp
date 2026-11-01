@@ -50,14 +50,24 @@ export function TestResult({ result, compact }: { result: ConnectionDiagnosis; c
  * GitHub (rate limit); a labeled simulated handshake for everything else. The last result shows
  * under the button and is announced politely.
  */
-export function TestConnection({ def, enabled, className }: { def: IntegrationDef; enabled: boolean; className?: string }) {
+export function TestConnection({ def, enabled, showButton = true, className }: {
+  def: IntegrationDef
+  enabled: boolean
+  /** The detail page puts the button in its header; the section then shows what a test does and the result. */
+  showButton?: boolean
+  className?: string
+}) {
   const { result, running } = useConnectionTest(def.id)
   return (
     <div className={cn('flex flex-col gap-3', className)}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <Button size="sm" variant="secondary" leadingIcon={Activity} loading={running} disabled={!enabled} onClick={() => void diagnoseConnection(def.id)}>
-          Test connection
-        </Button>
+        {showButton ? (
+          <Button size="sm" variant="secondary" leadingIcon={Activity} loading={running} disabled={!enabled} onClick={() => void diagnoseConnection(def.id)}>
+            Test connection
+          </Button>
+        ) : (
+          <h3 className="type-caption font-medium text-ink-2">Connection test</h3>
+        )}
         <span className="type-caption text-ink-3">{enabled ? testDescription(def) : `Connect ${def.name} to test it.`}</span>
       </div>
       <div role="status" aria-live="polite" className="min-w-0">

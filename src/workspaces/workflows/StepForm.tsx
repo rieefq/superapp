@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { useShallow } from 'zustand/react/shallow'
-import { ArrowUpRight, Copy, Send, Trash2 } from 'lucide-react'
+import { ArrowUpRight, Copy, Send, Trash2, X } from 'lucide-react'
 import { AgentPicker, CollectionPicker, Picker, PickerTrigger, type PickerOption } from '@/app/components'
 import { describeCron } from '@/core/assist'
 import { useDB, type Tables } from '@/core/db'
@@ -19,7 +19,8 @@ import { formatDateTime } from '@/lib/format'
 import {
   Button, EntityChip, Field, IconButton, Input, LiveBadge, MonogramMark, SegmentedControl, Select, SimBadge, StatusGlyph, StepStatusGlyph, Tag, Textarea, toast,
 } from '@/ui'
-import { deleteStep, updateStep, updateStepConfig } from './actions'
+import { connectSteps, deleteStep, disconnect, updateStep, updateStepConfig } from './actions'
+import { connectionProblem } from './graph'
 import { delayWords, NODE_TYPES, OUTPUT_KINDS, outputKindOf, TRIGGER_ICON } from './nodeMeta'
 import { useEditorStore } from './editorStore'
 import { useShowRun } from './hooks'
@@ -164,7 +165,95 @@ export function StepForm({ wf, node, issues, runSteps = [] }: StepFormProps) {
       {node.type === 'approval' && <ApprovalSettings wf={wf} node={node} />}
       {node.type === 'delay' && <DelaySettings wf={wf} node={node} />}
       {node.type === 'output' && <OutputSettings wf={wf} node={node} />}
+      <ConnectionsSection wf={wf} node={node} />
     </div>
+  )
+}
+
+// ------------------------------------------------------------------------------------------------ connections
+
+/**
+ * Connections without dragging (the keyboard way to edit the graph): where this step goes next — for
+ * a condition, its Yes and No — and where it is reached from.
+ */
+function ConnectionsSection({ wf, node }: { wf: Workflow; node: WorkflowNode }) {
+  const label = (id: string) => wf.nodes.find((n) => n.id === id)?.label ?? 'A deleted step'
+  const outgoing = wf.edges.filter((e) => e.source === node.id)
+  const incoming = wf.edges.filter((e) => e.target === node.id)
+  const graph = { nodes: wf.nodes, edges: wf.edges }
+  const candidates = (handle?: 'true' | 'false') =>
+    wf.nodes
+      .filter((n) => n.id !== node.id && !connectionProblem(graph, node.id, n.id, handle ?? null))
+      .map((n) => ({ value: n.id, label: n.label || NODE_TYPES[n.type].label, description: NODE_TYPES[n.type].label }))
+  const connectTo = (target: string, handle?: 'true' | 'false') => {
+    const problem = connectSteps(wf.id, node.id, target, handle ?? null)
+    if (problem) toast.error('Couldn’t connect these steps', { description: problem })
+  }
+  const Row = ({ edgeId, text }: { edgeId: string; text: string }) => (
+    <li className="flex min-h-8 items-center gap-2 rounded-sm px-1 hover:bg-hover">
+      <span className="type-body-sm min-w-0 flex-1 truncate text-ink-2">{text}</span>
+      <IconButton icon={X} label={`Remove the connection to ${text}`} size="xs" onClick={() => disconnect(wf.id, edgeId)} />
+    </li>
+  )
+  return (
+    <Section title="Connections">
+      {node.type === 'condition' ? (
+        (['true', 'false'] as const).map((h) => {
+          const edge = outgoing.find((e) => (e.sourceHandle ?? 'true') === h)
+          return (
+            <Field key={h} label={h === 'true' ? 'If yes, go to' : 'If no, go to'}>
+              <Select
+                aria-label={h === 'true' ? 'If yes, go to' : 'If no, go to'}
+                value={edge?.target ?? '__none__'}
+                onValueChange={(v) => {
+                  if (v === '__none__') {
+                    if (edge) disconnect(wf.id, edge.id)
+                  } else connectTo(v, h)
+                }}
+                options={[{ value: '__none__', label: 'Nowhere — the run stops' }, ...(edge ? [{ value: edge.target, label: label(edge.target) }] : []), ...candidates(h).filter((c) => c.value !== edge?.target)]}
+              />
+            </Field>
+          )
+        })
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          <span className="type-caption text-ink-3">Goes to</span>
+          {outgoing.length ? (
+            <ul className="flex flex-col">
+              {outgoing.map((e) => (
+                <Row key={e.id} edgeId={e.id} text={label(e.target)} />
+              ))}
+            </ul>
+          ) : (
+            <p className="type-caption text-ink-3">Nothing — the run ends here.</p>
+          )}
+          {candidates().length > 0 && (
+            <Select
+              aria-label="Connect to another step"
+              placeholder="Connect to…"
+              value={null}
+              onValueChange={(v) => connectTo(v)}
+              options={candidates()}
+              size="sm"
+            />
+          )}
+        </div>
+      )}
+      {node.type !== 'trigger' && (
+        <div className="flex flex-col gap-1.5">
+          <span className="type-caption text-ink-3">Comes from</span>
+          {incoming.length ? (
+            <ul className="flex flex-col">
+              {incoming.map((e) => (
+                <Row key={e.id} edgeId={e.id} text={`${label(e.source)}${e.sourceHandle ? ` (${e.sourceHandle === 'false' ? 'No' : 'Yes'})` : ''}`} />
+              ))}
+            </ul>
+          ) : (
+            <p className="type-caption text-ink-3">Nothing — this step never runs.</p>
+          )}
+        </div>
+      )}
+    </Section>
   )
 }
 
@@ -289,7 +378,7 @@ function EventList({ title, badge, note, options, value, onPick }: {
   onPick: (event: string) => void
 }) {
   return (
-    <fieldset className="flex flex-col gap-1.5">
+    <fieldset className="flex min-w-0 flex-col gap-1.5">
       <legend className="type-caption mb-1.5 flex items-center gap-2 font-medium text-ink-2">
         {title} {badge}
       </legend>
@@ -513,19 +602,21 @@ function ActionSettings({ wf, node }: { wf: Workflow; node: WorkflowNode }) {
         </Field>
       )}
       {capability && (decision || covered) && (
-        <p className="type-caption flex flex-wrap items-center gap-x-1.5 text-ink-3">
-          <span className="text-ink-2">Policy:</span>
-          {covered ? (
-            <span className="text-attn-ink">decided at the approval step ◆</span>
-          ) : decision?.outcome === 'ask' ? (
-            <span className="text-attn-ink">asks you ◆</span>
-          ) : decision?.outcome === 'deny' ? (
-            <span className="text-ink-2">blocked ⊘</span>
-          ) : (
-            <span className="text-ink-2">allowed</span>
-          )}
-          {!covered && decision && <span>· {decision.reason}.</span>}
-        </p>
+        <div className="type-caption flex flex-col gap-0.5 text-ink-3">
+          <span>
+            <span className="text-ink-2">Policy: </span>
+            {covered ? (
+              <span className="text-attn-ink">you decide at the approval step ◆</span>
+            ) : decision?.outcome === 'ask' ? (
+              <span className="text-attn-ink">asks you ◆</span>
+            ) : decision?.outcome === 'deny' ? (
+              <span className="text-ink-2">blocked ⊘</span>
+            ) : (
+              <span className="text-ink-2">allowed</span>
+            )}
+          </span>
+          {!covered && decision && <span className="text-pretty">{decision.reason}.</span>}
+        </div>
       )}
       {isMessage && node.integrationId === 'slack' && (
         <TextSetting label="Channel" value={channel} onChange={(v) => updateStepConfig(wf.id, node.id, { channel: v })} placeholder="#product" mono />

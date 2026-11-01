@@ -28,11 +28,13 @@ export function ChangesPane({ session, selectedPath, onSelectPath, active }: { s
   const width = useElementWidth(paneRef)
   const [storedMode, setStoredMode] = useLocalStorageState<DiffMode>('atrium.code.diffMode', 'unified')
   const mode: DiffMode = width > 0 && width < 720 ? 'unified' : storedMode
+  const narrow = width > 0 && width < 560
   const singleKeys = useSettings((s) => s.appearance.singleKeyShortcuts)
   // The selection is the URL's ?file= when it names a changed file, otherwise the first file.
   const index = Math.max(0, changes.findIndex((c) => c.path === selectedPath))
   const selected = changes[index]
-  const readOnly = session.status === 'archived'
+  // Archived sessions are read-only; merged ones have nothing left to decide.
+  const readOnly = session.status === 'archived' || session.status === 'merged'
 
   const decide = (change: FileChange | undefined, review: NonNullable<FileChange['review']>, advance = true) => {
     if (!change || readOnly) return
@@ -62,7 +64,7 @@ export function ChangesPane({ session, selectedPath, onSelectPath, active }: { s
 
   if (!changes.length) {
     return (
-      <div ref={paneRef} className="flex min-h-0 flex-1 flex-col">
+      <div ref={paneRef} className="flex min-h-0 min-w-0 flex-1 flex-col">
         <NoChanges session={session} />
       </div>
     )
@@ -80,11 +82,18 @@ export function ChangesPane({ session, selectedPath, onSelectPath, active }: { s
   }
 
   return (
-    <div ref={paneRef} className="flex min-h-0 flex-1 flex-col">
+    <div ref={paneRef} className="flex min-h-0 min-w-0 flex-1 flex-col">
       <FileList changes={changes} selectedPath={selected?.path ?? null} onSelect={onSelectPath} readOnly={readOnly} onDecide={decide} />
       <div className="min-h-0 flex-1 overflow-auto overscroll-contain px-4 py-4 md:px-5" data-diff-scroll="">
         {selected && (
           <div onClick={onLineClick} className={cn(!readOnly && '[&_span.tabular.text-right]:cursor-pointer [&_span.tabular.text-right:hover]:text-ink-2')}>
+            {/* Narrow panes: the decision sits above the diff so the diff header keeps its path. */}
+            {!readOnly && narrow && (
+              <div className="mb-2 flex items-center justify-end gap-1">
+                <span className="type-caption mr-auto text-ink-3">{REVIEW_WORD[selected.review ?? 'pending']}</span>
+                <DecisionButtons change={selected} onDecide={(r) => decide(selected, r)} />
+              </div>
+            )}
             <DiffView
               key={selected.path}
               oldText={selected.changeType === 'added' ? '' : (selected.before ?? '')}
@@ -93,10 +102,10 @@ export function ChangesPane({ session, selectedPath, onSelectPath, active }: { s
               oldPath={selected.oldPath}
               mode={mode}
               onModeChange={setStoredMode}
-              actions={readOnly ? undefined : <DecisionButtons change={selected} onDecide={(r) => decide(selected, r)} />}
+              actions={readOnly || narrow ? undefined : <DecisionButtons change={selected} onDecide={(r) => decide(selected, r)} />}
             />
             <p className="type-caption mt-2 text-ink-3 pointer-coarse:hidden">
-              {readOnly ? 'Archived sessions are read-only.' : 'Click a line number to reference it in your next instruction · J/K next or previous file · A accept · R reject · U clear · V layout'}
+              {readOnly ? (session.status === 'merged' ? 'Merged — these changes are on the base branch (simulated).' : 'Archived sessions are read-only.') : 'Click a line number to reference it in your next instruction · J/K next or previous file · A accept · R reject · U clear · V layout'}
             </p>
           </div>
         )}
@@ -284,7 +293,7 @@ export function ReviewBar({ session }: { session: CodeSession }) {
           </span>
           <span className="tabular">{checksClause(checks)}</span>
           {checks.total > 0 && <SimBadge className="ml-1.5 align-[-3px]" />}
-          {state === 'review' && stats.accepted === 0 && stats.pending > 0 && <span className="text-ink-3"> · Accept the files you want to ship</span>}
+          {state === 'review' && stats.accepted === 0 && stats.pending > 0 && <span className="text-ink-3"> · Accept the files you want in the pull request</span>}
         </p>
         <div className="flex flex-wrap items-center justify-end gap-1.5 @max-[859px]:-mr-1">
           {state === 'archived' && (

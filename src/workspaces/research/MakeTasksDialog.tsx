@@ -125,16 +125,20 @@ export function MakeTasksDialog({ open, onOpenChange, inv, candidates, heading =
                       })
                     }
                     aria-label={`Create “${titles[c.id] ?? c.text}”`}
-                    className="mt-[7px]"
+                    className="mt-2"
                   />
                   <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <input
+                    <textarea
                       value={titles[c.id] ?? ''}
-                      onChange={(e) => setTitles((t) => ({ ...t, [c.id]: e.target.value }))}
+                      rows={1}
+                      onChange={(e) => setTitles((t) => ({ ...t, [c.id]: e.target.value.replace(/\n/g, ' ') }))}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') e.preventDefault()
+                      }}
                       aria-label="Task title"
                       disabled={!on}
                       className={cn(
-                        'type-body-sm h-8 w-full min-w-0 rounded-sm border border-transparent bg-transparent px-1.5 text-ink outline-none transition-colors duration-(--dur-1)',
+                        'type-body-sm min-h-8 w-full min-w-0 resize-none rounded-sm border border-transparent bg-transparent px-1.5 py-[6px] text-ink outline-none transition-colors duration-(--dur-1) [field-sizing:content]',
                         'hover:border-line focus-visible:border-line-input focus-visible:bg-canvas disabled:text-ink-3 disabled:line-through pointer-coarse:text-[16px]',
                       )}
                     />

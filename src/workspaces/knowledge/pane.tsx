@@ -1,21 +1,7 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { useShallow } from 'zustand/react/shallow'
-import {
-  BookMarked,
-  Clock,
-  Hash,
-  Layers,
-  Library,
-  MessagesSquare,
-  Orbit,
-  Plus,
-  ScanSearch,
-  SquareDashed,
-  Telescope,
-  Upload,
-  type LucideIcon,
-} from 'lucide-react'
+import { Hash, Library, Plus, ScanSearch } from 'lucide-react'
 import { ListGroup, ListPane, ListRow, ListRows } from '@/app/templates'
 import { useDB, type Tables } from '@/core/db'
 import type { KnowledgeItem } from '@/core/types'
@@ -24,17 +10,7 @@ import { cn } from '@/lib/cn'
 import { CollectionDialog } from './dialogs'
 import { useFilterContext, useKnowledgePrefs, useListScope, usePaneCounts } from './hooks'
 import { matchesSmartFilter, parseLibraryParams, sameSection, sectionHref, SMART_FILTERS, type Section, type SmartFilter } from './model'
-
-const FILTER_ICON: Record<SmartFilter, LucideIcon> = {
-  recent: Clock,
-  held: Layers,
-  memory: BookMarked,
-  research: Telescope,
-  uploads: Upload,
-  chat: MessagesSquare,
-  agents: Orbit,
-  simulated: SquareDashed,
-}
+import { FILTER_ICON } from './parts'
 
 const FILTER_IDS = SMART_FILTERS.map((f) => f.id)
 const TAGS_COLLAPSED = 8

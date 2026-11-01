@@ -1,11 +1,12 @@
 import { memo, type ReactNode } from 'react'
+import { BookMarked, Clock, Layers, MessagesSquare, Orbit, SquareDashed, Telescope, Upload, type LucideIcon } from 'lucide-react'
 import { useDB, type Tables } from '@/core/db'
 import { AI_AVAILABILITY_LABEL, KNOWLEDGE_KIND_META, KIND_META, useKnowledgeUsage } from '@/core/services'
 import { getIntegration } from '@/core/integrations/catalog'
 import type { KnowledgeItem } from '@/core/types'
 import { DynamicIcon, KindTile, Tooltip } from '@/ui'
 import { cn } from '@/lib/cn'
-import { isImage } from './model'
+import { isImage, type SmartFilter } from './model'
 
 /** `[start, end)` ranges → text with `<mark>` washes (the neutral search highlight, §4.1 `--highlight`). */
 export function Highlight({ text, ranges, className }: { text: string; ranges?: readonly (readonly [number, number])[]; className?: string }) {
@@ -162,4 +163,16 @@ export const AVAILABILITY_EFFECT: Record<'always' | 'cited' | 'never', string> =
   always: 'Retrieval can pick it for any AI action in its project.',
   cited: 'Read only when held, attached or @-mentioned — never picked automatically.',
   never: 'Retrieval never reads it, and it can’t be held or @-mentioned. It stays searchable here.',
+}
+
+/** Smart filter icons (list pane rows, headers, empty states). Simulated uses the dashed square of the honesty grammar. */
+export const FILTER_ICON: Record<SmartFilter, LucideIcon> = {
+  recent: Clock,
+  held: Layers,
+  memory: BookMarked,
+  research: Telescope,
+  uploads: Upload,
+  chat: MessagesSquare,
+  agents: Orbit,
+  simulated: SquareDashed,
 }

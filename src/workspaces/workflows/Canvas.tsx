@@ -157,9 +157,7 @@ function FlowEdgeView({ id, sourceX, sourceY, targetX, targetY, sourcePosition, 
             style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
           >
             {custom && (
-              <span className="type-meta rounded-xs border border-line bg-canvas px-1.5 py-px text-ink-2">
-                {data?.handle === 'false' ? 'No' : data?.handle === 'true' ? 'Yes' : ''}
-                {data?.handle ? ' · ' : ''}
+              <span className="type-meta rounded-xs border border-line bg-sunken px-1.5 py-px text-ink-3" title={data?.handle ? `${data.handle === 'false' ? 'No' : 'Yes'} branch` : undefined}>
                 {custom}
               </span>
             )}

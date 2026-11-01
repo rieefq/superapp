@@ -11,27 +11,27 @@ import { Stage, StageHeader, useShellLayout } from '@/app/templates'
 import type { Command } from '@/app/types'
 import { estimateReferenceCost } from '@/core/ai'
 import { useContextStore, useIsPinned } from '@/core/context'
-import { db, useRow } from '@/core/db'
+import { db, useDB, useRow } from '@/core/db'
 import {
   RESEARCH_AGENT_ID, askFollowUp, completeInvestigation, reopenInvestigation, saveReportToKnowledge, startInvestigation, updateInvestigation,
   useInvestigation, useSources, entityRoute,
 } from '@/core/services'
 import { STEP_PROFILE } from '@/core/sim/research'
 import { useSettings } from '@/core/settings'
-import { isRunActive, type EntityRef, type Investigation, type Run } from '@/core/types'
+import { isRunActive, type EntityRef, type Investigation } from '@/core/types'
 import { cn } from '@/lib/cn'
 import { shortCode } from '@/lib/id'
 import { timeAgo } from '@/lib/format'
 import {
-  AgentMark, Button, EmptyState, EntityChip, ErrorState, HUE_FILL, IdCode, Menu, copyText, toast, useHotkey, type MenuItem,
+  AgentMark, Button, EmptyState, EntityChip, ErrorState, HUE_FILL, IconButton, IdCode, Menu, copyText, toast, useHotkey, type MenuItem,
 } from '@/ui'
 import { cancelQueuedFollowUp, confirmDelete, discussInChat, exportReport, makeDeck, queueFollowUp, sendFindingsToCode, useQueuedFollowUps } from './actions'
 import { ActivityView } from './ActivityView'
 import { Board } from './Board'
 import { FindingsView } from './FindingsView'
 import { Frontier } from './Frontier'
-import { useBoardColumns, useLatestRun, useSelectSource, useSelectedSourceId, SOURCE_PARAM } from './hooks'
-import { DEPTH_LABEL, openQuestions, readingSourceIds, sourceStats } from './logic'
+import { useBoardColumns, useReadingIds, useSelectSource, useSelectedSourceId, SOURCE_PARAM } from './hooks'
+import { DEPTH_LABEL, openQuestions, sourceStats } from './logic'
 import { MakeTasksDialog } from './MakeTasksDialog'
 import { NewBrief } from './NewBrief'
 import { InvestigationStatusChip } from './parts'
@@ -58,8 +58,13 @@ function InvestigationScreen({ inv, tabParam }: { inv: Investigation; tabParam?:
   const phone = layout.formFactor === 'phone'
   const [params] = useSearchParams()
   const sources = useSources(inv.id)
-  const run = useLatestRun(inv)
-  const active = !!run && isRunActive(run.status)
+  // Narrow subscriptions: the screen re-renders when the run's status changes, not on every step update.
+  const runId = inv.runIds[inv.runIds.length - 1]
+  const runStatus = useDB((s) => (runId ? s.runs[runId]?.status : undefined))
+  const runError = useDB((s) => (runId ? s.runs[runId]?.error : undefined))
+  const runAgentId = useDB((s) => (runId ? s.runs[runId]?.agentId : undefined))
+  const active = !!runStatus && isRunActive(runStatus)
+  const runLite = useMemo(() => (runStatus ? { status: runStatus } : undefined), [runStatus])
   const selectSource = useSelectSource()
   const selectedId = useSelectedSourceId()
   const columns = useBoardColumns()
@@ -75,7 +80,7 @@ function InvestigationScreen({ inv, tabParam }: { inv: Investigation; tabParam?:
   const boardMode = !hasReport && inv.status === 'running'
   const first: Tab = boardMode ? 'board' : 'report'
   const tab: Tab = SUB_TABS.includes(tabParam as Tab) ? (tabParam as Tab) : first
-  const readingIds = useMemo(() => readingSourceIds(active ? run : undefined, sources), [active, run, sources])
+  const readingIds = useReadingIds(runId, sources)
   // Each view starts at the top.
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: 0 })
@@ -152,7 +157,7 @@ function InvestigationScreen({ inv, tabParam }: { inv: Investigation; tabParam?:
   const copy = (text: string, what: string) => void copyText(text).then((ok) => toast(ok ? { title: `${what} copied` } : { tone: 'error', title: `Couldn’t copy the ${what.toLowerCase()}` }))
 
   // T opens Turn into, S saves the report (outside text fields; Settings › Keyboard can turn them off).
-  useHotkey('t', () => setTurnOpen(true), { enabled: singleKeys })
+  useHotkey('t', () => setTurnOpen(true), { enabled: singleKeys && !phone })
   useHotkey('s', () => {
     if (hasReport) saveOrOpen()
   }, { enabled: singleKeys && hasReport })
@@ -185,6 +190,9 @@ function InvestigationScreen({ inv, tabParam }: { inv: Investigation; tabParam?:
     { id: 'delete', label: 'Delete investigation…', icon: Trash2, danger: true, onSelect: () => void remove() },
   ]
 
+  const stageWidth = layout.docking.stageWidth
+  // Phones keep the title readable (every action lives in ⋯); narrow stages show Turn into as an icon.
+  const turnStyle: 'text' | 'icon' | 'menu' = phone ? 'menu' : stageWidth < 900 ? 'icon' : 'text'
   const turnMenu = (
     <Menu
       open={turnOpen}
@@ -193,9 +201,13 @@ function InvestigationScreen({ inv, tabParam }: { inv: Investigation; tabParam?:
       aria-label="Turn into"
       placement="bottom-end"
       trigger={
-        <Button size="sm" variant="ghost" leadingIcon={CornerUpRight} aria-keyshortcuts="t">
-          Turn into…
-        </Button>
+        turnStyle === 'icon' ? (
+          <IconButton icon={CornerUpRight} label="Turn into…" shortcut="t" size="sm" tooltipPlacement="bottom" />
+        ) : (
+          <Button size="sm" variant="ghost" leadingIcon={CornerUpRight} aria-keyshortcuts="t">
+            Turn into…
+          </Button>
+        )
       }
     />
   )
@@ -219,14 +231,10 @@ function InvestigationScreen({ inv, tabParam }: { inv: Investigation; tabParam?:
         </Button>
       ),
     })
-  if (inv.status === 'complete' && hasReport) actions.push({ key: 'save', node: <SaveReportButton key="save" inv={inv} /> })
-  actions.push({ key: 'turn', node: <span key="turn">{turnMenu}</span> })
-  if (inv.status !== 'complete' && hasReport) actions.push({ key: 'save', node: <SaveReportButton key="save" inv={inv} /> })
-  const stageWidth = layout.docking.stageWidth
-  // Phones keep the title readable: every action lives in ⋯ there.
-  const fit = phone ? 0 : stageWidth < 900 ? 1 : stageWidth < 1240 ? 2 : 3
-  const visibleActions = actions.slice(0, fit)
-  const turnHidden = !visibleActions.some((a) => a.key === 'turn')
+  if (hasReport) actions.push({ key: 'save', node: <SaveReportButton key="save" inv={inv} /> })
+  const slots = phone ? 0 : stageWidth < 1240 ? 1 : 2
+  const visibleActions = [...actions.slice(0, slots), ...(turnStyle === 'menu' ? [] : [{ key: 'turn', node: <span key="turn">{turnMenu}</span> }])]
+  const turnHidden = turnStyle === 'menu'
 
   // ---- ⌘K: actions for this view
   const commands = useMemo<Command[]>(() => {
@@ -263,7 +271,7 @@ function InvestigationScreen({ inv, tabParam }: { inv: Investigation; tabParam?:
           <StageHeader<Tab>
             title={inv.title}
             onRename={(t) => updateInvestigation(inv.id, { title: t })}
-            status={<InvestigationStatusChip inv={inv} run={run} />}
+            status={<InvestigationStatusChip inv={inv} run={runLite} />}
             tabs={{
               'aria-label': 'Investigation views',
               value: tab,
@@ -282,23 +290,23 @@ function InvestigationScreen({ inv, tabParam }: { inv: Investigation; tabParam?:
         }
         composer={
           <div className="mx-auto w-full max-w-[720px]">
-            <FollowUpComposer inv={inv} run={run} />
+            <FollowUpComposer inv={inv} active={active} />
           </div>
         }
       >
         <div className={cn('mx-auto flex w-full flex-col', column)}>
-          <Masthead inv={inv} run={run} compact={tab === 'findings' || tab === 'sources' || tab === 'activity'} phone={phone} />
-          {active && run && <Frontier inv={inv} run={run} sources={sources} className="mb-6" />}
+          <Masthead inv={inv} agentId={runAgentId} working={runStatus === 'running'} compact={tab === 'findings' || tab === 'sources' || tab === 'activity'} phone={phone} />
+          {active && runId && <Frontier inv={inv} runId={runId} sources={sources} className="mb-6" />}
           {tab === 'board' && (
-            <Board inv={inv} run={run} sources={sources} selectedId={selectedId} readingIds={readingIds} onSelectSource={selectSource} columns={columns} />
+            <Board inv={inv} runId={runId} sources={sources} selectedId={selectedId} readingIds={readingIds} onSelectSource={selectSource} columns={columns} />
           )}
           {tab === 'report' &&
             (hasReport ? (
-              <ReportView inv={inv} sources={sources} run={run} onSelectSource={selectSource} hotkeyScope={scopeRef} />
+              <ReportView inv={inv} sources={sources} runId={runId} busy={active} onSelectSource={selectSource} hotkeyScope={scopeRef} />
             ) : inv.status === 'failed' ? (
               <ErrorState
                 title="Couldn’t finish this investigation"
-                message={run?.error ? `The run stopped: ${run.error}` : 'The research run stopped before the report was drafted.'}
+                message={runError ? `The run stopped: ${runError}` : 'The research run stopped before the report was drafted.'}
                 onRetry={retry}
                 retryLabel="Retry"
                 className="py-10"
@@ -331,10 +339,9 @@ function InvestigationScreen({ inv, tabParam }: { inv: Investigation; tabParam?:
  * Who researches it, at what depth, in which project — and the question, in the document voice. The
  * list views (findings, sources, activity) get a compact version so the list starts high.
  */
-function Masthead({ inv, run, compact, phone }: { inv: Investigation; run?: Run; compact?: boolean; phone?: boolean }) {
-  const agent = useRow('agents', run?.agentId ?? RESEARCH_AGENT_ID)
+function Masthead({ inv, agentId, working, compact, phone }: { inv: Investigation; agentId?: string; working: boolean; compact?: boolean; phone?: boolean }) {
+  const agent = useRow('agents', agentId ?? RESEARCH_AGENT_ID)
   const project = useRow('projects', inv.projectId)
-  const working = run?.status === 'running'
   const sourcesOff = inv.sources && (!inv.sources.web || !inv.sources.knowledge)
   return (
     <header className={cn('flex flex-col', compact ? 'mb-5 gap-1.5' : 'mb-6 gap-2.5')}>
@@ -397,9 +404,8 @@ const FOLLOW_UP_TOKENS = (['plan', 'knowledge', 'search', 'browse', 'draft'] as 
  * The docked follow-up composer (§6.5): an in-place composer with a ReadBack line. A follow-up asked
  * while a run works is queued and starts when it ends — no steering mid-run (§8.1).
  */
-function FollowUpComposer({ inv, run }: { inv: Investigation; run?: Run }) {
+function FollowUpComposer({ inv, active }: { inv: Investigation; active: boolean }) {
   const phone = useShellLayout().formFactor === 'phone'
-  const active = !!run && isRunActive(run.status)
   const queued = useQueuedFollowUps(inv.id)
   const tokens = Math.round(FOLLOW_UP_TOKENS)
   const usd = estimateReferenceCost(Math.round(tokens * 0.7), Math.round(tokens * 0.3))

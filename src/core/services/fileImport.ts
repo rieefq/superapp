@@ -295,7 +295,7 @@ export function htmlToReadable(html: string): { title: string; text: string } | 
     }
     if (tag === 'TR') {
       const cells = Array.from(el.children).map((c) => squash(c.textContent ?? '')).filter(Boolean)
-      if (cells.length) blocks.push(cells.join(' | '))
+      if (cells.length) blocks.push(`| ${cells.join(' | ')} |`)
       return
     }
     if (tag === 'PRE') {

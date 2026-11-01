@@ -17,7 +17,7 @@ import { isRunActive, type Run, type Workflow, type WorkflowNodeType } from '@/c
 import { cn } from '@/lib/cn'
 import { shortCode } from '@/lib/id'
 import {
-  ApprovalCardConnected, Button, confirm, EmptyState, IdCode, MonogramMark, Popover, RUN_STATUS_META, RunStatusGlyph, SimBadge, StatusGlyph, StepTape, Switch, toast,
+  ApprovalCardConnected, Button, confirm, EmptyState, IconButton, IdCode, MonogramMark, Popover, RUN_STATUS_META, RunStatusGlyph, SimBadge, StatusGlyph, StepTape, Switch, toast,
   type MenuItem,
 } from '@/ui'
 import { ReadBack, useReadBack } from '@/app/components'
@@ -73,7 +73,7 @@ function TriggerChip({ wf, onClick }: { wf: Workflow; onClick: () => void }) {
       onClick={onClick}
       title="Trigger settings"
       aria-label={`Trigger: ${wf.trigger.label}. Open its settings`}
-      className="type-meta inline-flex h-6 max-w-[180px] items-center gap-1.5 rounded-sm border border-line-strong px-2 text-ink-2 transition-colors duration-(--dur-1) hover:bg-hover hover:text-ink"
+      className="type-meta inline-flex h-6 max-w-[180px] items-center gap-1.5 rounded-sm border border-line-strong px-2 text-ink-2 transition-colors duration-(--dur-1) hover:bg-hover hover:text-ink max-sm:hidden"
     >
       <Icon aria-hidden className="size-3.5 shrink-0" strokeWidth={1.75} />
       <span className="truncate">{triggerShort(wf.trigger)}</span>
@@ -118,6 +118,7 @@ export function EditorHeader({ workflowId, onSelectNode }: { workflowId: string;
   const [view, setView] = useEditorView()
   const requestTestRun = useWorkflowDialogs((s) => s.requestTestRun)
   const held = useIsPinned(workflowId ? { kind: 'workflow', id: workflowId } : null)
+  const phone = useShellLayout().formFactor === 'phone'
   if (!wf) return <StageHeader title="Workflow" />
   const trigger = wf.nodes.find((n) => n.type === 'trigger')
   const copy = async (text: string, what: string) => {
@@ -167,14 +168,18 @@ export function EditorHeader({ workflowId, onSelectNode }: { workflowId: string;
       tabs={{ items: [{ value: 'canvas', label: 'Canvas' }, { value: 'outline', label: 'Outline' }], value: view, onChange: (v) => setView(v as EditorView), 'aria-label': 'View' }}
       actions={
         <>
-          <SavedNote stamp={wf.updatedAt} />
+          {!phone && <SavedNote stamp={wf.updatedAt} />}
           <span className="type-meta hidden text-ink-3 sm:inline" title={`Version ${wf.version}: every editing session saves a new version`}>
             v{wf.version}
           </span>
-          <Switch size="sm" label={<span className="max-sm:sr-only">Enabled</span>} checked={wf.enabled} onCheckedChange={(on) => toggleEnabled(wf, on)} aria-label={wf.enabled ? 'Enabled. Turn off' : 'Off. Turn on'} />
-          <Button size="sm" variant="primary" leadingIcon={Play} onClick={() => requestTestRun(wf.id)}>
-            Test run
-          </Button>
+          <Switch size="sm" label={phone ? undefined : 'Enabled'} checked={wf.enabled} onCheckedChange={(on) => toggleEnabled(wf, on)} aria-label={wf.enabled ? 'Enabled. Turn off' : 'Off. Turn on'} />
+          {phone ? (
+            <IconButton icon={Play} label="Test run" variant="primary" size="sm" onClick={() => requestTestRun(wf.id)} />
+          ) : (
+            <Button size="sm" variant="primary" leadingIcon={Play} onClick={() => requestTestRun(wf.id)}>
+              Test run
+            </Button>
+          )}
         </>
       }
       menu={menu}

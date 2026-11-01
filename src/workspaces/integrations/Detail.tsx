@@ -14,6 +14,7 @@ import {
   disconnect,
   forgetSecrets,
   useConnection,
+  useConnectionTest,
   useIntegrationUsage,
   type IntegrationStatus,
 } from '@/core/services/integrations'
@@ -58,7 +59,7 @@ function WhatsReal({ simulated, children }: { simulated: boolean; children: Reac
   )
 }
 
-function Intro({ kicker, badge, description, facts }: { kicker: string; badge: ReactNode; description: string; facts: string[] }) {
+function Intro({ kicker, badge, description, facts }: { kicker: string; badge?: ReactNode; description: string; facts: string[] }) {
   return (
     <div className="flex flex-col gap-2.5">
       <div className="flex items-center gap-2">
@@ -94,6 +95,7 @@ function IntegrationDetail({ def }: { def: IntegrationDef }) {
     focusForm.current = fn
   }, [])
   const setWhatsRealOpen = useShellStore((s) => s.setWhatsRealOpen)
+  const { running: testing } = useConnectionTest(def.id)
   const vault = useSecretsStore((s) => s.secrets[def.id])
   const fields = def.fields ?? []
   const hasFields = fields.length > 0
@@ -164,7 +166,6 @@ function IntegrationDetail({ def }: { def: IntegrationDef }) {
   useRegisterCommands(`integrations.detail.${def.id}`, commands)
 
   const menu: MenuItem[] = [
-    ...(connectedLike ? [{ id: 'test', label: 'Test connection', icon: Activity, onSelect: () => void diagnoseConnection(def.id) }] : []),
     ...(status === 'connected' && !hasFields ? [{ id: 'reconnect', label: 'Reconnect', icon: RotateCw, onSelect: () => void connectNow() }] : []),
     ...(storedOptional.length ? [{ id: 'forget', label: `Forget ${storedOptional[0].label.toLowerCase()}`, icon: KeyRound, onSelect: doForget }] : []),
     { id: 'link', label: 'Copy link', icon: Link2, onSelect: () => copyLink(`/integrations/${def.id}`) },
@@ -204,14 +205,28 @@ function IntegrationDetail({ def }: { def: IntegrationDef }) {
         <StageHeader
           leading={<IntegrationMark def={def} size={24} />}
           title={def.name}
-          status={<StatusChip status={status} word={word} />}
+          status={
+            <span className="flex items-center gap-1.5">
+              <StatusChip status={status} word={word} />
+              {!phone && <ModeBadge support={def.support} />}
+            </span>
+          }
           actions={
             <>
-              {primary}
+              {/* Phones: Connect / Reconnect sit in the body and the rest become icons; the title keeps the room. */}
+              {!phone && primary}
+              {connectedLike &&
+                (phone ? (
+                  <IconButton icon={Activity} label="Test connection" size="sm" loading={testing} onClick={() => void diagnoseConnection(def.id)} disabled={status === 'connecting'} />
+                ) : (
+                  <Button size="sm" variant="secondary" leadingIcon={Activity} loading={testing} disabled={status === 'connecting'} onClick={() => void diagnoseConnection(def.id)}>
+                    Test connection
+                  </Button>
+                ))}
               <TurnIntoMenu
                 entity={ref}
                 kinds={['task', 'agent', 'note']}
-                trigger={phone ? <IconButton icon={CornerUpRight} label="Turn into…" size="sm" /> : undefined}
+                trigger={phone || connectedLike ? <IconButton icon={CornerUpRight} label="Turn into…" size="sm" /> : undefined}
               />
             </>
           }
@@ -221,7 +236,7 @@ function IntegrationDetail({ def }: { def: IntegrationDef }) {
     >
       <div className="flex flex-col gap-10 pb-12">
         <div className="flex flex-col gap-5">
-          <Intro kicker={categoryLabel(def.category)} badge={<ModeBadge support={def.support} />} description={def.description} facts={facts} />
+          <Intro kicker={categoryLabel(def.category)} badge={phone ? <ModeBadge support={def.support} /> : null} description={def.description} facts={facts} />
           {status === 'error' && (
             <div className="flex flex-wrap items-start gap-3 rounded-md border border-fail/40 bg-fail-tint/40 px-4 py-3">
               <span className="pt-[3px]">
@@ -231,9 +246,12 @@ function IntegrationDetail({ def }: { def: IntegrationDef }) {
                 <p className="type-body-sm font-medium text-fail-ink">{def.name} reported an error</p>
                 <p className="type-body-sm text-pretty text-ink-2">{connection?.error ?? 'The last check failed.'}</p>
               </div>
-              <Button size="sm" variant="secondary" leadingIcon={RotateCw} loading={connecting} onClick={() => void connectNow()}>
-                Reconnect
-              </Button>
+              {/* Desktop: Reconnect is the header's primary action; phones keep it here. */}
+              {phone && (
+                <Button size="sm" variant="secondary" leadingIcon={RotateCw} loading={connecting} onClick={() => void connectNow()}>
+                  Reconnect
+                </Button>
+              )}
             </div>
           )}
           <WhatsReal simulated={def.support === 'simulated'}>
@@ -251,7 +269,7 @@ function IntegrationDetail({ def }: { def: IntegrationDef }) {
                 {hasFields
                   ? fields.map((f) =>
                       f.secret ? (
-                        <KeyRow key={f.key} label={f.label}>
+                        <KeyRow key={f.key} label={f.key === 'token' ? 'Token' : f.label}>
                           {vault?.[f.key]?.trim() ? `Stored in this browser · ${maskSecret(vault[f.key])}` : <span className="text-ink-3">Not set</span>}
                         </KeyRow>
                       ) : (
@@ -303,7 +321,7 @@ function IntegrationDetail({ def }: { def: IntegrationDef }) {
                 </div>
               )
             )}
-            <TestConnection def={def} enabled={connectedLike && status !== 'connecting'} className="border-t border-line pt-5" />
+            <TestConnection def={def} enabled={connectedLike && status !== 'connecting'} showButton={false} className="border-t border-line pt-5" />
             {connectedLike && (
               <div className="flex flex-wrap items-center gap-2 border-t border-line pt-5">
                 <Button size="sm" variant="danger" leadingIcon={Unplug} onClick={() => setDisconnectOpen(true)}>

@@ -1,11 +1,11 @@
-import { useMemo, useRef, useState, type RefObject } from 'react'
+import { memo, useMemo, useRef, useState, type RefObject } from 'react'
 import { useNavigate } from 'react-router'
 import { ArrowUpRight, BookPlus, Check, Download, Eye, ListChecks, MessagesSquare, PenLine, RefreshCw } from 'lucide-react'
 import { DerivedRow, HoldButton, LandedCard, useDerived, useScopedKey } from '@/app/components'
 import { attachRun } from '@/app/shell/store'
 import { useRow } from '@/core/db'
 import { entityRoute, saveReportToKnowledge, updateReport } from '@/core/services'
-import { isRunActive, type ID, type Investigation, type Run, type Source } from '@/core/types'
+import { isRunActive, type ID, type Investigation, type Source } from '@/core/types'
 import { cn } from '@/lib/cn'
 import { Button, EntityChip, Markdown, ProvenanceLine, SimBadge, Textarea, Tooltip, confirm, toast, type Citation } from '@/ui'
 import { discussInChat, exportReport } from './actions'
@@ -37,13 +37,15 @@ export interface ReportViewProps {
   inv: Investigation
   sources: readonly Source[]
   /** The investigation's latest run. */
-  run?: Run
+  runId?: ID
+  /** A run is working on the investigation (editing waits for it). */
+  busy: boolean
   onSelectSource: (id: ID) => void
   /** S / H fire while focus is inside this element. */
   hotkeyScope: RefObject<HTMLElement | null>
 }
 
-export function ReportView({ inv, sources, run, onSelectSource, hotkeyScope }: ReportViewProps) {
+export const ReportView = memo(function ReportView({ inv, sources, runId, busy, onSelectSource, hotkeyScope }: ReportViewProps) {
   const navigate = useNavigate()
   const [editing, setEditing] = useState(false)
   const [tasksOpen, setTasksOpen] = useState(false)
@@ -62,7 +64,6 @@ export function ReportView({ inv, sources, run, onSelectSource, hotkeyScope }: R
   )
   const simulatedCited = useMemo(() => citedSimulatedCount(inv, sources), [inv, sources])
   const questions = useMemo(() => openQuestions(report).map((q) => ({ id: q.id, text: q.text, section: q.section })), [report])
-  const busy = !!run && isRunActive(run.status)
 
   return (
     <article aria-label="Report" className="flex flex-col">
@@ -84,7 +85,7 @@ export function ReportView({ inv, sources, run, onSelectSource, hotkeyScope }: R
       )}
 
       <div className="mt-8 flex flex-col gap-3 border-t border-line pt-3">
-        <ReportColophon run={run} simulatedCited={simulatedCited} />
+        <ReportColophon runId={runId} simulatedCited={simulatedCited} />
         {!editing && (
           <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Report actions">
             <SaveReportButton inv={inv} hotkeyScope={hotkeyScope} />
@@ -130,11 +131,12 @@ export function ReportView({ inv, sources, run, onSelectSource, hotkeyScope }: R
       <MakeTasksDialog open={tasksOpen} onOpenChange={setTasksOpen} inv={inv} candidates={questions} />
     </article>
   )
-}
+})
 
 // ------------------------------------------------------------------------------------------------ colophon
 
-function ReportColophon({ run, simulatedCited }: { run?: Run; simulatedCited: number }) {
+function ReportColophon({ runId, simulatedCited }: { runId?: ID; simulatedCited: number }) {
+  const run = useRow('runs', runId)
   if (run && !isRunActive(run.status)) {
     return <ProvenanceLine run={run} onViewRun={() => attachRun(run.id, 'research')} />
   }

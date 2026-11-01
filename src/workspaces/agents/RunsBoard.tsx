@@ -157,6 +157,7 @@ function FilterMenu<T extends string>({
 
 function RunFilters() {
   const [filters, set] = useBoardFilters()
+  const { formFactor } = useShellLayout()
   const agentsTable = useDB((s: Tables) => s.agents)
   const agents = useMemo(
     () => Object.values(agentsTable).filter((a) => a.status !== 'archived').sort((a, b) => a.name.localeCompare(b.name)),
@@ -235,11 +236,11 @@ function RunFilters() {
         size="sm"
         value={q}
         onValueChange={setQ}
-        placeholder="Title or RUN-…"
+        placeholder={formFactor === 'phone' ? 'Search' : 'Title or RUN-…'}
         aria-label="Search runs by title or handle"
         kbd="/"
         data-search-input
-        wrapperClassName="w-32 shrink-0 sm:w-44 lg:w-52"
+        wrapperClassName="w-28 shrink-0 sm:w-44 lg:w-52"
       />
     </div>
   )
@@ -644,7 +645,7 @@ function PendingApprovals({ runId }: { runId: ID }) {
   const pending = approvals.filter((a) => a.status === 'pending')
   if (!pending.length) return null
   return (
-    <div className="flex flex-col gap-2 pt-1 pb-2.5 pl-9 pr-2 md:pr-3">
+    <div className="flex flex-col gap-2 pt-1 pr-2 pb-2.5 pl-2 sm:pl-9 md:pr-3">
       {pending.map((a) => (
         <div key={a.id} data-approval-card className="max-w-[720px]">
           <ApprovalCardConnected approvalId={a.id} variant="compact" showRun={false} />

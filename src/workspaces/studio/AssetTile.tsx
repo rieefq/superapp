@@ -217,7 +217,7 @@ function Tile({ asset, index, tabbable, onFocusIndex, onMove, onInspect, onKeyDo
           active={!!asset.favorite}
           onClick={() => toggleFavorite(asset.id)}
           tabIndex={tabbable ? 0 : -1}
-          className={cn(asset.favorite && '[&_svg]:fill-current')}
+          className={cn(asset.favorite && '[&_svg]:fill-current', 'pointer-coarse:hidden')}
         />
         <Menu
           items={menu}

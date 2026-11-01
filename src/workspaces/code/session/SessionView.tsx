@@ -21,7 +21,7 @@ import { ESTIMATE_TOOLTIP } from '@/app/components'
 import { archiveWithUndo, copyDiff, deleteWithConfirm, exportPatch, restoreWithToast } from '../actions'
 import { changeStats, checksSummary } from '../logic'
 import { BranchLine, RepoMark, RepoModeBadge, SessionStatusChip, useLatestRunStatus } from '../parts'
-import { ActivityPane, PaneHeader, SimTerminalNote } from './Activity'
+import { ActivityPane } from './Activity'
 import { ChangesPane } from './Changes'
 import { ChecksPane } from './Checks'
 import { FilesPane } from './Files'
@@ -225,7 +225,6 @@ function SessionStage({ session }: { session: CodeSession }) {
                   className="gap-5 border-b-0"
                 />
                 <span className="flex-1" />
-                {reviewTab === 'checks' && <span className="hidden pb-2 xl:block"><SimTerminalNote /></span>}
               </div>
               <ReviewBody session={session} tab={reviewTab} file={file} path={path} setParam={setParam} onReviewFile={reviewFile} onAsk={toActivity} active />
             </section>
@@ -233,12 +232,7 @@ function SessionStage({ session }: { session: CodeSession }) {
         ) : tab === 'activity' ? (
           <ActivityPane session={session} onReviewFile={reviewFile} header={false} />
         ) : (
-          <div className="flex min-h-0 flex-1 flex-col">
-            {tab === 'checks' && (
-              <PaneHeader title="Checks">
-                <SimTerminalNote />
-              </PaneHeader>
-            )}
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <ReviewBody session={session} tab={tab} file={file} path={path} setParam={setParam} onReviewFile={reviewFile} onAsk={toActivity} active />
           </div>
         )}

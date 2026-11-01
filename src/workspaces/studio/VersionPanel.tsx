@@ -4,7 +4,7 @@ import { attachRun } from '@/app/shell/store'
 import { announce } from '@/app/shell/Announcer'
 import { useRow } from '@/core/db'
 import { useRun } from '@/core/runs'
-import { editAsset, stopGeneration, versionAt, versionParams } from '@/core/services/studio'
+import { editAsset, stopGeneration, versionAt, versionParams, type StudioVersion } from '@/core/services/studio'
 import type { Asset } from '@/core/types'
 import { cn } from '@/lib/cn'
 import { timeAgo } from '@/lib/format'
@@ -31,16 +31,22 @@ export function VersionDetails({ asset, index }: { asset: Asset; index: number }
     <section aria-label={`Version ${index + 1}`} className="flex min-w-0 flex-col gap-2">
       <div className="type-meta flex flex-wrap items-center gap-x-2 gap-y-1 text-ink-3">
         <span className="text-ink-2">v{index + 1}</span>
-        {index === asset.currentVersion && <span>Current</span>}
-        {v.note && (
+        {index === asset.currentVersion && (
           <>
             <span aria-hidden>·</span>
-            <span className="min-w-0 truncate">{v.note}</span>
+            <span>Current</span>
           </>
         )}
         <span aria-hidden>·</span>
         <span>{timeAgo(v.createdAt)}</span>
+        {(v as StudioVersion).editedAt && (
+          <>
+            <span aria-hidden>·</span>
+            <span>edited by you {timeAgo((v as StudioVersion).editedAt!)}</span>
+          </>
+        )}
       </div>
+      {v.note && <p className="type-body-sm max-w-[80ch] text-ink">{v.note}</p>}
       <p className={cn('type-body-sm max-w-[80ch] text-ink-2', !open && long && 'line-clamp-2')}>
         <span className="text-ink-3">Prompt · </span>
         {v.prompt}
@@ -170,7 +176,8 @@ export function IterateBar({ asset }: { asset: Asset }) {
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder={generating ? `Generating v${asset.versions.length + 1}… type the next change` : info.iteratePlaceholder}
+          placeholder={generating ? `Generating v${asset.versions.length + 1}… type the next change` : asset.versions.length ? info.iteratePlaceholder : 'No version to iterate on yet'}
+          disabled={!generating && !asset.versions.length}
           aria-label="Instruction for a new version"
           className="type-body block max-h-[160px] min-h-10 min-w-0 flex-1 resize-none overflow-y-auto bg-transparent py-2.5 text-ink outline-none placeholder:text-ink-3 pointer-coarse:text-[16px]"
         />
@@ -194,6 +201,8 @@ export function IterateBar({ asset }: { asset: Asset }) {
               View run
             </button>
           </>
+        ) : !asset.versions.length ? (
+          <span>Iterate starts from a version — retry the first generation above.</span>
         ) : (
           <>
             <span>

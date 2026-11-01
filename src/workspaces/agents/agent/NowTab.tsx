@@ -112,7 +112,7 @@ function Numbers({ agent }: { agent: Agent }) {
           </div>
         ))}
       </dl>
-      <div className="ml-auto flex w-[180px] max-w-full flex-col gap-1">
+      <div className="flex w-[180px] max-w-full flex-col gap-1 sm:ml-auto">
         <span className="type-label text-ink-3">Runs per day</span>
         <Sparkline values={daily} variant="bars" height={28} label={`${agent.name}: runs per day, last 30 days`} format={(v) => count(v, 'run')} />
       </div>

@@ -1,4 +1,4 @@
-import { Archive, History, ImagePlus, ListChecks, MessageSquarePlus, MessagesSquare, NotebookPen, Orbit, Search, SquareTerminal, Telescope } from 'lucide-react'
+import { Archive, History, ImagePlus, ListChecks, MessagesSquare, NotebookPen, Orbit, Search, SquareTerminal, Telescope } from 'lucide-react'
 import type { Command, CommandContext, SlashCommand, WorkspaceManifest } from '@/app/types'
 import { db } from '@/core/db'
 
@@ -50,17 +50,6 @@ export const manifest: WorkspaceManifest = {
   newAction: { label: 'New conversation', run: newConversation },
   composer: { placeholder: 'Ask anything — @ to add context, / for actions', slashCommands: CHAT_SLASH_COMMANDS },
   commands: (ctx): Command[] => [
-    {
-      id: 'chat.new',
-      title: 'New conversation',
-      subtitle: 'An empty thread in the current project',
-      icon: MessageSquarePlus,
-      group: 'Chat',
-      keywords: ['chat', 'ask', 'thread', 'new', 'conversation'],
-      shortcut: 'mod+shift+o',
-      priority: 60,
-      run: newConversation,
-    },
     {
       id: 'chat.resume',
       title: 'Continue the latest conversation',

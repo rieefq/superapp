@@ -114,23 +114,28 @@ test.describe('Projects', () => {
     await open(page, '/projects/prj_atlas')
     await page.getByRole('button', { name: 'Work in this project' }).click()
     await expect(page.getByRole('button', { name: 'In scope' })).toHaveAttribute('aria-pressed', 'true')
+    // The top bar's project crumb follows the scope.
+    await expect(page.getByRole('banner')).toContainText('Atlas Portal v2')
 
-    // Home filters to the scope (scope is not in the URL; it persists).
-    await open(page, '/')
+    // Home filters to the scope (client-side: scope lives in the context store, not the URL).
+    const rail = page.getByRole('navigation', { name: 'Workspaces' })
+    await rail.getByRole('link', { name: /^Home/ }).click()
     await expect(page.getByRole('status').filter({ hasText: 'Filtered to' })).toContainText('Atlas Portal v2')
 
     // So does My tasks, with a local Show all.
-    await open(page, '/projects/my-tasks')
+    await rail.getByRole('link', { name: /^Projects/ }).click()
+    await page.getByRole('link', { name: /^My tasks/ }).first().click()
+    await expect(page).toHaveURL(/\/projects\/my-tasks/)
     await expect(page.getByText('Filtered to')).toBeVisible()
     const scopedRows = await page.locator('[data-list-row]').count()
     await page.getByRole('button', { name: 'Show all' }).click()
     await expect.poll(() => page.locator('[data-list-row]').count()).toBeGreaterThan(scopedRows)
 
-    // The index marks the project in scope; "Show all work" from its menu clears the scope.
-    await open(page, '/projects')
+    // The index marks the project in scope; "Show all work" in its menu clears the scope.
+    await rail.getByRole('link', { name: /^Projects/ }).click()
     const atlas = page.locator('[data-project-card]', { hasText: 'Atlas Portal v2' })
     await expect(atlas).toContainText('In scope')
-    await atlas.getByRole('button', { name: /More actions for Atlas Portal v2/ }).click()
+    await atlas.getByRole('button', { name: 'More actions for Atlas Portal v2' }).click()
     await page.getByRole('menuitem', { name: 'Show all work' }).click()
     await expect(atlas).not.toContainText('In scope')
   })

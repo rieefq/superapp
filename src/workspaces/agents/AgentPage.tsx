@@ -11,7 +11,7 @@ import { useSettings } from '@/core/settings'
 import type { Agent, Autonomy } from '@/core/types'
 import { cn } from '@/lib/cn'
 import { shortCode } from '@/lib/id'
-import { AgentMark, Button, EmptyState, SegmentedControl, Switch, TickMeter, Tooltip, formatCost, toast, type MenuItem } from '@/ui'
+import { AgentMark, Button, EmptyState, IconButton, SegmentedControl, Switch, TickMeter, Tooltip, formatCost, toast, type MenuItem } from '@/ui'
 import { abilityRows, decisionWord } from './abilities'
 import { agentMenuItems, pauseWithFeedback, restoreWithFeedback, resumeWithFeedback } from './agentActions'
 import { AgentsList } from './AgentsList'
@@ -66,6 +66,7 @@ export default function AgentView() {
 
 function AgentScreen({ agent, tab, runParam }: { agent: Agent; tab: AgentTab; runParam: string | null }) {
   const navigate = useNavigate()
+  const phone = useShellLayout().formFactor === 'phone'
   const status = useAgentLiveStatus(agent.id)
   const bodyRef = useRef<HTMLDivElement>(null)
   const base = `/agents/${encodeURIComponent(agent.id)}`
@@ -113,7 +114,7 @@ function AgentScreen({ agent, tab, runParam }: { agent: Agent; tab: AgentTab; ru
         <StageHeader
           title={agent.name}
           leading={<AgentMark seed={agent.sigil} hue={agent.hue} size={24} live={status === 'working'} paused={agent.status === 'paused'} label={agent.name} />}
-          status={agent.status === 'archived' ? <span className="type-caption rounded-full bg-hover px-2 py-0.5 text-ink-2">Archived</span> : <AgentStatusChip status={status} />}
+          status={agent.status === 'archived' ? <span className="type-caption rounded-full bg-hover px-2 py-0.5 text-ink-2">Archived</span> : <AgentStatusChip status={status} compact={phone} />}
           backTo="/agents/roster"
           tabs={{
             'aria-label': `${agent.name} views`,
@@ -130,9 +131,13 @@ function AgentScreen({ agent, tab, runParam }: { agent: Agent; tab: AgentTab; ru
             <>
               <Tooltip content={unavailable ? `${agent.name} is ${agent.status}. ${agent.status === 'paused' ? 'Resume' : 'Restore'} it to run it.` : `Give ${agent.name} an instruction`}>
                 <span className="inline-flex">
-                  <Button size="sm" variant="primary" leadingIcon={Play} disabled={unavailable} onClick={() => openGiveWork(agent.id, 'instruction')}>
-                    Run now
-                  </Button>
+                  {phone ? (
+                    <IconButton icon={Play} label="Run now" size="sm" variant="primary" disabled={unavailable} onClick={() => openGiveWork(agent.id, 'instruction')} tooltip={false} />
+                  ) : (
+                    <Button size="sm" variant="primary" leadingIcon={Play} disabled={unavailable} onClick={() => openGiveWork(agent.id, 'instruction')}>
+                      Run now
+                    </Button>
+                  )}
                 </span>
               </Tooltip>
             </>
@@ -296,15 +301,15 @@ function BudgetMeter({ agent }: { agent: Agent }) {
     )
   }
   return (
-    <button type="button" onClick={configure} className="flex items-center gap-2 rounded-sm text-left" aria-label={`Monthly budget: ${formatCost(spend.countedUsd)} of ${formatCost(budget)} counted this month. Configure`}>
+    <button type="button" onClick={configure} className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-sm text-left" aria-label={`Monthly budget: ${formatCost(spend.countedUsd)} of ${formatCost(budget)} counted this month. Configure`}>
       <span className="type-label text-ink-3">Budget</span>
       <TickMeter value={spend.countedUsd} max={budget} width={88} label="Monthly budget" valueText={`${formatCost(spend.countedUsd)} of ${formatCost(budget)}`} />
-      <span className="type-meta text-ink-2 tabular">
+      <span className="type-meta whitespace-nowrap text-ink-2 tabular">
         {formatCost(spend.countedUsd)} of {formatCost(budget)}
       </span>
       {spend.estimatedUsd > 0 && !spend.countsEstimates && (
         <Tooltip content="Simulated runs are estimated at reference pricing; no money was spent, so they don’t count toward the budget.">
-          <span className="type-meta text-ink-3 tabular">· est. {formatCost(spend.estimatedUsd)} sim</span>
+          <span className="type-meta whitespace-nowrap text-ink-3 tabular">· est. {formatCost(spend.estimatedUsd)} sim</span>
         </Tooltip>
       )}
     </button>

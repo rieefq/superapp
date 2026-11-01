@@ -47,7 +47,7 @@ export function RepoBrowser({ repo, path, onPath, changed, actions, notice }: Re
   const showTree = wide || !path
   const showViewer = wide || !!path
   return (
-    <div ref={rootRef} className="flex min-h-0 flex-1">
+    <div ref={rootRef} className="flex h-full min-h-0 min-w-0 flex-1">
       {showTree && <FileTreePane repo={repo} path={path} onPath={onPath} changed={changed} className={wide ? 'w-[256px] shrink-0 border-r border-line' : 'flex-1'} />}
       {showViewer && (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -133,7 +133,7 @@ function FileViewer({
     <div className="flex min-h-0 flex-1 flex-col">
       <header className="flex min-h-11 shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-line py-1.5 pr-2 pl-3">
         {onBack && <Button size="xs" variant="ghost" leadingIcon={ArrowLeft} onClick={onBack} className="-ml-1">Files</Button>}
-        <span className="flex min-w-0 flex-1 items-center gap-2">
+        <span className="flex min-w-0 grow basis-[200px] items-center gap-2">
           <FileIcon name={base} className="size-3.5 shrink-0" />
           <span className="min-w-0 truncate font-mono text-xs" title={path}>
             <span className="text-ink-3">{dir}</span>

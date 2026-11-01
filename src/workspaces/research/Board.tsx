@@ -1,5 +1,6 @@
 import { memo, useMemo } from 'react'
-import type { ID, Investigation, Run, Source } from '@/core/types'
+import { useRow } from '@/core/db'
+import type { ID, Investigation, Source } from '@/core/types'
 import { cn } from '@/lib/cn'
 import { Skeleton, StepStatusGlyph } from '@/ui'
 import { FindingItem } from './FindingsView'
@@ -15,7 +16,7 @@ import { SourceList } from './SourcesView'
 
 export interface BoardProps {
   inv: Investigation
-  run?: Run
+  runId?: ID
   sources: readonly Source[]
   selectedId: ID | null
   readingIds: ReadonlySet<ID>
@@ -23,7 +24,8 @@ export interface BoardProps {
   columns: boolean
 }
 
-export function Board({ inv, run, sources, selectedId, readingIds, onSelectSource, columns }: BoardProps) {
+export function Board({ inv, runId, sources, selectedId, readingIds, onSelectSource, columns }: BoardProps) {
+  const run = useRow('runs', runId)
   const stats = useMemo(() => sourceStats(sources), [sources])
   const web = useMemo(() => sources.filter((s) => sourceOrigin(s) === 'web'), [sources])
   const plan = planChecklist(inv, run, {

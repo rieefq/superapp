@@ -4,6 +4,9 @@ import {
   ArrowLeft, Copy, Download, FolderInput, Hash, Layers, Link2, Presentation, RotateCcw, Shuffle, Square, Star, Trash2,
 } from 'lucide-react'
 import { HoldButton, SaveToKnowledgeButton, TurnIntoMenu } from '@/app/components'
+import { switchScope } from '@/app/shell/scope'
+import { useScope } from '@/core/context'
+import { useConnections } from '@/core/services/links'
 import { useRegisterCommands } from '@/app/commands/registry'
 import { announce } from '@/app/shell/Announcer'
 import { Stage, StageHeader, useInspectEntity } from '@/app/templates'
@@ -17,7 +20,7 @@ import type { Asset, EntityRef } from '@/core/types'
 import { cn } from '@/lib/cn'
 import { shortCode } from '@/lib/id'
 import {
-  Button, EmptyState, ErrorState, IconButton, KindTile, RunStatusBadge, StepTape, isTypingTarget, toast, type MenuItem,
+  Button, EmptyState, EntityChip, ErrorState, IconButton, KindTile, RunStatusBadge, StepTape, isTypingTarget, toast, type MenuItem,
 } from '@/ui'
 import { confirmDeleteAsset, downloadItems, exportFormats, MoveToBoardDialog } from './actions'
 import { Filmstrip } from './Filmstrip'
@@ -75,6 +78,9 @@ function AssetPage({ asset }: { asset: Asset }) {
   const ref = useMemo<EntityRef>(() => ({ kind: 'asset', id: asset.id }), [asset.id])
   const info = KINDS[asset.kind]
   const board = useDB((s: Tables) => (asset.boardId ? s.boards[asset.boardId] : undefined))
+  const project = useDB((s: Tables) => (asset.projectId ? s.projects[asset.projectId] : undefined))
+  const scope = useScope()
+  const origins = useConnections(ref).filter((c) => c.link.rel === 'derived_from' && c.direction === 'outgoing')
   const run = useRun(asset.status === 'generating' ? asset.runId : undefined)
   const singleKeys = useSettings((s) => s.appearance.singleKeyShortcuts)
   const [comparing, setComparing] = useState(false)
@@ -194,16 +200,16 @@ function AssetPage({ asset }: { asset: Asset }) {
     <>
       {asset.kind === 'presentation' && slides.length > 0 && (
         <Button size="sm" variant="primary" leadingIcon={Presentation} onClick={() => present(slide)} aria-label="Present (full screen)">
-          Present
+          <span className="max-sm:sr-only">Present</span>
         </Button>
       )}
       {asset.status === 'failed' ? (
-        <Button size="sm" variant="secondary" leadingIcon={RotateCcw} onClick={() => retryGeneration(asset.id)}>
-          Retry
+        <Button size="sm" variant="secondary" leadingIcon={RotateCcw} onClick={() => retryGeneration(asset.id)} aria-label="Retry">
+          <span className="max-sm:sr-only">Retry</span>
         </Button>
       ) : (
-        <Button size="sm" variant={asset.kind === 'presentation' ? 'ghost' : 'secondary'} leadingIcon={Shuffle} onClick={variation} disabled={generating || !count}>
-          Variation
+        <Button size="sm" variant={asset.kind === 'presentation' ? 'ghost' : 'secondary'} leadingIcon={Shuffle} onClick={variation} disabled={generating || !count} aria-label="Variation">
+          <span className="max-sm:sr-only">Variation</span>
         </Button>
       )}
       <IconButton
@@ -255,21 +261,53 @@ function AssetPage({ asset }: { asset: Asset }) {
           <HoldButton entity={ref} hotkeyScope={actionsRef} />
           {textual && count > 0 && <SaveToKnowledgeButton entity={ref} hotkeyScope={actionsRef} />}
           <TurnIntoMenu entity={ref} hotkeyScope={actionsRef} />
-          <span className="flex-1" />
-          {board ? (
-            <button
-              type="button"
-              onClick={() => navigate(backTo)}
-              className="type-caption rounded-xs text-ink-3 underline decoration-line-input underline-offset-2 hover:text-ink hover:decoration-ink"
-            >
-              On the board “{board.name}”
-            </button>
-          ) : (
-            <button type="button" onClick={() => setMoving(true)} className="type-caption rounded-xs text-ink-3 underline decoration-line-input underline-offset-2 hover:text-ink">
-              Not on a board · Move to board…
-            </button>
-          )}
         </div>
+        <dl className="type-caption -mt-3 flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2 text-ink-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <dt>Board</dt>
+            <dd className="min-w-0">
+              {board ? (
+                <button
+                  type="button"
+                  onClick={() => navigate(backTo)}
+                  className="rounded-xs text-ink-2 underline decoration-line-input underline-offset-2 hover:text-ink hover:decoration-ink"
+                >
+                  {board.name}
+                </button>
+              ) : (
+                <button type="button" onClick={() => setMoving(true)} className="rounded-xs text-ink-2 underline decoration-line-input underline-offset-2 hover:text-ink">
+                  None · Move to board…
+                </button>
+              )}
+            </dd>
+          </div>
+          {project && (
+            <div className="flex min-w-0 items-center gap-2">
+              <dt>Project</dt>
+              <dd className="flex min-w-0 items-center gap-1.5">
+                <EntityChip entity={{ kind: 'project', id: project.id }} size="sm" />
+                {scope && scope !== project.id && (
+                  <>
+                    <span>From {project.name} ·</span>
+                    <button type="button" onClick={() => switchScope(project.id)} className="rounded-xs text-ink-2 underline decoration-line-input underline-offset-2 hover:text-ink">
+                      Switch project
+                    </button>
+                  </>
+                )}
+              </dd>
+            </div>
+          )}
+          {origins.length > 0 && (
+            <div className="flex min-w-0 items-center gap-2">
+              <dt>Came from</dt>
+              <dd className="flex min-w-0 flex-wrap items-center gap-1.5">
+                {origins.slice(0, 3).map((c) => (
+                  <EntityChip key={`${c.other.kind}:${c.other.id}`} entity={c.other} size="sm" />
+                ))}
+              </dd>
+            </div>
+          )}
+        </dl>
         {asset.kind === 'video' && !comparing && count > 0 && <ShotList asset={asset} index={index} />}
         {count === 0 && !generating && asset.status !== 'failed' && (
           <p className="type-body-sm text-ink-3">{info.label} with no versions yet.</p>

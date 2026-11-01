@@ -3,7 +3,8 @@ import { Pause, Play, Square } from 'lucide-react'
 import { attachRun } from '@/app/shell/store'
 import { runEngine } from '@/core/runs'
 import { useApprovalsForRun } from '@/core/services'
-import type { Investigation, Run, Source } from '@/core/types'
+import { useRow } from '@/core/db'
+import type { ID, Investigation, Run, Source } from '@/core/types'
 import { cn } from '@/lib/cn'
 import {
   ApprovalCardConnected, Button, RunStatusGlyph, SimBadge, StepStatusGlyph, StepTape, formatClock, formatTok, runCurrentLine, useRunElapsed,
@@ -14,7 +15,13 @@ import { researchPhases, sourceOrigin, type Phase } from './logic'
  * The frontier strip (§6.5 Running): what Scout is doing now, the Step Tape, and the phases with
  * their counts — `Searching 3/4 → Reading 7/12 → Synthesizing` — plus Pause/Resume, Stop and View run.
  */
-export const Frontier = memo(function Frontier({ inv, run, sources, className }: { inv: Investigation; run: Run; sources: readonly Source[]; className?: string }) {
+export const Frontier = memo(function Frontier({ inv, runId, sources, className }: { inv: Investigation; runId: ID; sources: readonly Source[]; className?: string }) {
+  const run = useRow('runs', runId)
+  if (!run) return null
+  return <FrontierStrip inv={inv} run={run} sources={sources} className={className} />
+})
+
+function FrontierStrip({ inv, run, sources, className }: { inv: Investigation; run: Run; sources: readonly Source[]; className?: string }) {
   const web = useMemo(() => {
     const w = sources.filter((s) => sourceOrigin(s) === 'web')
     return { found: w.length, read: w.filter((s) => s.status === 'read' || s.status === 'cited' || (s.status === 'discarded' && !!s.content)).length }
@@ -82,7 +89,7 @@ export const Frontier = memo(function Frontier({ inv, run, sources, className }:
       </div>
     </section>
   )
-})
+}
 
 /** `Planning ✓ → Searching 3/4 → Reading → Synthesizing → Drafting`, the current phase in live ink. */
 function Phases({ phases }: { phases: readonly Phase[] }) {

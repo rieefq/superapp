@@ -25,8 +25,15 @@ const CHIP_TONE: Record<AgentLiveStatus, string> = {
   paused: 'bg-hover text-ink-2',
 }
 
-/** A capsule with the agent's status glyph and word (status chips are capsules, §4.8). */
-export function AgentStatusChip({ status, className }: { status: AgentLiveStatus; className?: string }) {
+/** A capsule with the agent's status glyph and word (status chips are capsules, §4.8); `compact` keeps the glyph only. */
+export function AgentStatusChip({ status, compact, className }: { status: AgentLiveStatus; compact?: boolean; className?: string }) {
+  if (compact) {
+    return (
+      <span role="img" aria-label={AGENT_STATUS_META[status].word} className={cn('inline-grid size-5 shrink-0 place-items-center rounded-full', CHIP_TONE[status], className)}>
+        <AgentStatusGlyph status={status} size={10} decorative />
+      </span>
+    )
+  }
   return (
     <span className={cn('type-caption inline-flex h-5 shrink-0 items-center gap-1.5 rounded-full pr-2 pl-1.5 font-medium', CHIP_TONE[status], className)}>
       <AgentStatusGlyph status={status} size={10} decorative />

@@ -197,6 +197,15 @@ export const FindingItem = memo(function FindingItem({ inv, finding: f, index, b
       </div>
       {!selecting && (
         <div className="flex shrink-0 items-start gap-0.5">
+          {!compact && (
+            <IconButton
+              icon={ListChecks}
+              label="Create a task from this finding"
+              size="sm"
+              onClick={() => taskFromFinding(inv, f)}
+              className="opacity-0 group-hover/finding:opacity-100 group-focus-within/finding:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
+            />
+          )}
           <IconButton
             icon={f.pinned ? PinOff : Pin}
             label={f.pinned ? 'Unpin this finding' : 'Pin this finding — it stays when the report is regenerated'}

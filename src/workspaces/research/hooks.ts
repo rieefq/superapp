@@ -1,10 +1,11 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router'
 import { setSelection, useShellStore } from '@/app/shell/store'
 import { useShellLayout } from '@/app/templates'
-import { useRow } from '@/core/db'
+import { useDB, useRow } from '@/core/db'
 import { useSettings } from '@/core/settings'
-import { isRunActive, type ID, type Investigation, type Run } from '@/core/types'
+import { isRunActive, type ID, type Investigation, type Run, type Source } from '@/core/types'
+import { readingSourceIds } from './logic'
 
 /** The investigation's latest run (live; re-renders only when that run changes). */
 export function useLatestRun(inv: Pick<Investigation, 'runIds'> | undefined): Run | undefined {
@@ -15,6 +16,26 @@ export function useLatestRun(inv: Pick<Investigation, 'runIds'> | undefined): Ru
 export function useActiveRun(inv: Pick<Investigation, 'runIds'> | undefined): Run | undefined {
   const run = useLatestRun(inv)
   return run && isRunActive(run.status) ? run : undefined
+}
+
+const NO_IDS: ReadonlySet<ID> = new Set()
+
+/**
+ * Sources being read right now (the running browse step's pages). Subscribes to that step only, so
+ * the many small updates of a running run don't re-render source lists.
+ */
+export function useReadingIds(runId: ID | undefined, sources: readonly Source[]): ReadonlySet<ID> {
+  const key = useDB((s) => {
+    const run = runId ? s.runs[runId] : undefined
+    if (!run || !isRunActive(run.status)) return ''
+    const step = run.steps.find((x) => x.status === 'running' && (x.tool === 'web.browse' || x.kind === 'browse'))
+    return step ? `${step.id}\n${step.input ?? ''}` : ''
+  })
+  return useMemo(() => {
+    if (!key) return NO_IDS
+    const input = key.slice(key.indexOf('\n') + 1)
+    return readingSourceIds({ steps: [{ id: 'reading', kind: 'browse', tool: 'web.browse', title: '', status: 'running', input }] }, sources)
+  }, [key, sources])
 }
 
 export const SOURCE_PARAM = 'source'

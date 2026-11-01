@@ -20,6 +20,9 @@ interface RunRow {
 }
 
 test.describe('Agents', () => {
+  // The first visit compiles the workspace on a cold dev server; runs are simulated at 8× speed.
+  test.describe.configure({ timeout: 120_000 })
+
   test('the run board bands every run; ?status=waiting shows only runs waiting on you', async ({ page }) => {
     await openAgents(page, '/agents')
     await expect(page.getByRole('heading', { name: 'All runs', level: 1 })).toBeVisible()
