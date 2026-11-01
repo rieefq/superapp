@@ -77,6 +77,8 @@ export interface RunStep {
   approvalId?: ID
   tokens?: number
   error?: string
+  /** Workflow node this step executed (workflow runs only), for live canvas highlighting. */
+  nodeId?: string
 }
 
 /** Persisted pointer into a simulator script so runs survive reloads. */

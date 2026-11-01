@@ -22,6 +22,8 @@ export interface StepPlan {
   output?: string
   refs?: EntityRef[]
   fileChanges?: FileChange[]
+  /** Workflow node executed by this step (workflow runs). */
+  nodeId?: string
   /** Simulated tokens consumed by this step (input+output split is estimated 70/30). */
   tokens?: number
   /**

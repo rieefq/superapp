@@ -113,3 +113,22 @@ export const BOARD = {
   social: 'brd_social', // "Social cutdowns"
   brand: 'brd_brand', // "Brand explorations"
 } as const
+
+/** Tasks referenced across seed parts (created by the content part). */
+export const TASK = {
+  ssoFix: 'tsk_sso_fix', // atlas — "Fix session expiry after SSO login" — assigned to Forge, in review (session ses_sso)
+  stripeMigration: 'tsk_stripe_migration', // atlas — "Migrate invoices to Stripe Billing" — Forge, in progress (ses_stripe)
+  bundleSize: 'tsk_bundle_size', // atlas — "Reduce dashboard bundle size" — done (ses_bundle)
+  flakyTest: 'tsk_flaky_test', // atlas — "Fix flaky checkout e2e test" — todo, last attempt failed (ses_flaky)
+  weeklyDigest: 'tsk_weekly_digest', // ops — "Send weekly project digest" — Herald, in progress (waiting approval)
+  competitorBrief: 'tsk_competitor_brief', // landscape — "Competitor brief for board deck" — Scout
+  heroVideo: 'tsk_hero_video', // lumen — "Storyboard the launch hero video" — Muse, in progress
+  triageRubric: 'tsk_triage_rubric', // ops — "Finalize triage rubric v2" — you, review
+} as const
+
+/**
+ * Source id convention: `src_<investigation-key>_<n>` (1-based), e.g. src_pricing_1 … src_pricing_8
+ * for INVESTIGATION.pricingTrends, src_portbase_1 … for INVESTIGATION.portbase, src_churn_n, src_einvoicing_n.
+ * Seeded in-flight run ids: run_seed_inv_pricing, run_seed_ses_stripe, run_seed_herald_digest,
+ * run_seed_sentinel_triage, run_seed_muse_storyboard. Pending approvals: apv_seed_npm, apv_seed_slack.
+ */
