@@ -1,7 +1,6 @@
 import { db, hydrate, startPersistence, writeAll } from '@/core/db'
 import { registerAllFactories } from '@/core/runs/factories'
 import { runEngine } from '@/core/runs'
-import { buildSeed } from '@/core/seed'
 import { recoverInterruptedMessages } from '@/core/ai/chat'
 
 let booted = false
@@ -17,11 +16,7 @@ export async function boot(): Promise<void> {
   booted = true
   registerAllFactories()
   const loaded = hydrate()
-  if (!loaded) {
-    const seed = buildSeed(Date.now())
-    db.replaceAll(seed)
-    writeAll(seed)
-  }
+  if (!loaded) await seedDemoWorld()
   startPersistence()
   try {
     recoverInterruptedMessages()
@@ -35,11 +30,20 @@ export async function boot(): Promise<void> {
   }
 }
 
-/** Wipe the database and re-seed the demo world (settings and secrets are kept). */
-export function resetDemoData(): void {
+/**
+ * Build and store the first-run demo world. The seed module is large and only needed on first
+ * run or reset, so it is loaded on demand (kept out of the main bundle).
+ */
+async function seedDemoWorld(): Promise<void> {
+  const { buildSeed } = await import('@/core/seed')
   const seed = buildSeed(Date.now())
   db.replaceAll(seed)
   writeAll(seed)
+}
+
+/** Wipe the database and re-seed the demo world (settings and secrets are kept). */
+export async function resetDemoData(): Promise<void> {
+  await seedDemoWorld()
   try {
     runEngine.resumeInterrupted()
   } catch {
