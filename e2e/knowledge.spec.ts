@@ -37,6 +37,9 @@ async function uploadRunbook(page: Page) {
 }
 
 test.describe('Knowledge', () => {
+  // These are multi-step journeys (upload → search → chat → back); give them room on a busy machine.
+  test.describe.configure({ timeout: 150_000 })
+
   test('upload → search with highlight → open → hold → a new chat answer cites it', async ({ page }) => {
     await openK(page, '/knowledge')
     await expect(page.getByRole('heading', { name: 'All knowledge' })).toBeVisible()
@@ -76,7 +79,7 @@ test.describe('Knowledge', () => {
     const threadId = new URL(page.url()).pathname.split('/').pop()!
     type Msg = { threadId: string; role: string; status: string; content: string; citations?: { ref: { kind: string; id: string } }[] }
     await expect
-      .poll(async () => (await persisted<Msg>(page, 'messages')).find((m) => m.threadId === threadId && m.role === 'assistant')?.status, { timeout: 30_000 })
+      .poll(async () => (await persisted<Msg>(page, 'messages')).find((m) => m.threadId === threadId && m.role === 'assistant')?.status, { timeout: 90_000 })
       .toBe('complete')
     const answer = (await persisted<Msg>(page, 'messages')).find((m) => m.threadId === threadId && m.role === 'assistant')!
     expect(answer.citations?.map((c) => c.ref.id)).toContain(id)

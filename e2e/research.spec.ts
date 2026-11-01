@@ -59,9 +59,10 @@ test.describe('Research · live run', () => {
     // The report lands in place of the board, with the simulated-sources banner and citations.
     const report = page.getByRole('article', { name: 'Report' })
     await expect(report).toBeVisible({ timeout: 45_000 })
-    await expect(report.getByText(/^Cites \d+ simulated sources? — not fetched from the web\.$/)).toBeVisible()
-    await expect(report.getByRole('heading', { name: 'Executive summary' })).toBeVisible()
-    await expect(page.getByText('Ready for review').first()).toBeVisible()
+    // (Generous timeouts: the shared dev server can reload while other workspaces are being edited.)
+    await expect(report.getByText(/^Cites \d+ simulated sources? — not fetched from the web\.$/)).toBeVisible({ timeout: 30_000 })
+    await expect(report.getByRole('heading', { name: 'Executive summary' })).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByText('Ready for review').first()).toBeVisible({ timeout: 30_000 })
 
     // Save to Knowledge (idempotent): the button turns into a link to the saved item.
     await report.getByRole('button', { name: 'Save to Knowledge' }).click()
@@ -84,7 +85,7 @@ test.describe('Research · live run', () => {
     // The investigation lists what it led to.
     await page.goto(`/research/${id}`)
     await page.waitForSelector('[data-app-ready="true"]')
-    await expect(page.getByRole('region', { name: 'Led to' })).toContainText('Knowledge')
+    await expect(page.getByRole('region', { name: 'Led to' })).toContainText('Knowledge', { timeout: 30_000 })
   })
 })
 
@@ -92,7 +93,7 @@ test.describe('Research', () => {
   test('open the seeded complete investigation and click a citation', async ({ page }) => {
     await open(page, '/research/inv_tidewell')
     const report = page.getByRole('article', { name: 'Report' })
-    await expect(report.getByRole('heading', { name: 'Executive summary' })).toBeVisible()
+    await expect(report.getByRole('heading', { name: 'Executive summary' })).toBeVisible({ timeout: 30_000 })
     await expect(page.getByRole('heading', { level: 2, name: /Who does Tidewell sell to/ })).toBeVisible()
     await expect(report.getByText('Cites 8 simulated sources — not fetched from the web.')).toBeVisible()
 
@@ -113,7 +114,7 @@ test.describe('Research', () => {
   test('sources can be filtered, discarded and restored; findings can be pinned', async ({ page }) => {
     await open(page, '/research/inv_tidewell/sources')
     const list = page.getByRole('list', { name: 'Sources' })
-    await expect(list.getByRole('listitem')).toHaveCount(10)
+    await expect(list.getByRole('listitem')).toHaveCount(10, { timeout: 30_000 })
     await page.getByRole('button', { name: /^Discard “Analyst note: customer portals in freight”/ }).click()
     await expect(page.getByText(/^Discarded “Analyst note/)).toBeVisible()
     await expect(list.getByRole('listitem')).toHaveCount(9)
@@ -134,7 +135,7 @@ test.describe('Research', () => {
   test('export downloads Markdown with the simulated notice; delete asks first', async ({ page }) => {
     await open(page, '/research/inv_churn')
     const report = page.getByRole('article', { name: 'Report' })
-    await expect(report).toBeVisible()
+    await expect(report).toBeVisible({ timeout: 30_000 })
     const download = page.waitForEvent('download')
     await report.getByRole('button', { name: 'Export .md' }).click()
     const file = await download
