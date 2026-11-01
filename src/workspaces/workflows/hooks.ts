@@ -99,6 +99,21 @@ export function useScopedWorkflows(projectId: ID | null): Workflow[] {
 
 // ------------------------------------------------------------------------------------------------ editor model
 
+/** Draw a run on the canvas and keep it in the URL (`?run=`), so it survives a reload and can be shared. */
+export function useShowRun(): (runId: ID | null) => void {
+  const [, setParams] = useSearchParams()
+  return (runId) =>
+    setParams(
+      (p) => {
+        const next = new URLSearchParams(p)
+        if (runId) next.set('run', runId)
+        else next.delete('run')
+        return next
+      },
+      { replace: true },
+    )
+}
+
 /** The run drawn on the canvas: ?run=, else the one you just started, else the newest run still in flight. */
 export function useOverlayRun(wf: Workflow | undefined, runs: Run[]): Run | undefined {
   const [params] = useSearchParams()

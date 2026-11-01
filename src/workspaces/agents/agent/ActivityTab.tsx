@@ -8,6 +8,14 @@ import { useSettings } from '@/core/settings'
 
 type Filter = 'all' | 'config' | 'runs' | 'approvals'
 
+/** The feed prints the actor first: "Scout completed …", not "Scout Scout completed …" or "Morgan Lee Started …". */
+function sentenceAfterActor(summary: string, actor: string): string {
+  const rest = summary.startsWith(`${actor} `) ? summary.slice(actor.length + 1) : summary
+  const first = rest.split(' ')[0] ?? ''
+  // Lowercase a leading verb ("Started" → "started"); keep names and acronyms ("SSO", "Scout's").
+  return /^[A-Z][a-z]+$/.test(first) && /(ed|ing)$/.test(first) ? rest.charAt(0).toLowerCase() + rest.slice(1) : rest
+}
+
 /**
  * Activity (audit log): everything that happened to and by this agent — configuration changes, its
  * runs starting and ending, approvals it asked for and how you answered, what it wrote.
@@ -48,7 +56,7 @@ export default function ActivityTab({ agent }: { agent: Agent }) {
               <Avatar name={profile.name} hue={profile.hue} size="sm" />
             ) : undefined,
         },
-        summary: e.summary,
+        summary: sentenceAfterActor(e.summary, actorName(e.actor)),
         target: e.target.kind === 'agent' ? undefined : <EntityChip entity={e.target} size="sm" />,
       })),
     [events, limit, agent.id, agent.sigil, agent.hue, profile.name, profile.hue],

@@ -206,7 +206,7 @@ function SourcePanel({ entity }: LensProps) {
         <span className="type-label text-ink-3">{s.kind === 'knowledge' ? 'Passage' : s.simulated ? 'Content summary' : 'Your notes'}</span>
         {s.simulated ? (
           <SimFrame header="Simulated web result">
-            <p className="type-body-sm px-3 py-2.5 whitespace-pre-wrap text-pretty text-ink-2">{s.content ?? 'Not read yet — the summary appears once Scout reads this source.'}</p>
+            <p className="type-body-sm rounded-sm bg-canvas px-3 py-2.5 whitespace-pre-wrap text-pretty text-ink-2">{s.content ?? 'Not read yet — the summary appears once Scout reads this source.'}</p>
           </SimFrame>
         ) : (
           <p className={cn('type-body-sm rounded-sm border border-line bg-raised px-3 py-2.5 whitespace-pre-wrap text-pretty', s.content ? 'text-ink-2' : 'text-ink-3')}>

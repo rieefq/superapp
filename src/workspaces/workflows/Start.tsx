@@ -47,7 +47,7 @@ export function useStartWorkflow() {
   }
 }
 
-const EXAMPLE = 'Every Monday at 9, summarize last week’s project activity and post it to #product — ask me before posting.'
+const EXAMPLE = 'Every Monday at 9am, summarize last week’s project activity and ask me before posting it to #product.'
 
 export function DescribeIt({ projectId, autoFocus, compact, initial }: { projectId: ID | null; autoFocus?: boolean; compact?: boolean; initial?: string }) {
   const [text, setText] = useState(initial ?? '')

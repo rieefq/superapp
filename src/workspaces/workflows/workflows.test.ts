@@ -245,6 +245,8 @@ describe('service', () => {
 
 describe('automatic triggers', () => {
   it('fires on Atrium events (not for knowledge the workflow wrote itself) and on schedules while open', async () => {
+    // Opened half a minute past the hour: the 10:00 run was before Atrium was open, 11:00 is not.
+    vi.setSystemTime(NOW + 30_000)
     const stop = startWorkflowTriggers({ tickMs: 10_000 })
     try {
       const onDoc = createWorkflow({ name: 'Research when a doc is added', trigger: buildTrigger({ type: 'event', event: 'knowledge.created' }) })

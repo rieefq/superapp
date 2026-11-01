@@ -65,7 +65,7 @@ export default function TasksView({ project }: { project: Project }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <Toolbar project={project} view={view} onView={setView} filters={filters} onFilters={setFilters} shown={visible.filter((t) => t.status !== 'cancelled').length} total={total} />
-      {total === 0 && !all.length ? (
+      {all.length === 0 && view !== 'board' ? (
         <div className="flex flex-1 items-start justify-center overflow-y-auto px-4 pt-12">
           <EmptyState
             icon={KanbanSquare}
@@ -92,7 +92,20 @@ export default function TasksView({ project }: { project: Project }) {
           />
         </div>
       ) : view === 'board' ? (
-        <Board tasks={visible} projectId={project.id} selectedId={selectedId} onOpen={onOpen} onAssignAgent={onAssignAgent} quickAdd={quickAdd} phone={phone} />
+        <>
+          {all.length === 0 && (
+            <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 px-4 pt-5 md:px-6">
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <h2 className="type-title-3 text-ink">Break the goal into tasks</h2>
+                <p className="type-body-sm text-ink-2">Add them to a column, or create one with details. Assign a task to an agent and it starts working.</p>
+              </div>
+              <Button variant="primary" size="sm" leadingIcon={Plus} onClick={() => openStartSheet('task', { prefill: { projectId: project.id } })}>
+                New task
+              </Button>
+            </div>
+          )}
+          <Board tasks={visible} projectId={project.id} selectedId={selectedId} onOpen={onOpen} onAssignAgent={onAssignAgent} quickAdd={quickAdd} phone={phone} />
+        </>
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {view === 'list' ? (

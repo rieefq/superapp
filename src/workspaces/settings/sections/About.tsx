@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from 'react'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { RotateCcw } from 'lucide-react'
 import { version } from '../../../../package.json'
 import { ModelLabel } from '@/app/components'
@@ -50,7 +50,7 @@ export default function AboutSection() {
     { id: 'delegated', title: 'Delegated runs', live: false, note: 'Research, coding sessions, agent runs and workflows play locally scripted steps.' },
     { id: 'web', title: 'Web search and browsing', live: false, note: 'Web results are simulated in this build, on fictional .example domains.' },
     { id: 'terminal', title: 'Code execution and checks', live: false, note: 'Simulated terminal — nothing was executed. Test results are generated.' },
-    { id: 'sends', title: 'Pull requests, pushes and messages', live: false, note: 'Marked “(simulated)” everywhere: Pull request #48 (simulated).' },
+    { id: 'sends', title: 'Pull requests, pushes and messages', live: false, note: 'Each is marked “(simulated)” after the noun, everywhere it appears.' },
     { id: 'media', title: 'Images, video, decks and voice', live: false, note: 'Simulated preview — no image model was called.' },
     { id: 'schedules', title: 'Schedules and triggers', live: false, note: 'Runs only while Atrium is open. Webhook triggers accept test events.' },
     { id: 'costs', title: 'Costs of simulated runs', live: false, note: 'Estimated at reference pricing; no money was spent. Shown with est.' },
@@ -173,12 +173,19 @@ function IntegrationsMatrix() {
       }
       footnote="Simulated integrations connect instantly and say so: “Simulated — nothing leaves your browser”."
     >
-      <ul className="grid grid-cols-1 gap-x-4 px-4 py-2 sm:grid-cols-2 lg:grid-cols-3" aria-label="Integrations by support level">
+      <ul className="grid grid-cols-1 gap-x-2 px-2 py-2 sm:grid-cols-2 lg:grid-cols-3" aria-label="Integrations by support level">
         {sorted.map((i) => (
-          <li key={i.id} className="flex h-9 min-w-0 items-center gap-2.5">
-            <MonogramMark text={i.monogram} hue={i.hue as Hue} variant="ring" size={20} simulated={i.support === 'simulated'} />
-            <span className="type-body-sm min-w-0 flex-1 truncate text-ink-2">{i.name}</span>
-            {i.support === 'live' ? <LiveBadge size="xs" /> : <SimBadge size="xs" noTooltip />}
+          <li key={i.id} className="min-w-0">
+            <Link
+              to={`/integrations/${i.id}`}
+              title={i.name}
+              className="group flex h-9 min-w-0 items-center gap-2.5 rounded-sm px-2 transition-colors duration-(--dur-1) ease-standard hover:bg-hover pointer-coarse:h-11"
+            >
+              <MonogramMark text={i.monogram} hue={i.hue as Hue} variant="ring" size={20} simulated={i.support === 'simulated'} />
+              <span className="type-body-sm min-w-0 flex-1 truncate text-ink-2 group-hover:text-ink">{i.name}</span>
+              {i.support === 'live' ? <LiveBadge size="xs" noTooltip /> : <SimBadge size="xs" noTooltip />}
+              <span className="sr-only">{i.support === 'live' ? ', live' : ', simulated'}</span>
+            </Link>
           </li>
         ))}
       </ul>

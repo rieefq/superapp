@@ -108,6 +108,12 @@ function settingsCommands(): Command[] {
     toggle('settings.notify-approvals', s.notifications.approvals, 'approval notifications', Bell, ['notifications', 'approvals', 'needs you'], (approvals) =>
       updateSettings('notifications', { approvals }),
     ),
+    toggle('settings.notify-completed', s.notifications.runCompleted, 'updates for finished runs', Bell, ['notifications', 'completed', 'done', 'landed'], (runCompleted) =>
+      updateSettings('notifications', { runCompleted }),
+    ),
+    toggle('settings.notify-failed', s.notifications.runFailed, 'updates for failed runs', Bell, ['notifications', 'failed', 'errors'], (runFailed) =>
+      updateSettings('notifications', { runFailed }),
+    ),
     {
       id: 'settings.always-allow',
       title: 'Review always-allow permissions',

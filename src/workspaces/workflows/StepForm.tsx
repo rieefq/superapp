@@ -17,11 +17,12 @@ import type { Capability, Hue, RunStep, Workflow, WorkflowNode, WorkflowTriggerT
 import { cn } from '@/lib/cn'
 import { formatDateTime } from '@/lib/format'
 import {
-  Button, Field, IconButton, Input, LiveBadge, MonogramMark, SegmentedControl, Select, SimBadge, StatusGlyph, StepStatusGlyph, Tag, Textarea, toast,
+  Button, EntityChip, Field, IconButton, Input, LiveBadge, MonogramMark, SegmentedControl, Select, SimBadge, StatusGlyph, StepStatusGlyph, Tag, Textarea, toast,
 } from '@/ui'
 import { deleteStep, updateStep, updateStepConfig } from './actions'
 import { delayWords, NODE_TYPES, OUTPUT_KINDS, outputKindOf, TRIGGER_ICON } from './nodeMeta'
 import { useEditorStore } from './editorStore'
+import { useShowRun } from './hooks'
 
 /**
  * The step settings shown in Inspector › Item (docs/DESIGN.md §6.6: "The Inspector shows node
@@ -326,6 +327,7 @@ function EventList({ title, badge, note, options, value, onPick }: {
 
 function WebhookSettings({ wf }: { wf: Workflow }) {
   const url = webhookUrl(wf)
+  const showRun = useShowRun()
   return (
     <div className="flex flex-col gap-3">
       <Field label="Address" hint="Simulated — nothing listens at this address in this build.">
@@ -357,6 +359,7 @@ function WebhookSettings({ wf }: { wf: Workflow }) {
           onClick={() => {
             const run = sendTestEvent(wf.id)
             useEditorStore.getState().setOverlayRun(run.id)
+            showRun(run.id)
             toast('Test event sent', { description: 'A simulated webhook payload started a run.' })
           }}
         >
@@ -385,6 +388,12 @@ function AgentSettings({ wf, node }: { wf: Workflow; node: WorkflowNode }) {
         hint="Sent with the previous step’s output. Workflow runs are simulated in this build — no model is called."
         multiline
       />
+      {agent && (
+        <div className="flex items-center gap-2">
+          <span className="type-caption text-ink-3">Agent</span>
+          <EntityChip entity={{ kind: 'agent', id: agent.id }} size="sm" />
+        </div>
+      )}
       {agent && (
         <p className="type-caption text-ink-3">
           {agent.name} can: {agent.capabilities.length ? agent.capabilities.map((g) => `${CAPABILITIES[g.capability].label}${g.mode === 'ask' ? ' (asks)' : g.mode === 'deny' ? ' (blocked)' : ''}`).join(' · ') : 'nothing granted yet'}.{' '}

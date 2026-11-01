@@ -1,5 +1,7 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router'
+import { WorkspaceScreen, useShellLayout } from '@/app/templates'
+import { AgentsList } from './AgentsList'
 import { RunsBoardView } from './RunsBoard'
 import { ViewSkeleton } from './skeleton'
 
@@ -26,6 +28,16 @@ export default function AgentsWorkspace() {
   )
 }
 
-function Lazy({ kind, children }: { kind: 'grid' | 'form' | 'detail'; children: React.ReactNode }) {
-  return <Suspense fallback={<ViewSkeleton kind={kind} />}>{children}</Suspense>
+/** While a view's chunk loads, keep the frame (the list pane) and draw the stage as a skeleton. */
+function Lazy({ kind, children }: { kind: 'grid' | 'form' | 'detail'; children: ReactNode }) {
+  return <Suspense fallback={<LoadingScreen kind={kind} />}>{children}</Suspense>
+}
+
+function LoadingScreen({ kind }: { kind: 'grid' | 'form' | 'detail' }) {
+  const { formFactor } = useShellLayout()
+  return (
+    <WorkspaceScreen list={formFactor === 'phone' ? undefined : <AgentsList />} phoneView="stage">
+      <ViewSkeleton kind={kind} />
+    </WorkspaceScreen>
+  )
 }

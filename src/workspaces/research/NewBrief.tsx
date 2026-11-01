@@ -323,7 +323,7 @@ function AnglesEditor({ angles, custom, hasQuestion, searched, depthLabel, onCha
   onReset: () => void
 }) {
   const listRef = useRef<HTMLOListElement>(null)
-  const focusAt = (i: number) => requestAnimationFrame(() => listRef.current?.querySelectorAll<HTMLInputElement>('input')[i]?.focus())
+  const focusAt = (i: number) => requestAnimationFrame(() => listRef.current?.querySelectorAll<HTMLTextAreaElement>('textarea')[i]?.focus())
   const edit = (i: number, value: string) => onChange(angles.map((a, j) => (j === i ? value : a)))
   const remove = (i: number) => {
     onChange(angles.filter((_, j) => j !== i))
@@ -334,7 +334,7 @@ function AnglesEditor({ angles, custom, hasQuestion, searched, depthLabel, onCha
     onChange([...angles.slice(0, at), '', ...angles.slice(at)])
     focusAt(at)
   }
-  const onKey = (e: KeyboardEvent<HTMLInputElement>, i: number) => {
+  const onKey = (e: KeyboardEvent<HTMLTextAreaElement>, i: number) => {
     if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey) {
       e.preventDefault()
       add(i + 1)
@@ -349,23 +349,24 @@ function AnglesEditor({ angles, custom, hasQuestion, searched, depthLabel, onCha
       {angles.length > 0 ? (
         <ol ref={listRef} className="flex flex-col" aria-label="Angles">
           {angles.map((a, i) => (
-            <li key={i} className="group/angle flex min-h-8 min-w-0 items-center gap-2">
-              <span aria-hidden className="type-meta w-4 shrink-0 text-right text-ink-3 tabular">
+            <li key={i} className="group/angle flex min-h-8 min-w-0 items-start gap-2">
+              <span aria-hidden className="type-meta w-4 shrink-0 pt-[7px] text-right text-ink-3 tabular">
                 {i + 1}
               </span>
-              <input
+              <textarea
                 value={a}
-                onChange={(e) => edit(i, e.target.value)}
+                rows={1}
+                onChange={(e) => edit(i, e.target.value.replace(/\n/g, ' '))}
                 onKeyDown={(e) => onKey(e, i)}
                 placeholder="Describe an angle to look into"
                 aria-label={`Angle ${i + 1}`}
                 className={cn(
-                  'type-body-sm h-8 min-w-0 flex-1 rounded-sm border border-transparent bg-transparent px-1.5 text-ink outline-none transition-colors duration-(--dur-1) placeholder:text-ink-3',
+                  'type-body-sm min-h-8 min-w-0 flex-1 resize-none rounded-sm border border-transparent bg-transparent px-1.5 py-[6px] text-ink outline-none transition-colors duration-(--dur-1) [field-sizing:content] placeholder:text-ink-3',
                   'hover:border-line focus-visible:border-line-input focus-visible:bg-canvas pointer-coarse:text-[16px]',
                   !custom && 'text-ink-2',
                 )}
               />
-              <IconButton icon={X} label={`Remove angle ${i + 1}`} size="xs" onClick={() => remove(i)} className="opacity-0 group-hover/angle:opacity-100 group-focus-within/angle:opacity-100 pointer-coarse:opacity-100" />
+              <IconButton icon={X} label={`Remove angle ${i + 1}`} size="xs" onClick={() => remove(i)} className="mt-1 opacity-0 group-hover/angle:opacity-100 group-focus-within/angle:opacity-100 pointer-coarse:opacity-100" />
             </li>
           ))}
         </ol>

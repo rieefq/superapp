@@ -5,7 +5,7 @@ import { useRow } from '@/core/db'
 import { triggerLabel } from '@/core/services/workflows'
 import type { Workflow } from '@/core/types'
 import { timeAgo } from '@/lib/format'
-import { MonogramMark, OutcomeTape, RUN_STATUS_META, RunStatusGlyph, Sparkline, Switch } from '@/ui'
+import { EntityChip, MonogramMark, OutcomeTape, RUN_STATUS_META, RunStatusGlyph, Sparkline, Switch } from '@/ui'
 import { toggleEnabled } from './dialogs'
 import { useRunsPerDay, useScopedWorkflows, useWorkflowSummaries, type WorkflowSummary } from './hooks'
 import { DescribeIt, TemplateCards } from './Start'
@@ -103,9 +103,8 @@ const WorkflowCard = memo(function WorkflowCard({ wf, summary }: { wf: Workflow;
         </div>
       </div>
       {project && (
-        <span className="type-caption flex items-center gap-1.5 text-ink-3">
-          <MonogramMark text={project.name} hue={project.hue} size={12} />
-          <span className="truncate">{project.name}</span>
+        <span className="relative z-10 flex min-w-0">
+          <EntityChip entity={{ kind: 'project', id: project.id }} size="sm" variant="subtle" />
         </span>
       )}
     </article>

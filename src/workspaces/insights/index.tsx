@@ -14,6 +14,9 @@ import { filterQuery, useInsightsFilters } from './state'
 
 type Tab = 'overview' | 'history' | 'journal'
 
+/** The shared filters of the page as it is now (for commands that run later). */
+const currentQuery = () => filterQuery(new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search))
+
 function tabOf(pathname: string): Tab {
   const rest = pathname.replace(/^\/insights/, '').replace(/\/+$/, '')
   if (rest === '/history') return 'history'
@@ -54,13 +57,40 @@ export default function InsightsWorkspace() {
         }),
       ),
       ...(tab !== 'history'
-        ? [{ id: 'insights.view.history', title: 'Show the runs behind these numbers', subtitle: 'Insights › History', icon: HistoryIcon, group: 'Insights', keywords: ['history', 'runs', 'executions'], run: (ctx) => { ctx.close(); navigate(`/insights/history${q}`) } } satisfies Command]
+        ? [
+            {
+              id: 'insights.view.history',
+              title: 'Show the runs behind these numbers',
+              subtitle: 'Insights › History',
+              icon: HistoryIcon,
+              group: 'Insights',
+              keywords: ['history', 'runs', 'executions'],
+              // Registered commands outlive this render: read the filters when the command runs.
+              run: (ctx) => {
+                ctx.close()
+                navigate(`/insights/history${currentQuery()}`)
+              },
+            } satisfies Command,
+          ]
         : []),
       ...(tab !== 'journal'
-        ? [{ id: 'insights.view.journal', title: 'Open the activity journal', subtitle: 'Insights › Journal', icon: ScrollText, group: 'Insights', keywords: ['journal', 'activity', 'audit', 'log'], run: (ctx) => { ctx.close(); navigate(`/insights/journal${q}`) } } satisfies Command]
+        ? [
+            {
+              id: 'insights.view.journal',
+              title: 'Open the activity journal',
+              subtitle: 'Insights › Journal',
+              icon: ScrollText,
+              group: 'Insights',
+              keywords: ['journal', 'activity', 'audit', 'log'],
+              run: (ctx) => {
+                ctx.close()
+                navigate(`/insights/journal${currentQuery()}`)
+              },
+            } satisfies Command,
+          ]
         : []),
     ],
-    [filters.rangeDays, tab, q, navigate, setRange],
+    [filters.rangeDays, tab, navigate, setRange],
   )
   useRegisterCommands('insights.view', commands)
 

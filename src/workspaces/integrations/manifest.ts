@@ -4,9 +4,15 @@ import { db } from '@/core/db'
 import { INTEGRATION_CATEGORIES, INTEGRATIONS } from '@/core/integrations/catalog'
 import { CAPABILITIES } from '@/core/permissions/capabilities'
 
-/** Focus the catalog's search field once the catalog is on screen. */
+/** Focus the catalog's search field as soon as the catalog is on screen (navigation renders in a transition). */
 function focusSearch() {
-  setTimeout(() => document.querySelector<HTMLElement>('#main [data-search-input] input, #main input[data-search-input]')?.focus(), 80)
+  const started = Date.now()
+  const tick = () => {
+    const input = window.location.pathname === '/integrations' ? document.querySelector<HTMLElement>('#main input[data-search-input]') : null
+    if (input) input.focus()
+    else if (Date.now() - started < 2000) requestAnimationFrame(tick)
+  }
+  requestAnimationFrame(tick)
 }
 
 const categoryLabel = (id: string) => INTEGRATION_CATEGORIES.find((c) => c.id === id)?.label ?? id

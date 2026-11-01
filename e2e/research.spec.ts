@@ -8,6 +8,9 @@ import { test, expect, open } from './fixtures'
 
 const QUESTION = 'How are mid-market freight forwarders adopting customer portals?'
 
+// Other workspaces are edited while these tests run; a dev-server full reload mid-test is retried.
+test.describe.configure({ retries: 2 })
+
 const inspector = (page: Page) => page.locator('[data-region="inspector"]').first()
 
 /** Rows of a persisted table (the app writes each table to localStorage). */
@@ -43,6 +46,7 @@ test.describe('Research · live run', () => {
   test('start an investigation → sources stream in → report → Save to Knowledge → backlink', async ({ page }) => {
     test.setTimeout(90_000)
     const id = await startInvestigation(page)
+    await expect(page.getByRole('heading', { level: 2, name: QUESTION })).toBeVisible({ timeout: 30_000 })
 
     // Live: the frontier strip shows the run, and sources appear on the board as Scout finds them.
     await expect(page.getByRole('region', { name: 'Research in progress' })).toBeVisible()

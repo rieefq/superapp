@@ -1,8 +1,10 @@
 import { useCallback } from 'react'
+import { Link } from 'react-router'
 import { budgetState, formatCost } from '@/app/components'
 import { useMinuteNow } from '@/core/analytics'
 import { useScope } from '@/core/context'
 import { useDB, useRow, type Tables } from '@/core/db'
+import { entityRoute } from '@/core/services'
 import { updateSettings, useSettings } from '@/core/settings'
 import { HUE_FILL, Input, Switch, TickMeter, Tooltip } from '@/ui'
 import { cn } from '@/lib/cn'
@@ -102,7 +104,12 @@ export default function BudgetsSection() {
           {project && projectSpend && (
             <p className="type-meta flex flex-wrap items-center gap-x-1.5 gap-y-1 text-ink-3">
               <span aria-hidden className={cn('size-2 rounded-[2px]', HUE_FILL[project.hue])} />
-              <span className="text-ink-2">{project.name}</span>
+              <Link
+                to={entityRoute({ kind: 'project', id: project.id })}
+                className="rounded-xs text-ink-2 underline decoration-line-input underline-offset-2 hover:text-ink hover:decoration-ink"
+              >
+                {project.name}
+              </Link>
               <span>
                 live {formatCost(projectSpend.live)} · est. {formatCost(projectSpend.sim)} simulated
               </span>

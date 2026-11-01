@@ -62,13 +62,15 @@ export function SourcesView({ inv, sources, selectedId, readingIds, onSelect }: 
           aria-label="Filter by status"
           value={status}
           onValueChange={setStatus}
-          items={[
-            { value: 'all', label: 'All', count: stats.active },
-            { value: 'cited', label: 'Cited', count: stats.cited },
-            { value: 'read', label: 'Read', count: stats.read },
-            { value: 'queued', label: 'Queued', count: stats.queued },
-            { value: 'discarded', label: 'Discarded', count: stats.discarded },
-          ]}
+          items={(
+            [
+              { value: 'all', label: 'All', count: stats.active },
+              { value: 'cited', label: 'Cited', count: stats.cited },
+              { value: 'read', label: 'Read', count: stats.read },
+              { value: 'queued', label: 'Queued', count: stats.queued },
+              { value: 'discarded', label: 'Discarded', count: stats.discarded },
+            ] as const
+          ).filter((t) => t.value === 'all' || t.value === status || t.count > 0)}
           className="min-w-0"
         />
         <span className="flex-1" />

@@ -1,13 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { ListChecks, Plus } from 'lucide-react'
 import { useRegisterCommands } from '@/app/commands/registry'
 import { openStartSheet } from '@/app/shell/store'
 import { ListRows, ScopeFilterRow, Stage, StageHeader, WorkspaceScreen } from '@/app/templates'
 import { useMinuteNow } from '@/core/analytics'
 import { useScope } from '@/core/context'
-import { useDB, type Tables } from '@/core/db'
-import { useMyTasks, useProjects } from '@/core/services'
-import type { Task } from '@/core/types'
+import { useDB, useRowsByIds, type Tables } from '@/core/db'
+import { updateTask, useMyTasks, useProjects } from '@/core/services'
+import type { Task, TaskStatus } from '@/core/types'
 import { Button, EmptyState } from '@/ui'
 import { groupByDue } from './logic'
 import { ProjectMark, useOpenTask, useSelectedTaskId } from './parts'
@@ -15,6 +15,7 @@ import { NewProjectDialog } from './ProjectForm'
 import { ProjectsListPane } from './ProjectsListPane'
 import { useTaskSelectionSync } from './selection'
 import { TaskListRow } from './TaskList'
+import { completeWithUndo } from './taskActions'
 
 /**
  * My tasks (§6.9, `/projects/my-tasks`): your open tasks across projects — assigned to you or to
@@ -30,7 +31,29 @@ export default function MyTasks() {
   const mine = useMyTasks()
   const now = useMinuteNow()
   const scoped = scope && !showAll
-  const visible = useMemo(() => (scoped ? mine.filter((t) => t.projectId === scope) : mine), [mine, scope, scoped])
+  // Tasks completed here stay in place (struck through) until you leave, so a slip is one click to undo.
+  const [completed, setCompleted] = useState<Map<string, TaskStatus>>(() => new Map())
+  const completedIds = useMemo(() => [...completed.keys()], [completed])
+  const recent = useRowsByIds('tasks', completedIds)
+  const visible = useMemo(() => {
+    const open = scoped ? mine.filter((t) => t.projectId === scope) : mine
+    const done = recent.filter((t) => t.status === 'done' && !open.some((o) => o.id === t.id) && (!scoped || t.projectId === scope))
+    return [...open, ...done]
+  }, [mine, recent, scope, scoped])
+  const toggleDone = useCallback((task: Task) => {
+    if (task.status === 'done') {
+      updateTask(task.id, { status: completed.get(task.id) ?? 'todo' })
+      setCompleted((m) => {
+        const next = new Map(m)
+        next.delete(task.id)
+        return next
+      })
+      return
+    }
+    setCompleted((m) => new Map(m).set(task.id, task.status))
+    completeWithUndo(task)
+  }, [completed])
+  const openCount = visible.filter((t) => t.status !== 'done').length
   const groups = useMemo(() => groupByDue(visible, now), [visible, now])
   const selectedId = useSelectedTaskId()
   const openTask = useOpenTask()
@@ -47,7 +70,7 @@ export default function MyTasks() {
           <StageHeader
             leading={<ListChecks aria-hidden className="mr-1 size-5 text-ink-2" strokeWidth={1.75} />}
             title="My tasks"
-            status={<span className="type-meta text-ink-3 tabular">{visible.length} open</span>}
+            status={<span className="type-meta text-ink-3 tabular">{openCount} open</span>}
             backTo="/projects"
             actions={
               <Button size="sm" variant="ghost" leadingIcon={Plus} kbd="n" onClick={newTask}>
@@ -85,7 +108,7 @@ export default function MyTasks() {
                 </h2>
                 <ul className="@container flex flex-col pt-1">
                   {g.tasks.map((t) => (
-                    <MyTaskRow key={t.id} task={t} selected={t.id === selectedId} onOpen={openTask} showProject={!scoped} />
+                    <MyTaskRow key={t.id} task={t} selected={t.id === selectedId} onOpen={openTask} showProject={!scoped} onToggleDone={toggleDone} />
                   ))}
                 </ul>
               </section>
@@ -98,13 +121,25 @@ export default function MyTasks() {
   )
 }
 
-function MyTaskRow({ task, selected, onOpen, showProject }: { task: Task; selected: boolean; onOpen: (id: string) => void; showProject: boolean }) {
+function MyTaskRow({
+  task,
+  selected,
+  onOpen,
+  showProject,
+  onToggleDone,
+}: {
+  task: Task
+  selected: boolean
+  onOpen: (id: string) => void
+  showProject: boolean
+  onToggleDone: (task: Task) => void
+}) {
   const project = useDB((s: Tables) => (task.projectId ? s.projects[task.projectId] : undefined))
   const info = useMemo(
     () => (showProject ? { name: project?.name ?? 'No project', mark: project ? <ProjectMark project={project} size={14} /> : <span aria-hidden className="size-3.5 rounded-[3px] border border-line-input" /> } : undefined),
     [showProject, project],
   )
-  return <TaskListRow task={task} selected={selected} onOpen={onOpen} showProject={info} compact />
+  return <TaskListRow task={task} selected={selected} onOpen={onOpen} showProject={info} compact onToggleDone={onToggleDone} />
 }
 
 function ShowingAll({ onFilter }: { onFilter: () => void }) {

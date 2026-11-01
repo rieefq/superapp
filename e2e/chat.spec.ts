@@ -42,14 +42,17 @@ test.describe('Chat', () => {
     await expect(answer).toHaveAttribute('aria-label', /Simulator \(simulated\)/)
     await expect(answer.getByText('No model was called')).toBeVisible()
     await expect(answer.getByRole('img', { name: /^Simulated: produced by Atrium/ }).first()).toBeVisible()
-    await expect(answer.locator('.atr-md li')).toHaveCount(5)
+    await expect(answer.locator('.atr-md > ol > li')).toHaveCount(5)
     // The thread is in the list, titled from the question.
     await expect(page.locator('[data-region="list"]').getByRole('link', { name: /ideas for improving onboarding/i })).toBeVisible()
   })
 
   test('a knowledge question is answered with citations and a Sources row', async ({ page }) => {
     await open(page, '/chat/new')
-    await ask(page, 'What does ADR-012 say about refreshing session tokens?')
+    // Only what the Context Line shows reaches the model: wait for the Likely match, then send.
+    await composer(page).fill('What does ADR-012 say about refreshing session tokens?')
+    await expect(page.getByRole('group', { name: 'Context for this action' })).toContainText('ADR-012: Session tokens & refresh')
+    await composer(page).press('Enter')
     const answer = turns(page).nth(1)
     await expectAnswered(answer)
     await expect(answer.getByRole('button', { name: /^Searched knowledge/ })).toBeVisible()
@@ -66,11 +69,12 @@ test.describe('Chat', () => {
   test('retry regenerates the latest answer with a fresh run', async ({ page }) => {
     await open(page, '/chat/new')
     await ask(page, 'Explain idempotency keys in two sentences')
+    await expect(page).toHaveURL(/\/chat\/thr_[a-z0-9]+$/)
     const answer = turns(page).nth(1)
     await expectAnswered(answer)
     const handle = answer.getByRole('button', { name: /^Handle RUN-/ }).first()
     const before = await handle.getAttribute('aria-label')
-    await answer.getByRole('button', { name: /^Retry with/ }).click()
+    await answer.getByRole('button', { name: 'Retry with Simulator · Swift' }).click()
     await expect(answer.getByRole('button', { name: /^Handle RUN-/ }).first()).not.toHaveAttribute('aria-label', before ?? '')
     await expectAnswered(answer)
     await expect(turns(page)).toHaveCount(2)

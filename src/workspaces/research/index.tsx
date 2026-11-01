@@ -1,16 +1,15 @@
-import { lazy, Suspense, useMemo, useRef } from 'react'
+import { useMemo, useRef } from 'react'
 import { Route, Routes, useMatch, useNavigate, useSearchParams } from 'react-router'
 import { Telescope } from 'lucide-react'
 import { Stage, StageHeader, WorkspaceScreen } from '@/app/templates'
 import { useScope } from '@/core/context'
 import { useInvestigations } from '@/core/services'
-import { Button, EmptyState, Skeleton } from '@/ui'
+import { Button, EmptyState } from '@/ui'
+import InvestigationStage from './InvestigationView'
 import { InvestigationList } from './InvestigationList'
 import { NewBrief } from './NewBrief'
 import { RecentReports } from './RecentReports'
 import { exampleQuestions } from './logic'
-
-const InvestigationStage = lazy(() => import('./InvestigationView'))
 
 /**
  * Research (§6.5, Session template): investigations in the list pane; the stage shows a new brief and
@@ -24,14 +23,7 @@ export default function ResearchWorkspace() {
       <Routes>
         <Route index element={<BriefStage />} />
         <Route path="new" element={<BriefStage focus />} />
-        <Route
-          path=":investigationId/:tab?"
-          element={
-            <Suspense fallback={<StageSkeleton />}>
-              <InvestigationStage />
-            </Suspense>
-          }
-        />
+        <Route path=":investigationId/:tab?" element={<InvestigationStage />} />
         <Route path="*" element={<MissingStage />} />
       </Routes>
     </WorkspaceScreen>
@@ -60,21 +52,6 @@ function BriefStage({ focus }: { focus?: boolean }) {
         {!focus && <RecentReports className="mt-12" />}
       </div>
     </Stage>
-  )
-}
-
-function StageSkeleton() {
-  return (
-    <div className="flex h-full flex-col" aria-busy="true" aria-label="Loading the investigation">
-      <div className="flex h-12 items-center gap-3 border-b border-line px-4">
-        <Skeleton width={220} height={16} />
-        <Skeleton width={72} height={16} className="rounded-full" />
-      </div>
-      <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4 px-6 py-8">
-        <Skeleton width="70%" height={28} />
-        <Skeleton variant="text" lines={5} />
-      </div>
-    </div>
   )
 }
 

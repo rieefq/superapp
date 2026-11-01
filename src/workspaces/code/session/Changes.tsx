@@ -275,7 +275,7 @@ export function ReviewBar({ session }: { session: CodeSession }) {
 
   const sentence = reviewSentence(stats)
   return (
-    <div role="region" aria-label="Review" className="@container sticky bottom-0 z-(--z-sticky) shrink-0 border-t border-line bg-canvas px-4 py-2.5 md:px-5">
+    <div role="region" aria-label="Review decision" className="@container sticky bottom-0 z-(--z-sticky) shrink-0 border-t border-line bg-canvas px-4 py-2.5 md:px-5">
       <div className="flex flex-col gap-2 @min-[860px]:flex-row @min-[860px]:items-center @min-[860px]:gap-4">
         <p className="type-body-sm min-w-0 flex-1 text-ink-2" aria-live="polite">
           <span className="tabular">{sentence}</span>

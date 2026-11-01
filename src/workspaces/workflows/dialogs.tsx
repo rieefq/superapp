@@ -10,6 +10,7 @@ import { formatDateTime } from '@/lib/format'
 import { Button, Dialog, toast } from '@/ui'
 import { workflowCapabilities } from './capabilities'
 import { useEditorStore } from './editorStore'
+import { useShowRun } from './hooks'
 
 /**
  * The two ReadBack confirms (docs/DESIGN.md §6.6): turning a workflow on, and Test run. Both read the
@@ -105,11 +106,13 @@ export function TestRunDialog() {
   const wf = useRow('workflows', testRunId)
   const data = useWorkflowReadBack(wf)
   const runRef = useRef<HTMLButtonElement>(null)
+  const showRun = useShowRun()
   const start = () => {
     if (!wf) return close()
     try {
       const run = runWorkflow(wf.id, { trigger: 'manual' })
       useEditorStore.getState().setOverlayRun(run.id)
+      showRun(run.id)
       attachRun(run.id, 'workflows')
     } catch (error) {
       toast.error('Couldn’t start the run', { description: error instanceof Error ? error.message : String(error) })

@@ -108,14 +108,18 @@ test.describe('Workflows', () => {
 
   test('Describe it drafts a template-based workflow and says how it was made', async ({ page }) => {
     await open(page, '/workflows/new')
-    await page.getByLabel('Describe it').fill('Every Monday at 9, summarize last week’s project activity and post it to #product — ask me before posting.')
+    await page.getByRole('button', { name: 'Use the example' }).click()
+    await expect(page.getByRole('textbox', { name: 'Describe it' })).toHaveValue(/ask me before posting it to #product/)
     await page.getByRole('button', { name: /Draft workflow/ }).click()
     await expect(editor(page)).toBeVisible()
     const notes = page.getByTestId('wf-draft-notes')
     await expect(notes).toContainText('Template-based draft')
     await expect(notes).toContainText('not AI')
     await expect(page.locator('.wf-node').first()).toBeVisible()
+    // "ask me before posting" became an approval step guarding the Slack post; new drafts start off.
     await expect(page.locator('.wf-node[data-type="approval"]')).toHaveCount(1)
+    await expect(page.locator('.wf-node[data-type="action"]')).toContainText('Post to #product')
+    await expect(page.getByRole('switch', { name: /Off\. Turn on/ })).toHaveAttribute('aria-checked', 'false')
   })
 
   test('turning a workflow on reads back what it will do first', async ({ page }) => {

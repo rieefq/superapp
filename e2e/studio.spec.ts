@@ -7,7 +7,13 @@ const bar = (page: Page) => page.locator('[data-studio-prompt-bar]')
 const prompt = (page: Page) => bar(page).getByRole('textbox')
 const frames = (page: Page) => page.getByRole('group', { name: 'Version frames' }).getByRole('button')
 
-test.describe('Studio', () => {
+// Dev-server page loads are slow while many suites share the machine; journeys get room.
+test.describe.configure({ timeout: 120_000 })
+
+test.describe('Studio · generation', () => {
+  // Real-time simulation, so the generating state is on screen long enough to assert on.
+  test.use({ simSpeed: 1 })
+
   test('generate an image → it appears generating → ready → open → variation → 2 versions', async ({ page }) => {
     await open(page, '/studio')
     await bar(page).getByRole('radio', { name: 'Image', exact: true }).click()
@@ -38,7 +44,9 @@ test.describe('Studio', () => {
     await expect(frames(page).nth(0)).toHaveAttribute('aria-pressed', 'true')
     await expect(page.getByText('No model was called').first()).toBeVisible()
   })
+})
 
+test.describe('Studio', () => {
   test('open the deck → Present → arrow through slides → Esc', async ({ page }) => {
     await open(page, '/studio')
     await page.getByRole('link', { name: 'Decks', exact: true }).click()
@@ -116,7 +124,7 @@ test.describe('Studio', () => {
     await expect(page.getByRole('link', { name: /^Spring launch/ })).toBeVisible()
     await page.getByRole('button', { name: 'More actions' }).click()
     await page.getByRole('menuitem', { name: 'Delete board…' }).click()
-    await page.getByRole('dialog').getByRole('button', { name: 'Delete board' }).click()
+    await page.getByRole('button', { name: 'Delete board', exact: true }).click()
     await expect(page.getByRole('link', { name: /^Spring launch/ })).toHaveCount(0)
     await expect(page.getByRole('heading', { level: 1, name: 'All assets' })).toBeVisible()
     await expect(page.locator('[data-asset-tile]').first().getByRole('link')).toHaveAccessibleName(/^Three LinkedIn posts/)

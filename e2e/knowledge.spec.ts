@@ -17,6 +17,8 @@ const RUNBOOK = [
 const results = (page: Page) => page.getByRole('list', { name: 'Knowledge items' })
 const row = (page: Page, title: string) => results(page).getByRole('listitem').filter({ hasText: title })
 const search = (page: Page) => page.getByRole('searchbox', { name: 'Search Knowledge' })
+/** The item title lives in the stage header (§3.4); the document may repeat it as its own heading. */
+const stageTitle = (page: Page) => page.locator('[data-region="stage"] > header h1').first()
 
 /** Rows of a table as persisted in this browser (the app writes each table to localStorage). */
 async function persisted<T>(page: Page, table: string): Promise<T[]> {
@@ -51,7 +53,7 @@ test.describe('Knowledge', () => {
     await hit.getByRole('link', { name: 'Quokka escalation runbook' }).click()
     await expect(page).toHaveURL(/\/knowledge\/kno_[a-z0-9]+$/)
     const id = new URL(page.url()).pathname.split('/').pop()!
-    await expect(page.getByRole('heading', { level: 1, name: 'Quokka escalation runbook' })).toBeVisible()
+    await expect(stageTitle(page)).toHaveText('Quokka escalation runbook')
     await expect(page.getByRole('article')).toContainText('The quokka protocol requires a written timeline')
 
     // Hold it: it rides along in every new AI action.
@@ -88,7 +90,7 @@ test.describe('Knowledge', () => {
 
   test('edit a note: autosaves, one History line per session, persists after reload', async ({ page }) => {
     await open(page, '/knowledge/kno_rust_plan')
-    await expect(page.getByRole('heading', { level: 1, name: 'Rust learning plan' })).toBeVisible()
+    await expect(stageTitle(page)).toHaveText('Rust learning plan')
     await page.keyboard.press('e')
     await expect(page).toHaveURL(/edit=1/)
     const editor = page.locator('[data-knowledge-editor]')
@@ -125,7 +127,7 @@ test.describe('Knowledge', () => {
     await expect(editor).toBeFocused()
     await expect(editor).toHaveValue('# Deploy freeze checklist\n\nNo deploys after 3pm on Fridays.')
     await expect(page.locator('[data-save-status]')).toHaveAttribute('data-save-status', 'saved')
-    await expect(page.getByRole('heading', { level: 1, name: 'Deploy freeze checklist' })).toBeVisible()
+    await expect(stageTitle(page)).toHaveText('Deploy freeze checklist')
     await editor.press('Escape')
 
     await page.getByRole('button', { name: /^Engineering/ }).first().click()
@@ -154,8 +156,9 @@ test.describe('Knowledge', () => {
     await expect(page.getByText('Moved 2 items to Research')).toBeVisible()
     await expect(results(page).getByRole('listitem')).toHaveCount(2)
 
-    await page.getByRole('button', { name: /^reading-list/ }).first().click()
-    await expect(page).toHaveURL(/tag=reading-list/)
+    // The tag is a real section of the library now.
+    await open(page, '/knowledge?tag=reading-list')
+    await expect(page.locator('[data-region="stage"] > header h1').first()).toHaveText('#reading-list')
     await expect(results(page).getByRole('listitem')).toHaveCount(2)
   })
 
@@ -191,7 +194,7 @@ test.describe('Knowledge', () => {
     await dialog.getByRole('textbox', { name: /Notes/ }).fill('Retry with exponential backoff; verify signatures.')
     await dialog.getByRole('button', { name: 'Save link' }).click()
     await expect(page).toHaveURL(/\/knowledge\/kno_/)
-    await expect(page.getByRole('heading', { level: 1, name: 'Best practices · docs.stripe.com' })).toBeVisible()
+    await expect(stageTitle(page)).toHaveText('Best practices · docs.stripe.com')
     await expect(page.getByRole('article')).toContainText('Not fetched')
 
     await page.getByRole('button', { name: 'More actions' }).first().click()

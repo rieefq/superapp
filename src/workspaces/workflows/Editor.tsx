@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
 import { Panel } from '@xyflow/react'
-import { ChevronDown, ChevronUp, Copy, FileJson, Files, Link2, Play, Trash2, Workflow as WorkflowIcon, X } from 'lucide-react'
+import { ChevronDown, ChevronUp, Copy, FileJson, Files, Layers, Link2, Play, Trash2, Workflow as WorkflowIcon, X } from 'lucide-react'
 import { CanvasTemplate, StageHeader, useShellLayout, type CanvasDrawer } from '@/app/templates'
+import { toggleHold } from '@/app/shell/scope'
 import { attachRun } from '@/app/shell/store'
+import { useIsPinned } from '@/core/context'
 import { useApprovalsForRun } from '@/core/services/approvals'
 import {
   deleteWorkflow, duplicateWorkflow, exportWorkflowJson, restoreWorkflow, saveWorkflowLayout, triggerShort, updateWorkflow, useWorkflow, useWorkflowRuns,
@@ -89,11 +91,33 @@ function downloadJson(wf: Workflow) {
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
+/** "Saved ✓" for a moment after each autosave (edits save as you make them). */
+function SavedNote({ stamp }: { stamp: number }) {
+  const first = useRef(stamp)
+  const [shown, setShown] = useState(false)
+  useEffect(() => {
+    if (stamp === first.current) return
+    setShown(true)
+    const t = setTimeout(() => setShown(false), 1800)
+    return () => clearTimeout(t)
+  }, [stamp])
+  return (
+    <span aria-live="polite" className={cn('type-meta inline-flex items-center gap-1 text-ink-3 transition-opacity duration-(--dur-2)', shown ? 'opacity-100' : 'opacity-0')}>
+      {shown && (
+        <>
+          <StatusGlyph shape="check" tone="done" size={11} decorative /> Saved
+        </>
+      )}
+    </span>
+  )
+}
+
 export function EditorHeader({ workflowId, onSelectNode }: { workflowId: string; onSelectNode: (nodeId: string | null, opts?: { inspect?: boolean }) => void }) {
   const wf = useWorkflow(workflowId)
   const navigate = useNavigate()
   const [view, setView] = useEditorView()
   const requestTestRun = useWorkflowDialogs((s) => s.requestTestRun)
+  const held = useIsPinned(workflowId ? { kind: 'workflow', id: workflowId } : null)
   if (!wf) return <StageHeader title="Workflow" />
   const trigger = wf.nodes.find((n) => n.type === 'trigger')
   const copy = async (text: string, what: string) => {
@@ -127,6 +151,7 @@ export function EditorHeader({ workflowId, onSelectNode }: { workflowId: string;
         }
       },
     },
+    { id: 'hold', label: held ? 'Release' : 'Hold', description: 'Held items ride along in every new AI action', icon: Layers, shortcut: 'h', onSelect: () => toggleHold({ kind: 'workflow', id: wf.id }) },
     { id: 'export', label: 'Export JSON', icon: FileJson, onSelect: () => downloadJson(wf) },
     { id: 'link', label: 'Copy link', icon: Link2, onSelect: () => void copy(`${window.location.origin}/workflows/${encodeURIComponent(wf.id)}`, 'Link') },
     { id: 'handle', label: 'Copy handle', icon: Copy, onSelect: () => void copy(shortCode(wf.id), 'Handle') },
@@ -142,6 +167,7 @@ export function EditorHeader({ workflowId, onSelectNode }: { workflowId: string;
       tabs={{ items: [{ value: 'canvas', label: 'Canvas' }, { value: 'outline', label: 'Outline' }], value: view, onChange: (v) => setView(v as EditorView), 'aria-label': 'View' }}
       actions={
         <>
+          <SavedNote stamp={wf.updatedAt} />
           <span className="type-meta hidden text-ink-3 sm:inline" title={`Version ${wf.version}: every editing session saves a new version`}>
             v{wf.version}
           </span>

@@ -49,7 +49,7 @@ const OUTCOMES: { id: 'done' | 'failed' | 'stopped' | 'active'; label: string; s
 export function RunsCard({ insights, params, now }: { insights: Insights; params: URLSearchParams; now: number }) {
   const [view, setView] = useState<RunsView>('outcome')
   const drill = useDrill(params)
-  const { buckets, totals: t, window } = insights
+  const { buckets, totals: t, window: win } = insights
   const unit = insights.bucketUnit
   const categories = useMemo(() => buckets.map(bucketLabel), [buckets])
 
@@ -70,11 +70,11 @@ export function RunsCard({ insights, params, now }: { insights: Insights; params
 
   const kindKey = RUN_KINDS.filter((k) => buckets.some((b) => b.byKind[k] > 0)).join()
   const kinds = useMemo(() => (kindKey ? (kindKey.split(',') as RunKind[]) : []), [kindKey])
+  // Empty when nothing ran (no series): the chart shows its placeholder. Colors follow the kind, not its rank.
   const kindSeries: TimeSeries[] = useMemo(
     () => kinds.map((k) => ({ id: k, label: KIND_LABEL[k], colorIndex: RUN_KINDS.indexOf(k), points: buckets.map((b) => ({ t: b.start, v: b.byKind[k] })) })),
     [buckets, kinds],
   )
-  // Empty when nothing ran (no series): the chart shows its placeholder.
   const timeFormat = useMemo(() => {
     const byStart = new Map(buckets.map((b) => [b.start, b]))
     return (ts: number) => {
@@ -93,10 +93,10 @@ export function RunsCard({ insights, params, now }: { insights: Insights; params
       {view === 'hour'
         ? heatPeak
           ? `busiest ${DAYS[heatPeak.day]} ${String(heatPeak.hour).padStart(2, '0')}:00 · ${heatPeak.value} ${heatPeak.value === 1 ? 'run' : 'runs'}`
-          : rangeLabel(window.rangeDays)
+          : rangeLabel(win.rangeDays)
         : peak
           ? `peak ${peak.runs} · ${bucketTitle(peak, now)}`
-          : rangeLabel(window.rangeDays)}
+          : rangeLabel(win.rangeDays)}
     </CardSummary>
   )
 
@@ -185,7 +185,7 @@ export function RunsCard({ insights, params, now }: { insights: Insights; params
             hideViewToggle
             format={(v) => COUNT.format(v)}
             tickFormat={countTick}
-            ariaLabel={`Runs per ${unit} by outcome, ${rangeLabel(window.rangeDays).toLowerCase()}: ${outcomeTotals.map((o) => `${o.total} ${o.label.toLowerCase()}`).join(', ')}.`}
+            ariaLabel={`Runs per ${unit} by outcome, ${rangeLabel(win.rangeDays).toLowerCase()}: ${outcomeTotals.map((o) => `${o.total} ${o.label.toLowerCase()}`).join(', ')}.`}
             empty="No runs in this period"
           />
         </div>
@@ -215,7 +215,7 @@ export function SpendCard({ insights, params, now }: { insights: Insights; param
   const [view, setView] = useState<SpendView>('day')
   const drill = useDrill(params)
   const agents = useTable('agents')
-  const { buckets, totals: t, previous: p, window } = insights
+  const { buckets, totals: t, previous: p, window: win } = insights
   const unit = insights.bucketUnit
   const estimateOnly = t.liveCostUsd === 0 && t.costUsd > 0
   const categories = useMemo(() => buckets.map(bucketLabel), [buckets])
@@ -266,20 +266,20 @@ export function SpendCard({ insights, params, now }: { insights: Insights; param
       }
     })
 
-  const delta = deltaPhrase(percentDelta(t.costUsd, p.costUsd), comparisonLabel(window.rangeDays))
+  const delta = deltaPhrase(percentDelta(t.costUsd, p.costUsd), comparisonLabel(win.rangeDays))
   const mixed = t.liveCostUsd > 0 && t.simulatedCostUsd > 0
   const summary = (
     // Live spend and estimates are never added into one figure: live leads, the estimate follows.
     <CardSummary figure={mixed ? `${formatCost(t.liveCostUsd)} live` : formatCost(t.costUsd, { est: estimateOnly })}>
       {mixed ? (
-        `+ ${formatCost(t.simulatedCostUsd, { est: true })} simulated · ${rangeLabel(window.rangeDays).toLowerCase()}`
+        `+ ${formatCost(t.simulatedCostUsd, { est: true })} simulated · ${rangeLabel(win.rangeDays).toLowerCase()}`
       ) : estimateOnly && view !== 'day' ? (
         <span className="inline-flex items-center gap-1.5">
           <SimBadge size="xs" />
-          {delta ?? rangeLabel(window.rangeDays)}
+          {delta ?? rangeLabel(win.rangeDays)}
         </span>
       ) : (
-        (delta ?? rangeLabel(window.rangeDays))
+        (delta ?? rangeLabel(win.rangeDays))
       )}
     </CardSummary>
   )
@@ -377,7 +377,7 @@ export function SpendCard({ insights, params, now }: { insights: Insights; param
             legend={false}
             hideViewToggle
             format={(v) => formatCost(v)}
-            ariaLabel={`Spend per ${unit}, ${rangeLabel(window.rangeDays).toLowerCase()}: ${formatCost(t.liveCostUsd)} live, ${formatCost(t.simulatedCostUsd)} estimated for simulated runs.`}
+            ariaLabel={`Spend per ${unit}, ${rangeLabel(win.rangeDays).toLowerCase()}: ${formatCost(t.liveCostUsd)} live, ${formatCost(t.simulatedCostUsd)} estimated for simulated runs.`}
             empty="Nothing spent in this period"
           />
         </div>
@@ -392,7 +392,7 @@ export function SpendCard({ insights, params, now }: { insights: Insights; param
 
 export function TokensCard({ insights, params }: { insights: Insights; params: URLSearchParams }) {
   const drill = useDrill(params)
-  const { totals: t, window } = insights
+  const { totals: t, window: win } = insights
   const items: BreakdownItem[] = insights.byKind.map((k) => {
     const Icon = RUN_KIND_ICON[k.kind as RunKind]
     const simOnly = k.simulatedRuns === k.runs
@@ -422,7 +422,7 @@ export function TokensCard({ insights, params }: { insights: Insights; params: U
               {allSim ? 'all simulated · counts are estimates' : `${formatTokenCount(simTokens)} simulated (est.)`}
             </span>
           ) : (
-            rangeLabel(window.rangeDays)
+            rangeLabel(win.rangeDays)
           )}
         </CardSummary>
       }

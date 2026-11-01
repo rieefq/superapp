@@ -20,8 +20,8 @@ import { filterQuery } from './state'
 const COUNT = new Intl.NumberFormat('en-US')
 
 export function KpiPanel({ insights, params }: { insights: Insights; params: URLSearchParams }) {
-  const { totals: t, previous: p, budget, window } = insights
-  const comparison = comparisonLabel(window.rangeDays)
+  const { totals: t, previous: p, budget, window: win } = insights
+  const comparison = comparisonLabel(win.rangeDays)
   const history = (extra: Record<string, string | null> = {}) => `/insights/history${filterQuery(params, extra)}`
   const setNeedsYouOpen = useShellStore((s) => s.setNeedsYouOpen)
   const setNeedsYouTab = useShellStore((s) => s.setNeedsYouTab)
@@ -36,7 +36,7 @@ export function KpiPanel({ insights, params }: { insights: Insights; params: URL
         <KpiTile
           label="Runs"
           to={history()}
-          ariaLabel={`Runs: ${t.runs}. Show them`}
+          ariaLabel={`Runs: ${t.runs}${spokenDelta(percentDelta(t.runs, p.runs), comparison)}, ${t.active} in flight. Show them`}
           figure={COUNT.format(t.runs)}
           delta={percentDelta(t.runs, p.runs)}
           comparison={comparison}
@@ -54,7 +54,7 @@ export function KpiPanel({ insights, params }: { insights: Insights; params: URL
         <KpiTile
           label="Success rate"
           to={history(failedOrStopped ? { status: 'failed' } : {})}
-          ariaLabel={`Success rate ${formatRate(t.successRate)}. ${failedOrStopped ? 'Show failed runs' : 'Show runs'}`}
+          ariaLabel={`Success rate ${formatRate(t.successRate)}${spokenDelta(pointsDelta(t.successRate, p.successRate), comparison)}, ${outcomeLine(t)}. ${failedOrStopped ? 'Show failed runs' : 'Show runs'}`}
           figure={formatRate(t.successRate)}
           delta={pointsDelta(t.successRate, p.successRate)}
           comparison={comparison}
@@ -71,7 +71,7 @@ export function KpiPanel({ insights, params }: { insights: Insights; params: URL
             setNeedsYouTab('needs')
             setNeedsYouOpen(true)
           }}
-          ariaLabel={`Median approval wait ${formatWait(t.medianApprovalWaitMs)}, ${t.approvalsPending} pending. Open Needs you`}
+          ariaLabel={`Waited on you: median approval wait ${formatWait(t.medianApprovalWaitMs)}${spokenDelta(percentDelta(t.medianApprovalWaitMs, p.medianApprovalWaitMs), comparison)}, ${t.approvalsPending} pending, ${t.approvalsResolved} decided. Open Needs you`}
           figure={formatWait(t.medianApprovalWaitMs)}
           figureNote={t.medianApprovalWaitMs !== null ? 'median' : undefined}
           delta={percentDelta(t.medianApprovalWaitMs, p.medianApprovalWaitMs)}
@@ -92,7 +92,7 @@ export function KpiPanel({ insights, params }: { insights: Insights; params: URL
         <KpiTile
           label="Spend · this month"
           to="/settings/budgets"
-          ariaLabel={`Spend this month ${formatCost(budget.countedUsd, { est: spendEstimate })}${budget.monthlyUsd ? ` of ${formatCost(budget.monthlyUsd)}` : ''}. Open Settings, Budgets`}
+          ariaLabel={`Spend this month ${formatCost(budget.countedUsd, { est: spendEstimate })}${budget.monthlyUsd ? ` of ${formatCost(budget.monthlyUsd)} budget` : ''}${budget.simulatedSpentUsd > 0 && !budget.countsSimulated ? `, plus ${formatCost(budget.simulatedSpentUsd, { est: true })} simulated, not counted` : ''}. Open Settings, Budgets`}
           figure={
             spendEstimate ? (
               <Tooltip content={ESTIMATE_TOOLTIP}>
@@ -136,7 +136,7 @@ export function KpiPanel({ insights, params }: { insights: Insights; params: URL
         <MiniStat
           label="Tokens"
           value={formatTokenCount(t.tokens)}
-          sub={t.tokens ? `${formatTokenCount(t.inputTokens)} in · ${formatTokenCount(t.outputTokens)} out` : rangeLabel(window.rangeDays)}
+          sub={t.tokens ? `${formatTokenCount(t.inputTokens)} in · ${formatTokenCount(t.outputTokens)} out` : rangeLabel(win.rangeDays)}
         />
         <MiniStat
           label="Median run"
@@ -149,7 +149,7 @@ export function KpiPanel({ insights, params }: { insights: Insights; params: URL
           sub={deltaText(absoluteDelta(t.tasksCompleted, p.tasksCompleted, (n) => COUNT.format(n)), comparison)}
         />
         <MiniStat
-          label={`Spend · ${window.rangeDays === 1 ? '24h' : `${window.rangeDays}d`}`}
+          label={`Spend · ${win.rangeDays === 1 ? '24h' : `${win.rangeDays}d`}`}
           value={
             // Live spend and estimates are never added into one figure.
             t.liveCostUsd > 0 ? (
@@ -177,6 +177,14 @@ export function KpiPanel({ insights, params }: { insights: Insights; params: URL
       </div>
     </section>
   )
+}
+
+/** The delta as a spoken phrase for a tile's accessible name ("up 16% vs previous 7 days"). */
+function spokenDelta(delta: Delta | null, comparison: string): string {
+  if (!delta) return ''
+  if (delta.value === 'New') return `, ${comparison.replace(/^vs previous/, 'none in the previous')}`
+  if (delta.direction === 'flat') return `, no change ${comparison}`
+  return `, ${delta.direction} ${delta.value} ${comparison}`
 }
 
 function deltaText(delta: Delta | null, comparison: string): string {

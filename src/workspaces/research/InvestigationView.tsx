@@ -173,6 +173,7 @@ function InvestigationScreen({ inv, tabParam }: { inv: Investigation; tabParam?:
   const menu: MenuItem[] = [
     ...(hasReport ? [{ id: 'follow', label: 'Ask a follow-up', icon: CornerUpRight, shortcut: '/', onSelect: focusFollowUp }] : []),
     { id: 'hold', label: held ? 'Release the report' : 'Hold the report', icon: Layers, shortcut: 'h', description: held ? undefined : 'It rides along in every new AI action', onSelect: toggleHold },
+    ...(phone && inv.status === 'failed' && !active ? [{ id: 'retry', label: 'Retry the research', icon: RotateCw, onSelect: retry }] : []),
     ...(phone && hasReport ? [{ id: 'save', label: inv.knowledgeId ? 'Open in Knowledge' : 'Save to Knowledge', icon: BookPlus, shortcut: 's', onSelect: saveOrOpen }] : []),
     { id: 'export', label: 'Export Markdown', icon: Download, disabled: !hasReport, onSelect: exportMd },
     ...(inv.status === 'review' ? [{ id: 'complete', label: 'Mark complete', icon: Check, onSelect: markComplete }] : []),
@@ -222,7 +223,8 @@ function InvestigationScreen({ inv, tabParam }: { inv: Investigation; tabParam?:
   actions.push({ key: 'turn', node: <span key="turn">{turnMenu}</span> })
   if (inv.status !== 'complete' && hasReport) actions.push({ key: 'save', node: <SaveReportButton key="save" inv={inv} /> })
   const stageWidth = layout.docking.stageWidth
-  const fit = phone || stageWidth < 900 ? 1 : stageWidth < 1240 ? 2 : 3
+  // Phones keep the title readable: every action lives in ⋯ there.
+  const fit = phone ? 0 : stageWidth < 900 ? 1 : stageWidth < 1240 ? 2 : 3
   const visibleActions = actions.slice(0, fit)
   const turnHidden = !visibleActions.some((a) => a.key === 'turn')
 
@@ -285,7 +287,7 @@ function InvestigationScreen({ inv, tabParam }: { inv: Investigation; tabParam?:
         }
       >
         <div className={cn('mx-auto flex w-full flex-col', column)}>
-          <Masthead inv={inv} run={run} />
+          <Masthead inv={inv} run={run} compact={tab === 'findings' || tab === 'sources' || tab === 'activity'} phone={phone} />
           {active && run && <Frontier inv={inv} run={run} sources={sources} className="mb-6" />}
           {tab === 'board' && (
             <Board inv={inv} run={run} sources={sources} selectedId={selectedId} readingIds={readingIds} onSelectSource={selectSource} columns={columns} />
@@ -325,14 +327,17 @@ function InvestigationScreen({ inv, tabParam }: { inv: Investigation; tabParam?:
 
 // ------------------------------------------------------------------------------------------------ masthead
 
-/** Who researches it, at what depth, in which project — and the question, in the document voice. */
-function Masthead({ inv, run }: { inv: Investigation; run?: Run }) {
+/**
+ * Who researches it, at what depth, in which project — and the question, in the document voice. The
+ * list views (findings, sources, activity) get a compact version so the list starts high.
+ */
+function Masthead({ inv, run, compact, phone }: { inv: Investigation; run?: Run; compact?: boolean; phone?: boolean }) {
   const agent = useRow('agents', run?.agentId ?? RESEARCH_AGENT_ID)
   const project = useRow('projects', inv.projectId)
   const working = run?.status === 'running'
   const sourcesOff = inv.sources && (!inv.sources.web || !inv.sources.knowledge)
   return (
-    <header className="mb-6 flex flex-col gap-2.5">
+    <header className={cn('flex flex-col', compact ? 'mb-5 gap-1.5' : 'mb-6 gap-2.5')}>
       <div className="type-meta flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-ink-3">
         {agent ? (
           <span className="inline-flex items-center gap-1.5 text-ink-2">
@@ -359,13 +364,21 @@ function Masthead({ inv, run }: { inv: Investigation; run?: Run }) {
             </span>
           </>
         )}
-        <span aria-hidden>·</span>
-        <span>Started {timeAgo(inv.createdAt)}</span>
-        <span aria-hidden>·</span>
-        <IdCode id={inv.id} />
+        {!phone && (
+          <>
+            <span aria-hidden>·</span>
+            <span>Started {timeAgo(inv.createdAt)}</span>
+            <span aria-hidden>·</span>
+            <IdCode id={inv.id} />
+          </>
+        )}
       </div>
-      <h2 className="type-doc-h2 max-w-[760px] text-pretty text-ink">{inv.question}</h2>
-      {inv.origin && (
+      {compact ? (
+        <h2 className="type-body-sm line-clamp-2 max-w-[760px] text-pretty text-ink-2">{inv.question}</h2>
+      ) : (
+        <h2 className="type-doc-h2 max-w-[760px] text-pretty text-ink">{inv.question}</h2>
+      )}
+      {inv.origin && !compact && (
         <div className="type-caption flex min-w-0 items-center gap-1.5 text-ink-3">
           <span>From</span>
           <EntityChip entity={inv.origin} size="sm" />
@@ -385,6 +398,7 @@ const FOLLOW_UP_TOKENS = (['plan', 'knowledge', 'search', 'browse', 'draft'] as 
  * while a run works is queued and starts when it ends — no steering mid-run (§8.1).
  */
 function FollowUpComposer({ inv, run }: { inv: Investigation; run?: Run }) {
+  const phone = useShellLayout().formFactor === 'phone'
   const active = !!run && isRunActive(run.status)
   const queued = useQueuedFollowUps(inv.id)
   const tokens = Math.round(FOLLOW_UP_TOKENS)
@@ -419,6 +433,7 @@ function FollowUpComposer({ inv, run }: { inv: Investigation; run?: Run }) {
       placeholder={inv.report ? 'Ask a follow-up — Scout searches again and adds a section' : 'Ask a follow-up — it starts when this run ends'}
       aria-label="Ask a follow-up"
       submitLabel={active ? 'Queue' : 'Ask'}
+      size={phone ? 'compact' : 'default'}
       showModel={false}
       above={above}
       readBack={<ReadBackLine data={readBack} />}

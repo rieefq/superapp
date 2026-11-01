@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react'
+import { memo, useCallback, useId, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { useShallow } from 'zustand/react/shallow'
 import { ShieldCheck } from 'lucide-react'
@@ -112,10 +112,12 @@ function AlwaysAskChips({ selected, labelledBy, describedBy }: { selected: reado
 function PolicyPreview() {
   const safety = useSettings((s) => s.safety)
   const rows = useMemo(() => policyRows(safety), [safety])
+  const [open, setOpen] = useState<Capability | null>(null)
   const always = rows.filter((r) => r.alwaysAsk)
   const autonomyAsks = rows.filter((r) => !r.alwaysAsk && r.decision.outcome === 'ask')
   const allowed = rows.filter((r) => r.decision.outcome === 'allow')
   const effect = AUTONOMY_OPTIONS.find((o) => o.value === safety.defaultAutonomy)?.effect ?? ''
+  const toggle = useCallback((c: Capability) => setOpen((cur) => (cur === c ? null : c)), [])
   return (
     <Group
       label="What runs may do"
@@ -125,15 +127,22 @@ function PolicyPreview() {
           {AUTONOMY_LABEL[safety.defaultAutonomy]} · asks before {always.length + autonomyAsks.length} of {rows.length}
         </span>
       }
-      footnote="An agent’s own grants and a connected service’s permissions apply on top of this. Hover a capability for the exact reason."
+      footnote="An agent’s own grants and a connected service’s permissions apply on top of this. Select a capability to see why."
     >
       <Row className="flex flex-col gap-3">
         <h3 className="type-body-sm flex items-center gap-1.5 font-medium text-attn-ink">
           Asks you <span aria-hidden>◆</span>
           <span className="type-meta font-normal text-ink-3">{always.length + autonomyAsks.length}</span>
         </h3>
-        {always.length > 0 && <PolicyGroup caption="In your always-ask list" rows={always} />}
-        {autonomyAsks.length > 0 && <PolicyGroup caption={`${AUTONOMY_LABEL[safety.defaultAutonomy]}: ${effect.charAt(0).toLowerCase()}${effect.slice(1)}`} rows={autonomyAsks} />}
+        {always.length > 0 && <PolicyGroup caption="In your always-ask list" rows={always} open={open} onToggle={toggle} />}
+        {autonomyAsks.length > 0 && (
+          <PolicyGroup
+            caption={`${AUTONOMY_LABEL[safety.defaultAutonomy]}: ${effect.charAt(0).toLowerCase()}${effect.slice(1)}`}
+            rows={autonomyAsks}
+            open={open}
+            onToggle={toggle}
+          />
+        )}
         {always.length + autonomyAsks.length === 0 && <p className="text-xs text-ink-3">Nothing. Every capability runs without asking.</p>}
       </Row>
       <Row className="flex flex-col gap-3">
@@ -142,7 +151,7 @@ function PolicyPreview() {
           <span className="type-meta font-normal text-ink-3">{allowed.length}</span>
         </h3>
         {allowed.length > 0 ? (
-          <PolicyGroup rows={allowed} />
+          <PolicyGroup rows={allowed} open={open} onToggle={toggle} />
         ) : (
           <p className="text-xs text-ink-3">Nothing. Every capability waits for your approval.</p>
         )}
@@ -151,23 +160,57 @@ function PolicyPreview() {
   )
 }
 
-const PolicyGroup = memo(function PolicyGroup({ caption, rows }: { caption?: string; rows: PolicyRow[] }) {
+/** Capabilities as chips; selecting one reveals the policy's exact reason under the group. */
+const PolicyGroup = memo(function PolicyGroup({
+  caption,
+  rows,
+  open,
+  onToggle,
+}: {
+  caption?: string
+  rows: PolicyRow[]
+  open: Capability | null
+  onToggle: (c: Capability) => void
+}) {
+  const reasonId = useId()
+  const shown = rows.find((r) => r.capability === open)
   return (
     <div className="flex flex-col gap-1.5">
       {caption && <p className="text-xs text-ink-3 text-pretty">{caption}</p>}
       <ul className="flex flex-wrap gap-1.5" aria-label={caption ?? 'Capabilities'}>
-        {rows.map((r) => (
-          <li key={r.capability} title={`${r.decision.reason}.`} className="type-caption inline-flex h-[22px] items-center gap-1.5 rounded-xs border border-line px-2 text-ink-2">
-            <DynamicIcon name={CAPABILITIES[r.capability].icon} aria-hidden className="size-3.5 shrink-0 text-ink-3" strokeWidth={1.75} />
-            {r.label}
-            <span className={cn('type-meta-caps text-[10px] tracking-[0.04em]', r.risk === 'high' ? 'text-fail-ink' : 'text-ink-3')}>
-              <span className="sr-only">, risk </span>
-              {RISK_SHORT[r.risk]}
-            </span>
-            <span className="sr-only">. {r.decision.reason}.</span>
-          </li>
-        ))}
+        {rows.map((r) => {
+          const expanded = r.capability === open
+          return (
+            <li key={r.capability}>
+              <button
+                type="button"
+                aria-expanded={expanded}
+                aria-controls={expanded ? reasonId : undefined}
+                onClick={() => onToggle(r.capability)}
+                className={cn(
+                  'type-caption relative inline-flex h-[22px] items-center gap-1.5 rounded-xs border px-2 transition-colors duration-(--dur-1) ease-standard focus-visible:outline-offset-1',
+                  "pointer-coarse:after:absolute pointer-coarse:after:-inset-y-3 pointer-coarse:after:inset-x-0 pointer-coarse:after:content-['']",
+                  expanded ? 'border-line-strong bg-hover text-ink' : 'border-line text-ink-2 hover:border-line-strong hover:text-ink',
+                )}
+              >
+                <DynamicIcon name={CAPABILITIES[r.capability].icon} aria-hidden className="size-3.5 shrink-0 text-ink-3" strokeWidth={1.75} />
+                {r.label}
+                <span className={cn('type-meta-caps text-[10px] tracking-[0.04em]', r.risk === 'high' ? 'text-fail-ink' : 'text-ink-3')}>
+                  <span className="sr-only">, risk </span>
+                  {RISK_SHORT[r.risk]}
+                </span>
+              </button>
+            </li>
+          )
+        })}
       </ul>
+      {shown && (
+        <p id={reasonId} className="type-mono-sm flex flex-wrap items-baseline gap-x-2 pt-0.5 text-ink-2">
+          <span className="text-ink">{shown.label}</span>
+          <span aria-hidden className="text-ink-4">·</span>
+          <span>{shown.decision.reason}.</span>
+        </p>
+      )}
     </div>
   )
 })

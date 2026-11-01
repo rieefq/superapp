@@ -86,6 +86,7 @@ export const TaskListRow = memo(function TaskListRow({
   onOpen,
   showProject,
   compact,
+  onToggleDone,
 }: {
   task: Task
   selected: boolean
@@ -93,6 +94,8 @@ export const TaskListRow = memo(function TaskListRow({
   showProject?: { name: string; mark: ReactNode }
   /** My tasks: no assignee mark (it is always you) and no origin chip. */
   compact?: boolean
+  /** Replace the glyph's quick complete (My tasks keeps completed rows in place). */
+  onToggleDone?: (task: Task) => void
 }) {
   const signal = useTaskSignal(task)
   const assignee = useActorName(task.assignee)
@@ -115,7 +118,7 @@ export const TaskListRow = memo(function TaskListRow({
           type="button"
           tabIndex={-1}
           aria-label={closed ? `Reopen “${task.title}”` : `Mark “${task.title}” done`}
-          onClick={() => completeWithUndo(task)}
+          onClick={() => (onToggleDone ? onToggleDone(task) : completeWithUndo(task))}
           className="relative z-10 -my-1 grid size-6 shrink-0 place-items-center rounded-xs transition-colors duration-(--dur-1) hover:bg-press"
         >
           <TaskStatusGlyph task={task} decorative />
