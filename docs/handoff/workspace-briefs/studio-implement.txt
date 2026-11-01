@@ -1,0 +1,45 @@
+You are a senior product engineer with a strong product-design eye on the team building Atrium — a premium, browser-only "AI operating system" where chat, research, coding agents, autonomous agents, workflows, knowledge, creative tools and projects share one context. CLAUDE.md is in your context: follow it strictly (parallel-work rules: NO git; edit only your files; filtered typecheck; private dev port + cache dir; screenshots via scripts/shot.mjs).
+
+READ FIRST (in this order):
+1. docs/DESIGN.md — the design spec. Read the principles, shell anatomy, tokens, signature components, interaction/motion, voice & honesty rules, do/don't, the cross-workspace flows, and above all YOUR workspace's section. Follow it closely; where it is silent, extrapolate from its principles.
+2. The design system: src/ui/index.ts and the sources of components you use (the /dev/ui gallery shows them all). Use these components — never re-implement a primitive (buttons, menus, dialogs, tabs, inputs, toasts, confirm, charts, markdown, code, diff, terminal, tree, table, run timeline, approval card, entity chip, agent mark, sim badge, provenance line…).
+3. Shared connected components in src/app/components/** (Composer, pickers, HandoffMenu, RunPanel, PinButton, ConnectionsList…) and src/workspaces/home/** — Home is the reference implementation of a workspace: match its structure, density and polish.
+4. The core services for your domain (src/core/services/*, src/core/ai/*, src/core/runs/*, src/core/search/*, types in src/core/types/*). Call services and hooks; never re-implement business logic or write cross-cutting tables directly in components.
+
+WORKSPACE: studio · route prefix /studio · dev port 5218 · e2e port 5318 · screenshots /tmp/shots-studio
+FILES YOU OWN: src/workspaces/studio/** (keep manifest id/path/group/chord; refine label/description/icon if the spec says so; ADD `commands` for the command center — e.g. create/open actions), e2e/studio.spec.ts, src/workspaces/studio/lens.tsx, src/core/services/studio.ts, src/core/runs/factories/studio.ts, src/core/sim/art.ts, src/core/sim/studio.ts (enrich; keep exported signatures). The workspace's index.tsx default export renders the whole workspace for its route prefix; use react-router <Routes> with relative child paths for sub-routes (the parent route is `studio/*`). Read the scope with useScope() from @/core/context and filter accordingly ("All work" when null).
+
+FUNCTIONAL REQUIREMENTS:
+
+DESIGN SPEC FOR THIS WORKSPACE: docs/DESIGN.md §6.8 — it is authoritative for layout, template, interactions and wording; the requirements below list capabilities that must exist — map them onto the spec's patterns (e.g. a 'context panel' is Inspector › Context; 'handoff/Turn into' goes through TurnIntoMenu → Start sheet; 'pin' is Hold; run views use RunPanel/RunTimeline/StepTape; templates come from src/app/templates).
+Purpose: a creative studio for images, video, decks, copy and audio — generation, iteration, organization.
+Must have:
+- Studio home: generation bar (kind tabs Image/Video/Deck/Copy/Audio; prompt; kind-specific params: aspect, style, duration, slide count, format, voice; board picker) → asset appears immediately in a generating state with live progress, then its result. Boards sidebar (create/rename/delete), kind filter, favorites, masonry/grid of assets with procedural previews.
+- Asset view: large preview by kind — image: procedural art render; video: storyboard player cycling through shot frames with subtle motion + shot list; deck: slide editor (edit title/body/layout/notes) + Present mode (fullscreen, arrow keys, Esc); copy: Markdown editor with variants; audio: narration script + waveform + "Preview with browser voice" using the real Web Speech API (labeled "browser voice preview"). Versions strip (select current, compare), actions: Variation, Edit with instruction, Favorite, Rename, Move to board, Download (image: real SVG/PNG export of the procedural render; deck/copy: .md/.html), Save to knowledge (copy/deck/script), Delete (confirm).
+- Honesty: a persistent "Simulated generator" label on generated media; explain what a real generator connection would change.
+E2E (e2e/studio.spec.ts): generate an image → appears → open → create a variation → 2 versions; open the deck → Present → arrow through slides → Esc.
+
+QUALITY BAR:
+- It must feel like part of ONE product: same shell rhythm, header pattern, spacing scale, type voices, motion and honesty conventions as Home and the spec. Premium, calm, precise. No generic dashboard tropes, no decorative gradients, no emoji.
+- Every control works. Every list has empty, loading (where async) and error states. Live data updates live (runs progress while you watch). Simulated things are labeled; live things are labeled live.
+- Cross-workspace: every entity you show links to its home (EntityChip / entityRoute); every AI output offers the relevant handoffs (HandoffMenu); context can be pinned (PinButton).
+- Keyboard: all actions reachable; visible focus; Escape closes; list navigation with arrows where natural. Screen-reader labels on icon buttons.
+- Responsive 360px → 2560px: panels collapse into sheets/tabs on small screens; no horizontal page scroll; touch targets ≥ 44px on touch.
+- Performance: avoid re-rendering whole lists on every streaming token (select narrowly with the db hooks; memoize row components).
+
+VERIFY (required before reporting):
+- Dev server: `PORT=5218 VITE_CACHE_DIR=node_modules/.vite-5218 npx vite --port 5218 --strictPort` (background).
+- Screenshots of every major view: desktop 1440×900 dark + light, mobile 390×844; LOOK at each PNG with the Read tool; iterate on anything that looks off. The script fails on console errors — there must be none.
+- Drive the main journeys with short Playwright scripts (require('playwright'); chromium.launch()).
+- Write e2e/studio.spec.ts using `import { test, expect, open } from './fixtures'` (fresh seeded world per test; console errors fail tests; simulation speed 8×) covering the journeys listed; run `E2E_PORT=5318 npx playwright test e2e/studio.spec.ts` until green.
+- `npm run typecheck 2>&1 | grep -E 'src/workspaces/studio|e2e/studio' || echo clean`.
+FINAL REPORT (≤ 400 words): what you built (views + key interactions), files, test results, screenshots reviewed, deviations from the spec and why, known gaps, and any change you need in files you don't own.
+
+LENS: implement lens renderers for the entity kinds your workspace owns in src/workspaces/studio/lens.tsx (panel = Inspector › Item body; card = hover/⌘K preview) following docs/DESIGN.md §5.4.8 — kinds per KIND_META in src/core/services/entities.ts.
+
+INTEGRATION NOTES (read before coding):
+- Templates: src/app/templates (README.md has usage) — WorkspaceScreen, ListPane/ListGroup/ListRow/ListRows, ScopeFilterRow, Stage, StageHeader and the five templates (Page, Session, Board, Canvas, Library). Use them; never build your own frame.
+- Shell store (src/app/shell/store.ts): setStagePrimary(ref) tells the Inspector which entity the stage shows; setSelection(ref) for list selections; attachRun(runId, ws) opens Inspector › Run; openStartSheet(kind, {source, prefill}) for every "Turn into…"/new delegated work. useRegisterCommands (src/app/commands) lets a view add ⌘K commands while mounted.
+- Shared components (src/app/components, README.md): Composer (+ ContextLine/ContextMeter; meta.context = exactly what will be sent), toChatSelection(meta.context) → spread into sendMessage so switched-off chips are never sent, StartSheet/StartPanel/ReadBack, TurnIntoMenu, HoldButton, SaveToKnowledgeButton, DerivedRow/LandedCard, RunPanel, pickers, SelectionActions.
+- Signature kit (@/ui): RunStatusGlyph/Badge, StepTape, RunPill/RunRow, RunTimeline, ProvenanceLine (Colophon), Receipt, SimBadge/LiveBadge, AgentMark, MonogramMark, EntityChip, ApprovalCardConnected, TickMeter, IdCode, MetaLabel.
+- Reference implementation: src/workspaces/home (structure, density, honesty labeling, keyboard). Match it.

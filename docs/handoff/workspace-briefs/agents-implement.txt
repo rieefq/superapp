@@ -1,0 +1,49 @@
+You are a senior product engineer with a strong product-design eye on the team building Atrium — a premium, browser-only "AI operating system" where chat, research, coding agents, autonomous agents, workflows, knowledge, creative tools and projects share one context. CLAUDE.md is in your context: follow it strictly (parallel-work rules: NO git; edit only your files; filtered typecheck; private dev port + cache dir; screenshots via scripts/shot.mjs).
+
+READ FIRST (in this order):
+1. docs/DESIGN.md — the design spec. Read the principles, shell anatomy, tokens, signature components, interaction/motion, voice & honesty rules, do/don't, the cross-workspace flows, and above all YOUR workspace's section. Follow it closely; where it is silent, extrapolate from its principles.
+2. The design system: src/ui/index.ts and the sources of components you use (the /dev/ui gallery shows them all). Use these components — never re-implement a primitive (buttons, menus, dialogs, tabs, inputs, toasts, confirm, charts, markdown, code, diff, terminal, tree, table, run timeline, approval card, entity chip, agent mark, sim badge, provenance line…).
+3. Shared connected components in src/app/components/** (Composer, pickers, HandoffMenu, RunPanel, PinButton, ConnectionsList…) and src/workspaces/home/** — Home is the reference implementation of a workspace: match its structure, density and polish.
+4. The core services for your domain (src/core/services/*, src/core/ai/*, src/core/runs/*, src/core/search/*, types in src/core/types/*). Call services and hooks; never re-implement business logic or write cross-cutting tables directly in components.
+
+WORKSPACE: agents · route prefix /agents · dev port 5213 · e2e port 5313 · screenshots /tmp/shots-agents
+FILES YOU OWN: src/workspaces/agents/** (keep manifest id/path/group/chord; refine label/description/icon if the spec says so; ADD `commands` for the command center — e.g. create/open actions), e2e/agents.spec.ts, src/workspaces/agents/lens.tsx, src/core/services/agents.ts, src/core/services/agentTemplates.ts, src/core/runs/factories/agent.ts, src/core/runs/factories/agentContent.ts (enrich; keep exported signatures). The workspace's index.tsx default export renders the whole workspace for its route prefix; use react-router <Routes> with relative child paths for sub-routes (the parent route is `agents/*`). Read the scope with useScope() from @/core/context and filter accordingly ("All work" when null).
+
+FUNCTIONAL REQUIREMENTS:
+
+DESIGN SPEC FOR THIS WORKSPACE: docs/DESIGN.md §6.4 — it is authoritative for layout, template, interactions and wording; the requirements below list capabilities that must exist — map them onto the spec's patterns (e.g. a 'context panel' is Inspector › Context; 'handoff/Turn into' goes through TurnIntoMenu → Start sheet; 'pin' is Hold; run views use RunPanel/RunTimeline/StepTape; templates come from src/app/templates).
+Purpose: the command center for autonomous agents and every run — what is happening, what is done, where it is stuck, where a human is needed.
+Must have:
+- Fleet overview: status counts (working / waiting on you / idle / paused / needs attention), live "now" strip of active runs across all agents (agent identity, current step title, progress, elapsed) — multiple agents visibly working at once.
+- Roster: every agent with identity mark, name, role, live status, current activity, success rate, last run, 30-day cost; filters (status), "New agent".
+- Runs: a filterable, live-updating list of ALL runs (status, kind, agent, project, date) — the execution history; selecting one opens the run detail.
+- Agent detail: identity header (mark, name, role, status; actions: Run now (instruction dialog), Pause/Resume, Assign task (pick existing task or create one → assignTask), duplicate, archive, delete (confirm)). Tabs: Overview (stats + sparkline + current run live + recent runs), Runs, Configuration (instructions editor, model picker, autonomy segmented control with plain-language explanation, capability grants table — capability, providing integration + its connection status, allow/ask/deny — with links to connect missing integrations, knowledge scope (all / collections / projects), schedule presets + enabled, monthly budget), Activity (audit log).
+- Run detail (shared component used by other workspaces too): header (title, status, agent, origin chip, RUN code, tokens, cost (estimate label when simulated), duration), live RunTimeline with expandable step details (input/output, refs, file changes), approvals inline, outputs as entity chips, controls (pause/resume/cancel/retry), "Send result to…" (task, knowledge).
+- Create agent: template gallery → identity (name, role, hue) → instructions → capabilities + autonomy → knowledge scope → review & create; then "Run now".
+E2E (e2e/agents.spec.ts): create an agent from a template and run it → run appears live and completes; approve the pending Herald Slack approval → run continues to success; pause an agent and see Run now disabled; change a capability grant to "deny".
+
+QUALITY BAR:
+- It must feel like part of ONE product: same shell rhythm, header pattern, spacing scale, type voices, motion and honesty conventions as Home and the spec. Premium, calm, precise. No generic dashboard tropes, no decorative gradients, no emoji.
+- Every control works. Every list has empty, loading (where async) and error states. Live data updates live (runs progress while you watch). Simulated things are labeled; live things are labeled live.
+- Cross-workspace: every entity you show links to its home (EntityChip / entityRoute); every AI output offers the relevant handoffs (HandoffMenu); context can be pinned (PinButton).
+- Keyboard: all actions reachable; visible focus; Escape closes; list navigation with arrows where natural. Screen-reader labels on icon buttons.
+- Responsive 360px → 2560px: panels collapse into sheets/tabs on small screens; no horizontal page scroll; touch targets ≥ 44px on touch.
+- Performance: avoid re-rendering whole lists on every streaming token (select narrowly with the db hooks; memoize row components).
+
+VERIFY (required before reporting):
+- Dev server: `PORT=5213 VITE_CACHE_DIR=node_modules/.vite-5213 npx vite --port 5213 --strictPort` (background).
+- Screenshots of every major view: desktop 1440×900 dark + light, mobile 390×844; LOOK at each PNG with the Read tool; iterate on anything that looks off. The script fails on console errors — there must be none.
+- Drive the main journeys with short Playwright scripts (require('playwright'); chromium.launch()).
+- Write e2e/agents.spec.ts using `import { test, expect, open } from './fixtures'` (fresh seeded world per test; console errors fail tests; simulation speed 8×) covering the journeys listed; run `E2E_PORT=5313 npx playwright test e2e/agents.spec.ts` until green.
+- `npm run typecheck 2>&1 | grep -E 'src/workspaces/agents|e2e/agents' || echo clean`.
+FINAL REPORT (≤ 400 words): what you built (views + key interactions), files, test results, screenshots reviewed, deviations from the spec and why, known gaps, and any change you need in files you don't own.
+
+LENS: implement lens renderers for the entity kinds your workspace owns in src/workspaces/agents/lens.tsx (panel = Inspector › Item body; card = hover/⌘K preview) following docs/DESIGN.md §5.4.8 — kinds per KIND_META in src/core/services/entities.ts.
+
+INTEGRATION NOTES (read before coding):
+- Templates: src/app/templates (README.md has usage) — WorkspaceScreen, ListPane/ListGroup/ListRow/ListRows, ScopeFilterRow, Stage, StageHeader and the five templates (Page, Session, Board, Canvas, Library). Use them; never build your own frame.
+- Shell store (src/app/shell/store.ts): setStagePrimary(ref) tells the Inspector which entity the stage shows; setSelection(ref) for list selections; attachRun(runId, ws) opens Inspector › Run; openStartSheet(kind, {source, prefill}) for every "Turn into…"/new delegated work. useRegisterCommands (src/app/commands) lets a view add ⌘K commands while mounted.
+- Shared components (src/app/components, README.md): Composer (+ ContextLine/ContextMeter; meta.context = exactly what will be sent), toChatSelection(meta.context) → spread into sendMessage so switched-off chips are never sent, StartSheet/StartPanel/ReadBack, TurnIntoMenu, HoldButton, SaveToKnowledgeButton, DerivedRow/LandedCard, RunPanel, pickers, SelectionActions.
+- Signature kit (@/ui): RunStatusGlyph/Badge, StepTape, RunPill/RunRow, RunTimeline, ProvenanceLine (Colophon), Receipt, SimBadge/LiveBadge, AgentMark, MonogramMark, EntityChip, ApprovalCardConnected, TickMeter, IdCode, MetaLabel.
+- Reference implementation: src/workspaces/home (structure, density, honesty labeling, keyboard). Match it.
+- Agents specifically: /agents?status=waiting must filter the run board to runs waiting on approval (assist suggestions link there). Capability grant editor shows 'Always allow' grants distinctly (CapabilityGrant.always).

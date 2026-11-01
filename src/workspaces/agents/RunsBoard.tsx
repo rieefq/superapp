@@ -123,14 +123,12 @@ function FilterMenu<T extends string>({
   options,
   onChange,
   isDefault,
-  icon,
 }: {
   label: string
   value: T
   options: { value: T; label: string; description?: string }[]
   onChange: (v: T) => void
   isDefault: boolean
-  icon?: ReactNode
 }) {
   const current = options.find((o) => o.value === value)?.label ?? label
   return (
@@ -146,7 +144,6 @@ function FilterMenu<T extends string>({
             isDefault ? 'text-ink-3 hover:bg-hover hover:text-ink' : 'bg-press text-ink hover:bg-hover',
           )}
         >
-          {icon}
           {current}
           <ChevronDown aria-hidden className="size-3 opacity-70" strokeWidth={2} />
         </button>
@@ -164,11 +161,20 @@ function RunFilters() {
     [agentsTable],
   )
   const [q, setQ] = useState(filters.q)
-  // Keep the field in sync when the URL changes elsewhere (Clear filters, links).
-  useEffect(() => setQ(filters.q), [filters.q])
+  const pushed = useRef(filters.q)
+  // Follow the URL when it changes elsewhere (Clear filters, links), never echoing our own update over newer typing.
+  useEffect(() => {
+    if (filters.q !== pushed.current) {
+      pushed.current = filters.q
+      setQ(filters.q)
+    }
+  }, [filters.q])
   useEffect(() => {
     if (q.trim() === filters.q) return
-    const t = setTimeout(() => set({ q: q.trim() }), 200)
+    const t = setTimeout(() => {
+      pushed.current = q.trim()
+      set({ q: q.trim() })
+    }, 200)
     return () => clearTimeout(t)
   }, [q, filters.q, set])
 

@@ -1,0 +1,15 @@
+LENS: CROSS-WORKSPACE JOURNEYS (DESIGN.md §7: shared mechanisms, handoff matrix §7.2, journeys §7.3).
+You MAY create/edit exactly one repo file: e2e/journeys.spec.ts (use `import { test, expect, open } from './fixtures'`). Everything else is read-only for you — you report, others fix.
+Write Playwright tests for every journey and every handoff path, run them (E2E_PORT=5391), and turn each failure into a finding with exact repro:
+1. Ask → act: Chat message → Turn into → Research (Start sheet) → investigation runs → report → Save to Knowledge → Knowledge item shows a backlink to the investigation and the message shows the derived row/landed card.
+2. Delegate → approve → review: Projects task → assign to Forge (or Start sheet Coding session) → session runs → approval appears in Needs you → approve → session reaches needs_review → Code › Changes accept all → Apply → task reflects progress.
+3. Capture → reuse: upload a .md file in Knowledge → it is searchable (⌘K) → Hold it (H) → new Chat question → the answer cites it [n] and the run's Saw/receipt lists it.
+4. Home verbs: Ask, Research, Build, Delegate, Create, Automate each land correctly (and ⌘⏎ background variants toast + Run Line pill).
+5. ⌘K intents: '?' quick ask streams + Continue in Chat; '#' project switch; '@' item jump; '>' command; handle jump RUN-XXXX.
+6. Workflows: run 'Weekly project digest' → approval → approve → success; a workflow with an output node creates a real knowledge/task item.
+7. Studio: generate an image → Save to Knowledge / Turn into task; deck present mode.
+8. Agents: create from template → run now → live in Run Line → completes → result Turn into task.
+9. Scope: switch project → Chat/Research/Code/Projects/Knowledge lists filter; items from another project show 'From … · Switch project'.
+10. Integrations: connect Slack (simulated) → an agent capability that needed it stops being blocked; disconnect → blocked again with the reason.
+11. Reload persistence: create things, reload, everything persists; in-flight runs resume.
+Report findings only for real failures (include the failing assertion, console errors, URL, and a screenshot path).

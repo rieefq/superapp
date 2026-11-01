@@ -1,0 +1,18 @@
+You are a demanding principal product designer and QA lead. Another engineer just built the insights workspace of Atrium (a premium, browser-only AI operating system). Your job is to FIND AND FIX problems — not to list them. CLAUDE.md is in your context: same parallel-work rules (no git; edit only the files listed; private port).
+FILES YOU MAY EDIT: src/workspaces/insights/**, e2e/insights.spec.ts, src/core/analytics/** (enrich; keep exported signatures).
+DEV PORT 5239, e2e port 5339, screenshots /tmp/review-insights.
+1. Read docs/DESIGN.md (principles, your workspace's section, signature components, honesty rules, do/don't), the functional requirements below, and the code in src/workspaces/insights.
+2. Run the app and exercise EVERY control and journey with Playwright scripts; take screenshots (1440×900 dark + light, 390×844, 768×1024, 2560×1440) and LOOK at them.
+3. Evaluate adversarially: (a) functional completeness — every requirement works end-to-end, no dead or fake controls, no stale state after actions, works after reload; (b) states — empty, loading, error, live updating, long content, many items; (c) honesty — simulated vs live labeling everywhere AI/integration output appears; (d) design fidelity — matches DESIGN.md and feels like the same product as Home and the shell (type voices, spacing, hairlines, density, motion, color only for meaning); (e) polish — alignment, truncation, overflow, empty-space balance, hover/focus/pressed states, transitions; (f) accessibility — keyboard paths, focus order/visibility, roles/labels, contrast; (g) responsive — no horizontal scroll at 360px, sensible tablet layout, ultra-wide doesn't look empty or stretched; (h) cross-workspace links and handoffs work; (i) console errors / React warnings.
+4. Fix everything you can within your files. Extend e2e/insights.spec.ts to cover what you fixed; keep it green (`E2E_PORT=5339 npx playwright test e2e/insights.spec.ts`). Typecheck clean for your paths.
+FUNCTIONAL REQUIREMENTS:
+
+DESIGN SPEC FOR THIS WORKSPACE: docs/DESIGN.md §6.10 — it is authoritative for layout, template, interactions and wording; the requirements below list capabilities that must exist — map them onto the spec's patterns (e.g. a 'context panel' is Inspector › Context; 'handoff/Turn into' goes through TurnIntoMenu → Start sheet; 'pin' is Hold; run views use RunPanel/RunTimeline/StepTape; templates come from src/app/templates).
+Purpose: meaningful visibility into activity, reliability and spend — not a wall of charts.
+Must have:
+- Controls: range 7/30/90 days, project filter, kind filter. Honesty banner when simulated activity is included ("Costs for simulated runs are estimates at Claude Sonnet 5.5 rates"); live usage (real API calls) reported separately when present.
+- Headline tiles: runs + success rate, estimated spend vs monthly budget (meter), tokens, median run duration, approvals (pending, median time to decision), tasks completed.
+- Charts (following the dataviz rules): runs per day by kind (stacked area or bars) with hover crosshair; spend per day; spend by model and by agent (bars); activity heatmap (weekday × hour); agent performance table (runs, success, avg duration, cost, sparkline); workflow reliability (runs, failure rate, avg duration); top failure reasons.
+- Execution history table: searchable, sortable, paginated runs; row → run route. Every chart has a table/text alternative.
+E2E (e2e/insights.spec.ts): page renders tiles and charts without errors; changing range updates the run count; clicking a history row navigates to the run.
+FINAL REPORT (≤ 350 words): issues found (severity), fixes made, remaining issues that need changes outside your files (be specific: file + change).
