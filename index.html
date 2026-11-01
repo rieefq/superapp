@@ -5,6 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="color-scheme" content="dark light" />
     <title>Atrium</title>
+    <script>
+      // Apply theme before first paint (avoids a flash). Mirrors ThemeProvider logic.
+      (function () {
+        try {
+          var raw = localStorage.getItem('atrium.settings')
+          var s = raw ? JSON.parse(raw) : null
+          var app = (s && s.state && s.state.settings && s.state.settings.appearance) || {}
+          var pref = app.theme || 'dark'
+          var theme = pref === 'system' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : pref
+          document.documentElement.setAttribute('data-theme', theme)
+          if (app.reduceMotion === 'reduce') document.documentElement.setAttribute('data-motion', 'reduce')
+          if (app.density) document.documentElement.setAttribute('data-density', app.density)
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'dark')
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

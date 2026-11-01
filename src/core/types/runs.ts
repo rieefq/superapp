@@ -137,6 +137,8 @@ export interface Approval {
   risk: RiskLevel
   requestedBy: ActorRef
   status: ApprovalStatus
+  /** Why the permission policy asked for approval, e.g. "Your safety settings require approval to run commands". */
+  reason?: string
   preview?: ApprovalPreview
   createdAt: Timestamp
   resolvedAt?: Timestamp

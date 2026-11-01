@@ -1,4 +1,4 @@
-import { Suspense, type ReactNode } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { createBrowserRouter, Outlet, useRouteError } from 'react-router'
 import { WORKSPACES } from './registry'
 import { Shell } from './shell/Shell'
@@ -17,7 +17,10 @@ function Lazy({ children }: { children: ReactNode }) {
   return <Suspense fallback={<div data-route-loading className="h-full" />}>{children}</Suspense>
 }
 
+const Gallery = lazy(() => import('@/ui/gallery/Gallery'))
+
 export const router = createBrowserRouter([
+  { path: '/dev/ui', element: <Lazy><Gallery /></Lazy> },
   {
     element: (
       <Shell>

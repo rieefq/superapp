@@ -1,47 +1,13 @@
-import type { EntityKind, EntityRef, ID, KnowledgeItem } from '@/core/types'
-
-/** STUB — replaced by the search implementation (signatures are a contract). */
-export interface SearchResult {
-  ref: EntityRef
-  kind: EntityKind
-  title: string
-  /** Plain-text excerpt around the best match. */
-  snippet: string
-  /** [start, end) character ranges in `snippet` that matched the query. */
-  highlights: Array<[number, number]>
-  score: number
-  projectId: ID | null
-  updatedAt?: number
-}
-
-export interface SearchOptions {
-  kinds?: EntityKind[]
-  projectId?: ID | null
-  limit?: number
-}
-
-export function search(query: string, opts?: SearchOptions): SearchResult[] {
-  void query
-  void opts
-  return []
-}
-
-export interface RetrievedPassage {
-  item: KnowledgeItem
-  /** The most relevant passage of the item's content. */
-  passage: string
-  score: number
-}
-
-export interface RetrieveOptions {
-  projectId?: ID | null
-  /** Restrict to these knowledge ids (e.g. pinned context). */
-  ids?: ID[]
-  limit?: number
-}
-
-export function retrieveKnowledge(query: string, opts?: RetrieveOptions): RetrievedPassage[] {
-  void query
-  void opts
-  return []
-}
+/**
+ * Local search & knowledge retrieval — real BM25 full-text search running in the browser
+ * (not simulated). See store.ts for indexing lifecycle and entityIndex.ts for ranking.
+ */
+export type { SearchResult, SearchOptions, RetrievedPassage, RetrieveOptions } from './types'
+export {
+  search, retrieveKnowledge, warmSearchIndex, isSearchReady, subscribeSearchIndex, getSearchIndexVersion,
+  __resetSearchForTests,
+} from './store'
+export { useSearch, SEARCH_DEBOUNCE_MS } from './hooks'
+export { highlightText, SNIPPET_LENGTH } from './snippet'
+export { splitPassages, PASSAGE_TARGET_CHARS } from './retrieval'
+export { DEFAULT_SEARCH_LIMIT } from './entityIndex'

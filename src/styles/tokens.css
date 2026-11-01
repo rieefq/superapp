@@ -1,0 +1,205 @@
+/*
+ * Atrium design tokens — semantic roles. Components use ONLY these (via the Tailwind
+ * utilities mapped in src/index.css). Values are themed; names are the contract.
+ *
+ * Color carries meaning, not decoration:
+ *   live  = AI is working right now        attn = waiting on a human (needs you)
+ *   done  = finished successfully           fail = failed / destructive
+ *   sim   = simulated (drawn as a hatch)    accent = focus, links, selection
+ * Identity hues (volt…cyan) are only for identity marks (agents, projects, collections,
+ * integrations) and chart series — never for state.
+ */
+
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* Surfaces (back → front) */
+  --surface-chrome: #0c0c0b;
+  --surface-canvas: #121211;
+  --surface-sunken: #0e0e0d;
+  --surface-raised: #181817;
+  --surface-overlay: #1e1e1c;
+  --surface-hover: #1f1f1d;
+  --surface-press: #282825;
+
+  /* Lines */
+  --line: #262624;
+  --line-strong: #363632;
+
+  /* Ink (text) */
+  --ink: #edebe5;
+  --ink-2: #b4b1a7;
+  --ink-3: #8b887f;
+  --ink-4: #5b5953;
+
+  /* Inverted (primary buttons) */
+  --inverse: #edebe5;
+  --inverse-ink: #121211;
+
+  /* Semantic signals: base (marks/dots), ink (text on canvas), tint (washes) */
+  --accent: #8fb1e6;
+  --accent-ink: #a8c3ee;
+  --accent-tint: #1a2433;
+  --live: #8fb1e6;
+  --live-ink: #a8c3ee;
+  --live-tint: #18222f;
+  --live-glow: rgb(143 177 230 / 0.35);
+  --attn: #e2ad45;
+  --attn-ink: #ebbd5e;
+  --attn-tint: #2d2410;
+  --done: #73c4a3;
+  --done-ink: #8cd2b5;
+  --done-tint: #13261e;
+  --fail: #f07a60;
+  --fail-ink: #f59580;
+  --fail-tint: #351812;
+  --sim-hatch: #4a4842;
+  --sim-tint: #1b1b19;
+  --sim-ink: #b4b1a7;
+
+  /* Identity hues (agents, projects, collections, integrations, chart series) */
+  --hue-volt: #c8dc6e;
+  --hue-sky: #8dbaf2;
+  --hue-violet: #b3a2f0;
+  --hue-coral: #efa08c;
+  --hue-amber: #d9b77a;
+  --hue-mint: #86d9b9;
+  --hue-rose: #eba2c0;
+  --hue-cyan: #7fcbdb;
+
+  /* Diff */
+  --diff-add-bg: #13261a;
+  --diff-add-ink: #9fe8b2;
+  --diff-add-mark: #2c6b3f;
+  --diff-del-bg: #2b1715;
+  --diff-del-ink: #ff9e94;
+  --diff-del-mark: #7a2e26;
+
+  /* Misc */
+  --selection: rgb(143 177 230 / 0.24);
+  --scrim: rgb(4 4 3 / 0.6);
+  --focus-ring: #8fb1e6;
+  --highlight: rgb(226 173 69 / 0.28);
+  --inset-highlight: inset 0 1px 0 rgb(255 255 255 / 0.04);
+  --shadow-e1: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -8px rgb(0 0 0 / 0.55), inset 0 1px 0 rgb(255 255 255 / 0.04);
+  --shadow-e2: 0 24px 64px -16px rgb(0 0 0 / 0.7), 0 2px 6px rgb(0 0 0 / 0.35), inset 0 1px 0 rgb(255 255 255 / 0.05);
+  --shadow-e3: 0 40px 100px -20px rgb(0 0 0 / 0.75), 0 4px 12px rgb(0 0 0 / 0.4), inset 0 1px 0 rgb(255 255 255 / 0.05);
+
+  /* Syntax (code) */
+  --syn-keyword: #c6a3f0;
+  --syn-string: #9fd8a0;
+  --syn-number: #f2b880;
+  --syn-comment: #6f6c64;
+  --syn-function: #8fc1f2;
+  --syn-type: #e8cf86;
+  --syn-punct: #8b887f;
+  --syn-plain: #e0ddd5;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --surface-chrome: #ecebe6;
+  --surface-canvas: #f7f6f2;
+  --surface-sunken: #efede7;
+  --surface-raised: #fdfdfb;
+  --surface-overlay: #ffffff;
+  --surface-hover: #efeee9;
+  --surface-press: #e5e3dc;
+
+  --line: #e2e0d8;
+  --line-strong: #cfccc2;
+
+  --ink: #1c1b18;
+  --ink-2: #55524a;
+  --ink-3: #6e6a60;
+  --ink-4: #a39f94;
+
+  --inverse: #1c1b18;
+  --inverse-ink: #f7f6f2;
+
+  --accent: #2d5b9a;
+  --accent-ink: #2d5b9a;
+  --accent-tint: #e3eaf4;
+  --live: #2d5b9a;
+  --live-ink: #2d5b9a;
+  --live-tint: #e3eaf4;
+  --live-glow: rgb(45 91 154 / 0.25);
+  --attn: #c98a10;
+  --attn-ink: #8c5e00;
+  --attn-tint: #f7ebc6;
+  --done: #2a7259;
+  --done-ink: #2a7259;
+  --done-tint: #e2efe8;
+  --fail: #c23b22;
+  --fail-ink: #b8361e;
+  --fail-tint: #f8e4de;
+  --sim-hatch: #c9c4b8;
+  --sim-tint: #f0ede6;
+  --sim-ink: #55524a;
+
+  --hue-volt: #56620f;
+  --hue-sky: #275a9c;
+  --hue-violet: #5844a8;
+  --hue-coral: #a3412b;
+  --hue-amber: #76561a;
+  --hue-mint: #1c6e52;
+  --hue-rose: #973a62;
+  --hue-cyan: #1a6a7c;
+
+  --diff-add-bg: #e3f4e8;
+  --diff-add-ink: #1b6b3a;
+  --diff-add-mark: #b5dfc2;
+  --diff-del-bg: #fbe6e2;
+  --diff-del-ink: #a3291a;
+  --diff-del-mark: #f0bdb4;
+
+  --selection: rgb(45 91 154 / 0.16);
+  --scrim: rgb(28 27 24 / 0.32);
+  --focus-ring: #2d5b9a;
+  --highlight: rgb(229 181 58 / 0.32);
+  --inset-highlight: inset 0 1px 0 rgb(255 255 255 / 0.6);
+  --shadow-e1: 0 1px 2px rgb(28 27 24 / 0.06), 0 8px 24px -8px rgb(28 27 24 / 0.18);
+  --shadow-e2: 0 24px 64px -16px rgb(28 27 24 / 0.28), 0 2px 6px rgb(28 27 24 / 0.08);
+  --shadow-e3: 0 40px 100px -20px rgb(28 27 24 / 0.32), 0 4px 12px rgb(28 27 24 / 0.1);
+
+  --syn-keyword: #6b3fa0;
+  --syn-string: #2f6b2f;
+  --syn-number: #a0521a;
+  --syn-comment: #8f8a7f;
+  --syn-function: #1f5a96;
+  --syn-type: #7a5a0f;
+  --syn-punct: #6e6a60;
+  --syn-plain: #1c1b18;
+}
+
+:root {
+  /* Type voices */
+  --font-ui: 'Instrument Sans Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-system: 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --font-doc: 'Newsreader Variable', 'Iowan Old Style', Georgia, serif;
+
+  /* Motion */
+  --dur-1: 120ms; /* hover, press, color */
+  --dur-2: 180ms; /* popovers, row actions */
+  --dur-3: 240ms; /* panels, route transitions */
+  --dur-4: 360ms; /* command center, dialogs */
+  --ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Layers */
+  --z-rail: 30;
+  --z-topbar: 40;
+  --z-panel: 50;
+  --z-overlay: 60;
+  --z-popover: 70;
+  --z-toast: 80;
+  --z-tooltip: 90;
+
+  /* Shell dimensions */
+  --rail-w: 60px;
+  --rail-w-expanded: 232px;
+  --topbar-h: 48px;
+  --panel-w: 360px;
+}

@@ -1,1 +1,129 @@
-@import "tailwindcss";
+@import 'tailwindcss';
+@import '@fontsource-variable/instrument-sans/index.css';
+@import '@fontsource-variable/jetbrains-mono/index.css';
+@import '@fontsource-variable/newsreader/opsz.css';
+@import '@fontsource-variable/newsreader/opsz-italic.css';
+@import './styles/tokens.css';
+@import './styles/base.css';
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+@custom-variant light (&:where([data-theme='light'], [data-theme='light'] *));
+
+/*
+ * Tailwind theme = design tokens only. Defaults are reset so components cannot reach
+ * for arbitrary palette colors, fonts or radii.
+ */
+@theme {
+  --color-*: initial;
+  --font-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
+  --text-*: initial;
+
+  --breakpoint-xs: 30rem;
+
+  --text-2xs: 11px;
+  --text-2xs--line-height: 14px;
+  --text-xs: 12px;
+  --text-xs--line-height: 16px;
+  --text-sm: 13px;
+  --text-sm--line-height: 18px;
+  --text-base: 14px;
+  --text-base--line-height: 20px;
+  --text-md: 15px;
+  --text-md--line-height: 24px;
+  --text-lg: 17px;
+  --text-lg--line-height: 26px;
+  --text-xl: 20px;
+  --text-xl--line-height: 28px;
+  --text-2xl: 24px;
+  --text-2xl--line-height: 32px;
+  --text-3xl: 30px;
+  --text-3xl--line-height: 36px;
+  --text-4xl: 36px;
+  --text-4xl--line-height: 44px;
+  --text-5xl: 44px;
+  --text-5xl--line-height: 50px;
+
+  --radius-xs: 3px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  --ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+}
+
+@theme inline {
+  --font-sans: var(--font-ui);
+  --font-mono: var(--font-system);
+  --font-serif: var(--font-doc);
+
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  --color-chrome: var(--surface-chrome);
+  --color-canvas: var(--surface-canvas);
+  --color-sunken: var(--surface-sunken);
+  --color-raised: var(--surface-raised);
+  --color-overlay: var(--surface-overlay);
+  --color-hover: var(--surface-hover);
+  --color-press: var(--surface-press);
+
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+
+  --color-inverse: var(--inverse);
+  --color-inverse-ink: var(--inverse-ink);
+
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-tint: var(--accent-tint);
+  --color-live: var(--live);
+  --color-live-ink: var(--live-ink);
+  --color-live-tint: var(--live-tint);
+  --color-attn: var(--attn);
+  --color-attn-ink: var(--attn-ink);
+  --color-attn-tint: var(--attn-tint);
+  --color-done: var(--done);
+  --color-done-ink: var(--done-ink);
+  --color-done-tint: var(--done-tint);
+  --color-fail: var(--fail);
+  --color-fail-ink: var(--fail-ink);
+  --color-fail-tint: var(--fail-tint);
+  --color-sim-hatch: var(--sim-hatch);
+  --color-sim-tint: var(--sim-tint);
+  --color-sim-ink: var(--sim-ink);
+
+  --color-hue-volt: var(--hue-volt);
+  --color-hue-sky: var(--hue-sky);
+  --color-hue-violet: var(--hue-violet);
+  --color-hue-coral: var(--hue-coral);
+  --color-hue-amber: var(--hue-amber);
+  --color-hue-mint: var(--hue-mint);
+  --color-hue-rose: var(--hue-rose);
+  --color-hue-cyan: var(--hue-cyan);
+
+  --color-diff-add-bg: var(--diff-add-bg);
+  --color-diff-add-ink: var(--diff-add-ink);
+  --color-diff-add-mark: var(--diff-add-mark);
+  --color-diff-del-bg: var(--diff-del-bg);
+  --color-diff-del-ink: var(--diff-del-ink);
+  --color-diff-del-mark: var(--diff-del-mark);
+
+  --color-scrim: var(--scrim);
+  --color-highlight: var(--highlight);
+
+  --shadow-e1: var(--shadow-e1);
+  --shadow-e2: var(--shadow-e2);
+  --shadow-e3: var(--shadow-e3);
+  --shadow-inset: var(--inset-highlight);
+}

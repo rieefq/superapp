@@ -1,0 +1,127 @@
+import { useDB } from '@/core/db'
+import { EntityIndex } from './entityIndex'
+import { PassageIndex } from './retrieval'
+import type { RetrievedPassage, RetrieveOptions, SearchOptions, SearchResult } from './types'
+
+/**
+ * Runtime owner of the search indexes.
+ * - Built lazily: synchronously on the first query, or in the background via `warmSearchIndex`.
+ * - Kept fresh incrementally: one store subscription, debounced (250ms, at most 1s behind),
+ *   re-indexes only rows whose reference changed. Queries also sync first, so a result
+ *   never misses a change made just before it.
+ * - `subscribeSearchIndex`/`getSearchIndexVersion` let hooks recompute when the index changes.
+ */
+const DEBOUNCE_MS = 250
+const MAX_WAIT_MS = 1000
+
+type Timer = ReturnType<typeof setTimeout>
+
+let entities = new EntityIndex()
+let passages = new PassageIndex()
+let unsubscribe: (() => void) | null = null
+let syncTimer: Timer | null = null
+let notifyTimer: Timer | null = null
+let warmTimer: Timer | null = null
+let firstDirtyAt = 0
+let version = 0
+const listeners = new Set<() => void>()
+
+function emit(): void {
+  version++
+  for (const listener of [...listeners]) listener()
+}
+
+/** Notify outside the current call stack (queries can run during React render). */
+function emitSoon(): void {
+  if (notifyTimer) return
+  notifyTimer = setTimeout(() => {
+    notifyTimer = null
+    emit()
+  }, 0)
+}
+
+function flushBackground(): void {
+  syncTimer = null
+  firstDirtyAt = 0
+  const state = useDB.getState()
+  const changedEntities = entities.built && entities.sync(state)
+  const changedPassages = passages.built && passages.sync(state.knowledge)
+  if (changedEntities || changedPassages) emit()
+}
+
+function ensureSubscribed(): void {
+  if (unsubscribe) return
+  unsubscribe = useDB.subscribe((state) => {
+    const dirty = (entities.built && entities.isStale(state)) || (passages.built && passages.isStale(state.knowledge))
+    if (!dirty) return
+    const now = Date.now()
+    if (!firstDirtyAt) firstDirtyAt = now
+    if (syncTimer) clearTimeout(syncTimer)
+    syncTimer = setTimeout(flushBackground, now - firstDirtyAt >= MAX_WAIT_MS ? 0 : DEBOUNCE_MS)
+  })
+}
+
+function syncEntitiesNow(): void {
+  const state = useDB.getState()
+  if (!entities.isStale(state)) return
+  entities.sync(state)
+  ensureSubscribed()
+  emitSoon()
+}
+
+/** Local full-text search over every workspace's entities (real, not simulated). */
+export function search(query: string, opts: SearchOptions = {}): SearchResult[] {
+  if (!query.trim()) return []
+  syncEntitiesNow()
+  return entities.search(query, opts, useDB.getState())
+}
+
+/** The most relevant passages of knowledge items for a question (grounding for AI answers). */
+export function retrieveKnowledge(query: string, opts: RetrieveOptions = {}): RetrievedPassage[] {
+  if (!query.trim()) return []
+  const { knowledge } = useDB.getState()
+  if (passages.isStale(knowledge)) {
+    passages.sync(knowledge)
+    ensureSubscribed()
+  }
+  return passages.retrieve(query, opts, knowledge)
+}
+
+/** Build the entity index soon, off the current call stack (e.g. when the command palette mounts). */
+export function warmSearchIndex(): void {
+  if (entities.built || warmTimer) return
+  warmTimer = setTimeout(() => {
+    warmTimer = null
+    const state = useDB.getState()
+    if (!entities.isStale(state)) return
+    entities.sync(state)
+    ensureSubscribed()
+    emit()
+  }, 0)
+}
+
+export function isSearchReady(): boolean {
+  return entities.built
+}
+
+export function subscribeSearchIndex(listener: () => void): () => void {
+  listeners.add(listener)
+  return () => listeners.delete(listener)
+}
+
+export function getSearchIndexVersion(): number {
+  return version
+}
+
+/** Test-only: drop both indexes, timers and the store subscription. */
+export function __resetSearchForTests(): void {
+  unsubscribe?.()
+  unsubscribe = null
+  for (const t of [syncTimer, notifyTimer, warmTimer]) if (t) clearTimeout(t)
+  syncTimer = notifyTimer = warmTimer = null
+  firstDirtyAt = 0
+  entities = new EntityIndex()
+  passages = new PassageIndex()
+  version = 0
+  listeners.clear()
+}

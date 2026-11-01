@@ -29,9 +29,18 @@ export interface KnowledgeItem {
     url?: string
     integrationId?: string
   }
-  file?: { name: string; mime: string; size: number; blobKey?: string }
+  file?: {
+    name: string
+    mime: string
+    size: number
+    blobKey?: string
+    /** Small (≤480px) JPEG data URL preview for imported images. */
+    previewUrl?: string
+  }
   author: ActorRef
   pinned?: boolean
+  /** True when the content was produced by the local simulator (e.g. notes from a simulated agent run). */
+  simulated?: boolean
   createdAt: Timestamp
   updatedAt: Timestamp
 }
