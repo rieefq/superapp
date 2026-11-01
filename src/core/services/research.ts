@@ -95,10 +95,13 @@ export type InvestigationPatch = Partial<Pick<Investigation, 'title' | 'question
 
 /** Edit a (usually draft) investigation's brief. */
 export function updateInvestigation(id: ID, patch: InvestigationPatch): Investigation | undefined {
-  const clean: InvestigationPatch = { ...patch }
-  if (clean.title !== undefined) clean.title = clean.title.trim() || undefined
-  if (clean.angles) clean.angles = clean.angles.map((a) => a.trim()).filter(Boolean)
-  return touch(id, (inv) => ({ ...inv, ...Object.fromEntries(Object.entries(clean).filter(([, v]) => v !== undefined)) }))
+  const clean: InvestigationPatch = {}
+  if (patch.title?.trim()) clean.title = patch.title.trim()
+  if (patch.question?.trim()) clean.question = patch.question.trim()
+  if (patch.depth !== undefined) clean.depth = patch.depth
+  if (patch.angles !== undefined) clean.angles = patch.angles.map((a) => a.trim()).filter(Boolean)
+  if (patch.projectId !== undefined) clean.projectId = patch.projectId
+  return touch(id, (inv) => ({ ...inv, ...clean }))
 }
 
 /** The investigation's run that is still in progress, if any. */

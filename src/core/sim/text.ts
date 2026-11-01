@@ -254,7 +254,8 @@ export function stripMarkdown(md: string): string {
 
 /** First sentence(s) of a passage as clean prose, at most `max` characters, ending with punctuation. */
 export function excerpt(text: string, max = 180): string {
-  const prose = stripMarkdown(text)
+  // Headings and table rows are not prose.
+  const prose = stripMarkdown(text.replace(/^\s{0,3}#{1,6}\s.*$/gm, '').replace(/^\s*\|.*\|\s*$/gm, ''))
   if (!prose) return ''
   const sentences = prose.match(/[^.!?]+[.!?]+["”’)]*|[^.!?]+$/g)?.map((s) => s.trim()).filter(Boolean) ?? [prose]
   let out = ''

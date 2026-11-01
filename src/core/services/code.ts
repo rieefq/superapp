@@ -113,8 +113,9 @@ export async function connectGithubRepo(input: string, opts: { projectId?: ID | 
   const findExisting = (fullName: string) => db.find('repos', (r) => r.provider === 'github' && r.fullName.toLowerCase() === fullName.toLowerCase())
   const known = findExisting(`${coords.owner}/${coords.name}`)
   if (known) {
+    if (opts.projectId && !known.projectId) db.update('repos', known.id, { projectId: opts.projectId })
     addRepoToProject(opts.projectId, known.id)
-    return known
+    return db.get('repos', known.id) ?? known
   }
   const info = await getRepo(coords.owner, coords.name)
   if (!info.ok) throw new GithubRequestError(info.error)

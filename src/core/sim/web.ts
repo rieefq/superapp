@@ -110,7 +110,7 @@ const ANGLE_STOP = new Set([
   'discussed', 'evidence', 'supports', 'support', 'data', 'notes', 'tell', 'approaches', 'teams', 'minimal', 'first', 'step',
   'mitigated', 'measure', 'worked', 'require', 'timeline', 'parts', 'affected', 'comparable', 'companies', 'preparing',
   'resolve', 'experts', 'shifts', 'durable', 'trend', 'hype', 'adopting', 'rationale', 'positioning', 'describe',
-  'appear', 'work', 'strengths', 'gaps', 'relative', 'comparing', 'options', 'differ', 'scope', 'capabilities', 'fit',
+  'appear', 'work', 'strengths', 'gaps', 'relative', 'compare', 'comparing', 'options', 'differ', 'scope', 'capabilities', 'fit',
   'whom', 'switching', 'costs', 'each', 'option', 'come', 'operations', 'product', 'implications', 'implication',
 ])
 

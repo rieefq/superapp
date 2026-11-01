@@ -20,9 +20,19 @@ import {
   type TerminalLine,
   type TreeNode,
 } from '@/ui/display'
+import {
+  BarChart,
+  DonutChart,
+  Heatmap,
+  Sparkline,
+  TimeSeriesChart,
+  type CalendarCell,
+  type TimeSeries,
+  type WeekdayHourCell,
+} from '@/ui/charts'
 import { cn } from '@/lib/cn'
 import { createRng } from '@/lib/rng'
-import { formatDuration, formatUsd } from '@/lib/format'
+import { formatCompact, formatDuration, formatUsd } from '@/lib/format'
 
 /* ------------------------------------------------------------------------------------------ */
 /* Gallery scaffolding                                                                        */
@@ -673,8 +683,20 @@ function FiguresDemo() {
     <div className="flex flex-col gap-10">
       <Demo title="Stat" note={<GButton pressed={loading} onClick={() => setLoading((l) => !l)}>Loading</GButton>}>
         <div className="grid grid-cols-1 gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
-          <Stat label="Runs this week" value="1,284" delta={{ value: '12%', direction: 'up', period: 'vs last week' }} loading={loading} />
-          <Stat label="Spend (estimate)" value="$42.18" delta={{ value: '$6.02', direction: 'up', goodWhen: 'down', period: 'vs last week' }} loading={loading} />
+          <Stat
+            label="Runs this week"
+            value="1,284"
+            delta={{ value: '12%', direction: 'up', period: 'vs last week' }}
+            trend={<Sparkline label="Runs per day, last 14 days" values={daily('stat-runs', 14, 180, 0.4, 3).map((p) => p.v)} />}
+            loading={loading}
+          />
+          <Stat
+            label="Spend (estimate)"
+            value="$42.18"
+            delta={{ value: '$6.02', direction: 'up', goodWhen: 'down', period: 'vs last week' }}
+            trend={<Sparkline label="Spend per day, last 14 days" variant="bars" values={[4.1, 3.8, 5.2, 4.9, 6.3, 1.2, 0.8, 5.5, 6.1, 5.8, 7.2, 6.4, 1.9, 1.1]} format={(v) => formatUsd(v)} />}
+            loading={loading}
+          />
           <Stat label="Median latency" value="1.18" unit="s" delta={{ value: '0.21 s', direction: 'down', goodWhen: 'down', period: 'p50' }} loading={loading} />
           <Stat label="Approvals waiting" value="3" delta={{ value: '0', direction: 'flat', period: 'since yesterday' }} helper="Oldest is 2h old — Ops wants to rotate keys." loading={loading} />
         </div>
@@ -713,6 +735,221 @@ function ActivityDemo() {
   )
 }
 
+
+/* ------------------------------------------------------------------------------------------ */
+/* Chart fixtures (seeded, realistic)                                                         */
+/* ------------------------------------------------------------------------------------------ */
+
+const TODAY = (() => {
+  const d = new Date(NOW)
+  d.setHours(0, 0, 0, 0)
+  return d.getTime()
+})()
+
+function daily(seed: string, days: number, base: number, amp: number, trend = 0): { t: number; v: number }[] {
+  const rng = createRng(seed)
+  return Array.from({ length: days }, (_, i) => {
+    const t = TODAY - (days - 1 - i) * DAY
+    const dow = new Date(t).getDay()
+    const weekend = dow === 0 || dow === 6 ? 0.45 : 1
+    const v = Math.max(0, (base + trend * i) * weekend * (1 + (rng.next() - 0.5) * amp))
+    return { t, v: Math.round(v) }
+  })
+}
+
+const TOKEN_SERIES: TimeSeries[] = [
+  { id: 'sonnet', label: 'Claude Sonnet', points: daily('sonnet', 30, 410_000, 0.35, 6_000) },
+  { id: 'haiku', label: 'Claude Haiku', points: daily('haiku', 30, 220_000, 0.4, -1_500) },
+  { id: 'compat', label: 'OpenAI-compatible', points: daily('compat', 30, 90_000, 0.6, 1_200) },
+]
+
+const SPEND_SERIES: TimeSeries[] = [
+  {
+    id: 'spend',
+    label: 'Spend (estimate)',
+    points: Array.from({ length: 48 }, (_, i) => {
+      const t = TODAY + (new Date(NOW).getHours() + 1) * HOUR - (47 - i) * HOUR
+      const h = new Date(t).getHours()
+      const day = h >= 8 && h <= 19 ? 1 : 0.25
+      const rng = createRng(`spend${i}`)
+      return { t, v: Math.round((0.35 + rng.next() * 0.9) * day * 100) / 100 }
+    }),
+  },
+]
+
+const AGENT_WEEKLY: TimeSeries[] = ['Research', 'Coder', 'Ops', 'Writer'].map((label, k) => {
+  const rng = createRng(`weekly-${label}`)
+  return {
+    id: label.toLowerCase(),
+    label,
+    points: Array.from({ length: 12 }, (_, i) => ({ t: TODAY - (11 - i) * 7 * DAY, v: Math.round((30 + k * 14) * (0.7 + i * 0.05) * (0.8 + rng.next() * 0.4)) })),
+  }
+})
+
+const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+function makeWeekdayHour(): WeekdayHourCell[] {
+  const rng = createRng('heat')
+  const cells: WeekdayHourCell[] = []
+  for (let day = 0; day < 7; day++)
+    for (let hour = 0; hour < 24; hour++) {
+      const work = hour >= 9 && hour <= 18 ? 1 : hour >= 7 && hour <= 21 ? 0.45 : 0.08
+      const weekday = day < 5 ? 1 : 0.3
+      const lunch = hour === 12 ? 0.6 : 1
+      const v = Math.round(work * weekday * lunch * (6 + rng.next() * 30))
+      cells.push({ day, hour, value: rng.chance(0.06) ? 0 : v })
+    }
+  return cells
+}
+
+function makeCalendar(): CalendarCell[] {
+  const rng = createRng('calendar')
+  return Array.from({ length: 26 * 7 }, (_, i) => {
+    const t = TODAY - i * DAY
+    const dow = new Date(t).getDay()
+    const base = dow === 0 || dow === 6 ? 2 : 14
+    return { date: t, value: rng.chance(0.12) ? 0 : Math.round(base * (0.3 + rng.next() * 1.4) * (1 - i / 400)) }
+  })
+}
+
+/* ------------------------------------------------------------------------------------------ */
+/* Chart demos                                                                                */
+/* ------------------------------------------------------------------------------------------ */
+
+function ChartStates() {
+  const [state, setState] = useState<'loading' | 'empty'>('loading')
+  return (
+    <Demo
+      title="States · loading / empty"
+      note={
+        <span className="flex gap-1.5">
+          <GButton pressed={state === 'loading'} onClick={() => setState('loading')}>
+            Loading
+          </GButton>
+          <GButton pressed={state === 'empty'} onClick={() => setState('empty')}>
+            Empty
+          </GButton>
+        </span>
+      }
+    >
+      <div className="grid gap-10 md:grid-cols-2">
+        <TimeSeriesChart title="Runs per day" series={[]} loading={state === 'loading'} height={180} empty="No runs in the last 30 days" />
+        <BarChart title="Cost by project" categories={[]} series={[]} loading={state === 'loading'} height={180} empty="No spend recorded yet" />
+      </div>
+    </Demo>
+  )
+}
+
+function ChartsDemo() {
+  const heat = useMemo(() => makeWeekdayHour(), [])
+  const calendar = useMemo(() => makeCalendar(), [])
+  const thisWeek = [42, 51, 47, 58, 39, 12, 8]
+  const lastWeek = [38, 44, 52, 41, 45, 9, 11]
+  return (
+    <div className="flex flex-col gap-12">
+      <Demo title="TimeSeriesChart · lines" note="crosshair + all-series tooltip · ← → keys · legend toggles">
+        <TimeSeriesChart
+          title="Tokens per day by model"
+          description="Last 30 days · input + output"
+          series={TOKEN_SERIES}
+          format={(v) => `${formatCompact(v)} tok`}
+          height={260}
+        />
+      </Demo>
+      <div className="grid gap-12 lg:grid-cols-2">
+        <Demo title="TimeSeriesChart · area (single series)">
+          <TimeSeriesChart title="Spend per hour" description="Last 48 hours · estimate" series={SPEND_SERIES} variant="area" format={(v) => formatUsd(v)} height={220} />
+        </Demo>
+        <Demo title="TimeSeriesChart · stacked area">
+          <TimeSeriesChart title="Runs per week by agent" description="Last 12 weeks" series={AGENT_WEEKLY} variant="stacked-area" height={220} />
+        </Demo>
+      </div>
+      <div className="grid gap-12 lg:grid-cols-2">
+        <Demo title="BarChart · grouped columns">
+          <BarChart
+            title="Runs by weekday"
+            description="This week vs last week"
+            categories={WEEKDAYS}
+            series={[
+              { id: 'this', label: 'This week', values: thisWeek },
+              { id: 'last', label: 'Last week', values: lastWeek },
+            ]}
+            height={220}
+          />
+        </Demo>
+        <Demo title="BarChart · horizontal, value labels">
+          <BarChart
+            title="Cost by project"
+            description="October · estimate"
+            orientation="horizontal"
+            categories={['Atrium launch', 'Billing refactor', 'Research: vector DBs', 'Support automation', 'Docs site']}
+            series={[{ id: 'cost', label: 'Cost', values: [18.4, 11.2, 7.95, 3.1, 1.42] }]}
+            format={(v) => formatUsd(v)}
+            valueLabels
+          />
+        </Demo>
+      </div>
+      <div className="grid gap-12 lg:grid-cols-2">
+        <Demo title="BarChart · stacked">
+          <BarChart
+            title="Tokens by kind per agent"
+            categories={['Research', 'Coder', 'Ops', 'Writer', 'Triage']}
+            series={[
+              { id: 'in', label: 'Input', values: [820_000, 1_240_000, 210_000, 380_000, 160_000] },
+              { id: 'out', label: 'Output', values: [190_000, 420_000, 40_000, 260_000, 30_000] },
+              { id: 'cache', label: 'Cache reads', values: [560_000, 980_000, 90_000, 120_000, 60_000] },
+            ]}
+            mode="stacked"
+            format={(v) => formatCompact(v)}
+            valueLabels
+            height={240}
+          />
+        </Demo>
+        <Demo title="DonutChart · folds past 6 into Other">
+          <DonutChart
+            title="Knowledge by collection"
+            description="Documents indexed"
+            slices={[
+              { label: 'Engineering handbook', value: 412 },
+              { label: 'Customer interviews', value: 268 },
+              { label: 'Research papers', value: 191 },
+              { label: 'Product specs', value: 144 },
+              { label: 'Meeting notes', value: 96 },
+              { label: 'Support macros', value: 41 },
+              { label: 'Legal', value: 18 },
+              { label: 'Archive', value: 12 },
+            ]}
+            centerLabel="Documents"
+          />
+        </Demo>
+      </div>
+      <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <Demo title="Heatmap · weekday × hour">
+          <Heatmap mode="weekday-hour" title="When agents run" description="Runs started, last 4 weeks" data={heat} unit="runs" />
+        </Demo>
+        <Demo title="Heatmap · calendar">
+          <Heatmap mode="calendar" title="Daily runs" description="Last 26 weeks" data={calendar} unit="runs" />
+        </Demo>
+      </div>
+      <Demo title="Sparkline · line, area, bars">
+        <div className="grid grid-cols-1 gap-x-10 gap-y-6 sm:grid-cols-3">
+          {[
+            { label: 'Runs per day, 14 days', node: <Sparkline label="Runs per day, last 14 days" values={daily('sp1', 14, 40, 0.5).map((p) => p.v)} /> },
+            { label: 'Latency p50, 14 days', node: <Sparkline label="Median latency, last 14 days" values={[1.42, 1.38, 1.4, 1.31, 1.29, 1.33, 1.25, 1.21, 1.24, 1.19, 1.22, 1.17, 1.2, 1.18]} area format={(v) => `${v.toFixed(2)} s`} /> },
+            { label: 'Approvals per day', node: <Sparkline label="Approvals per day, last 14 days" values={[3, 5, 2, 6, 4, 1, 0, 4, 7, 5, 3, 6, 2, 3]} variant="bars" /> },
+          ].map((x) => (
+            <div key={x.label} className="flex flex-col gap-2">
+              <span className="text-xs text-ink-3">{x.label}</span>
+              {x.node}
+            </div>
+          ))}
+        </div>
+      </Demo>
+      <ChartStates />
+    </div>
+  )
+}
+
 /* ------------------------------------------------------------------------------------------ */
 
 export default function Section() {
@@ -745,6 +982,9 @@ export default function Section() {
       <Group title="Figures & activity">
         <FiguresDemo />
         <ActivityDemo />
+      </Group>
+      <Group title="Charts">
+        <ChartsDemo />
       </Group>
     </section>
   )
