@@ -74,7 +74,10 @@ test.describe('Workflows', () => {
     await expect(node(page, 'Check something')).toBeVisible()
     // Its No branch is missing: a warning appears on the canvas and in the problems list.
     await expect(page.getByTestId('wf-issue-count')).toContainText('1 warning')
+    await expect(node(page, 'Check something')).toHaveAttribute('data-issue', 'warning')
+    await page.getByRole('button', { name: /^Problems · 1/ }).click()
     await expect(page.getByTestId('wf-issues')).toContainText('no “false” branch')
+    await page.getByRole('button', { name: 'Hide problems' }).click()
     // The selected step's settings are in Inspector › Item.
     await expect(page.getByTestId('step-form')).toContainText('Condition')
 
@@ -104,6 +107,24 @@ test.describe('Workflows', () => {
     await page.getByRole('menuitem', { name: 'Delete step' }).click()
     await expect(outline).not.toContainText('Wait 1 hour')
     await expect(page.getByText('Deleted “Wait 1 hour”')).toBeVisible()
+  })
+
+  test('connections can be changed without dragging, from the step settings', async ({ page }) => {
+    await open(page, '/workflows/wfl_triage?view=outline')
+    const outline = page.getByRole('list', { name: 'Steps of Support triage' })
+    await outline.locator('[data-outline-step]').filter({ hasText: 'Check “Urgent?”' }).getByRole('button').first().click()
+    const form = page.getByTestId('step-form')
+    await expect(form).toContainText('If no, go to')
+    // Send the No branch straight to the log (by keyboard): the Linear step is left unconnected and validation says so.
+    const noBranch = form.getByRole('combobox', { name: 'If no, go to' })
+    await noBranch.focus()
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('option', { name: /Log triage decision/ })).toBeVisible()
+    await page.keyboard.type('Log tri')
+    await page.keyboard.press('Enter')
+    await expect(noBranch).toContainText('Log triage decision')
+    await expect(page.getByRole('region', { name: 'Not connected' })).toContainText('Create Linear issue')
+    await expect(page.getByTestId('wf-issue-count')).toContainText('warning')
   })
 
   test('Describe it drafts a template-based workflow and says how it was made', async ({ page }) => {

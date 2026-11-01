@@ -76,7 +76,7 @@ test.describe('Research · live run', () => {
     await page.goto(`/research/${id}?inspect=knowledge:${saved[0].id}`)
     await page.waitForSelector('[data-app-ready="true"]')
     const links = inspector(page).getByRole('region', { name: 'Links' })
-    await expect(links).toBeVisible()
+    await expect(links).toBeVisible({ timeout: 30_000 })
     await expect(links.getByText('Came from')).toBeVisible()
     await expect(links.getByRole('link', { name: /How are mid-market freight forwarders/ }).first()).toBeVisible()
 

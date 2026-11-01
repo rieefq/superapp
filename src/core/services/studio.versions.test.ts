@@ -106,6 +106,28 @@ describe('per-version text', () => {
     expect(a.content).not.toBe('# The original copy')
     expect(a.versions[1].note).toBe('Variation')
   })
+
+  it('never shows another version’s text under a version whose text was not recorded', () => {
+    const slides = [{ id: 's1', title: 'Current deck', body: '', layout: 'title' as const }]
+    db.insert(
+      'assets',
+      fx.asset({
+        id: 'ast_deck',
+        kind: 'presentation',
+        slides,
+        currentVersion: 1,
+        versions: [
+          { id: 'v1', prompt: 'p', preview: { type: 'procedural', seed: 1, palette: ['#111111'], style: 'rays' }, createdAt: NOW - 2000 },
+          { id: 'v2', prompt: 'p', preview: { type: 'procedural', seed: 2, palette: ['#111111'], style: 'rays' }, createdAt: NOW - 1000 },
+        ],
+      }),
+    )
+    setCurrentVersion('ast_deck', 0)
+    expect(versionContent(asset('ast_deck'), 0)).toMatchObject({ known: false })
+    expect(asset('ast_deck').slides).toBeUndefined()
+    setCurrentVersion('ast_deck', 1)
+    expect(asset('ast_deck').slides).toEqual(slides)
+  })
 })
 
 describe('instruction edits', () => {

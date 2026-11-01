@@ -27,7 +27,7 @@ export function SimulatorMark({ size = 32 }: { size?: number }) {
       className="sim-hatch relative inline-grid shrink-0 place-items-center rounded-full border border-dashed border-line-input"
       style={{ width: size, height: size }}
     >
-      <span className="type-meta-caps rounded-xs bg-sim-tint px-0.5 text-[9px] leading-none text-sim-ink" style={{ fontSize: Math.max(8, Math.round(size * 0.28)) }}>
+      <span className="type-meta-caps rounded-xs bg-sim-tint px-0.5 leading-none text-sim-ink" style={{ fontSize: Math.max(8, Math.round(size * 0.28)) }}>
         SIM
       </span>
     </span>

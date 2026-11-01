@@ -229,6 +229,25 @@ function AbilityRowView({ row, onChange, onRemove }: { row: AbilityRow; onChange
           <Effective row={row} />
         </div>
       </div>
+      {mismatch(row) && (
+        <p className="type-caption col-span-full pl-6.5 text-ink-3 text-pretty @min-[760px]/abilities:row-start-2">
+          {row.decision.reason}.{' '}
+          {row.provider.id && /is set to ask|is not allowed|is not connected/.test(row.decision.reason) ? (
+            <Link to={`/integrations/${row.provider.id}`} className="text-ink-2 underline decoration-line-input underline-offset-2 hover:text-ink">
+              Change it in Integrations
+            </Link>
+          ) : null}
+        </p>
+      )}
     </li>
   )
+}
+
+/** The grant says one thing and the policy does another (an integration's scope, a missing connection, always-ask). */
+function mismatch(row: AbilityRow): boolean {
+  const { mode } = row.grant
+  const outcome = row.decision.outcome
+  if (mode === 'deny') return false
+  if (row.alwaysAsk && outcome === 'ask') return false
+  return (mode === 'allow' && outcome !== 'allow') || (mode === 'ask' && outcome === 'deny')
 }

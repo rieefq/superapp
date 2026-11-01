@@ -15,7 +15,7 @@ import { isRunActive, type CodeSession, type ID } from '@/core/types'
 import { cn } from '@/lib/cn'
 import { shortCode } from '@/lib/id'
 import {
-  AgentMark, Button, EmptyState, EntityChip, Tabs, Tooltip, copyText, formatClock, formatCost, toast, useNow, type MenuItem,
+  Button, EmptyState, EntityChip, Tabs, Tooltip, copyText, formatClock, formatCost, toast, useNow, type MenuItem,
 } from '@/ui'
 import { ESTIMATE_TOOLTIP } from '@/app/components'
 import { archiveWithUndo, copyDiff, deleteWithConfirm, exportPatch, restoreWithToast } from '../actions'
@@ -86,9 +86,13 @@ function SessionStage({ session }: { session: CodeSession }) {
 
   const sync = useCallback(
     (next: { tab: SessionTab; file: string | null; path: string | null }) => {
-      const q = new URLSearchParams()
+      // Keep the shell's parameters (?inspect=); ?run= only focuses a turn on arrival.
+      const q = new URLSearchParams(window.location.search)
+      q.delete('run')
       if (next.file) q.set('file', next.file)
+      else q.delete('file')
       if (next.path) q.set('path', next.path)
+      else q.delete('path')
       const qs = q.toString()
       navigate(`${base}/${next.tab}${qs ? `?${qs}` : ''}`, { replace: true })
     },
@@ -117,6 +121,8 @@ function SessionStage({ session }: { session: CodeSession }) {
   const toActivity = useCallback(() => {
     if (!split) go('activity')
   }, [split, go])
+  // In the split the composer is on screen already: inserting text focuses it, nothing to switch to.
+  const compose = split ? undefined : toActivity
 
   const stats = useMemo(() => changeStats(session.changes), [session.changes])
   const checks = useMemo(() => checksSummary(session.checks), [session.checks])
@@ -226,14 +232,14 @@ function SessionStage({ session }: { session: CodeSession }) {
                 />
                 <span className="flex-1" />
               </div>
-              <ReviewBody session={session} tab={reviewTab} file={file} path={path} setParam={setParam} onReviewFile={reviewFile} onAsk={toActivity} active />
+              <ReviewBody session={session} tab={reviewTab} file={file} path={path} setParam={setParam} onReviewFile={reviewFile} onAsk={toActivity} onCompose={compose} active />
             </section>
           </>
         ) : tab === 'activity' ? (
           <ActivityPane session={session} onReviewFile={reviewFile} header={false} />
         ) : (
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <ReviewBody session={session} tab={tab} file={file} path={path} setParam={setParam} onReviewFile={reviewFile} onAsk={toActivity} active />
+            <ReviewBody session={session} tab={tab} file={file} path={path} setParam={setParam} onReviewFile={reviewFile} onAsk={toActivity} onCompose={compose} active />
           </div>
         )}
       </div>
@@ -242,7 +248,7 @@ function SessionStage({ session }: { session: CodeSession }) {
 }
 
 function ReviewBody({
-  session, tab, file, path, setParam, onReviewFile, onAsk, active,
+  session, tab, file, path, setParam, onReviewFile, onAsk, onCompose, active,
 }: {
   session: CodeSession
   tab: ReviewTab
@@ -251,11 +257,12 @@ function ReviewBody({
   setParam: (key: 'file' | 'path', value: string | null) => void
   onReviewFile: (path: string) => void
   onAsk: () => void
+  onCompose?: () => void
   active: boolean
 }) {
   const selectFile = useCallback((p: string | null) => setParam('file', p), [setParam])
   const openPath = useCallback((p: string | null) => setParam('path', p), [setParam])
-  if (tab === 'changes') return <ChangesPane session={session} selectedPath={file} onSelectPath={selectFile} active={active} />
+  if (tab === 'changes') return <ChangesPane session={session} selectedPath={file} onSelectPath={selectFile} active={active} onCompose={onCompose} />
   if (tab === 'checks') return <ChecksPane session={session} header={false} />
   return <FilesPane session={session} path={path} onPath={openPath} onAsk={onAsk} onReviewFile={onReviewFile} />
 }
@@ -291,10 +298,15 @@ function SessionMeta({ session }: { session: CodeSession }) {
         </span>
       )}
       {agent && (
-        <span className="type-meta flex shrink-0 items-center gap-1.5 text-ink-2">
-          <AgentMark seed={agent.sigil} hue={agent.hue} size={14} live={anyRunning} label={agent.name} />
-          {agent.name}
-          {session.autonomy && <span className="text-ink-3">· {session.autonomy.charAt(0).toUpperCase() + session.autonomy.slice(1)}</span>}
+        <span className="flex shrink-0 items-center gap-1.5">
+          <EntityChip entity={{ kind: 'agent', id: agent.id }} size="sm" />
+          {session.autonomy && (
+            <Tooltip content="Approval policy for this session">
+              <span tabIndex={0} className="type-meta text-ink-3">
+                {session.autonomy.charAt(0).toUpperCase() + session.autonomy.slice(1)}
+              </span>
+            </Tooltip>
+          )}
         </span>
       )}
       <span className="flex-1" />

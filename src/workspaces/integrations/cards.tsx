@@ -116,7 +116,15 @@ export const IntegrationCard = memo(function IntegrationCard({ def, connection, 
       id={def.id}
       to={`/integrations/${def.id}`}
       inspect={`integration:${def.id}`}
-      label={`${def.name}, ${categoryLabel(def.category)}, ${def.support === 'live' ? 'live' : 'simulated'}, ${word}`}
+      label={[
+        def.name,
+        categoryLabel(def.category),
+        def.support === 'live' ? 'live' : 'simulated',
+        status === 'error' && detail ? `${word}: ${detail}` : word,
+        status === 'connected' ? usage : undefined,
+      ]
+        .filter(Boolean)
+        .join(', ')}
       mark={<IntegrationMark def={def} />}
       name={def.name}
       category={categoryLabel(def.category)}

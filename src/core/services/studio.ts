@@ -235,19 +235,29 @@ export function stopGeneration(assetId: ID): void {
   if (run) runEngine.cancel(run.id, 'Stopped by you')
 }
 
-/** Make a version current. Text kinds swap the working copy to that version's text (hand edits are kept). */
+const TEXT_KINDS: ReadonlySet<AssetKind> = new Set<AssetKind>(['presentation', 'document', 'audio', 'video'])
+
+/**
+ * Make a version current. Text kinds swap the working copy to that version's text (hand edits are
+ * kept in the version they were made on). A version whose text was never recorded (seeded data that
+ * predates per-version text) leaves no working copy, so nothing is shown under the wrong version.
+ */
 export function setCurrentVersion(assetId: ID, index: number): Asset | undefined {
   return touch(assetId, (a) => {
     if (index < 0 || index >= a.versions.length || index === a.currentVersion) return a
     const versions = syncCurrent(a)
     const target = versions[index]
-    return {
-      ...a,
-      versions,
-      currentVersion: index,
-      ...(target.content !== undefined ? { content: target.content } : {}),
-      ...(target.slides !== undefined ? { slides: target.slides } : {}),
+    const next: Asset = { ...a, versions, currentVersion: index }
+    if (target.content !== undefined || target.slides !== undefined) {
+      if (target.content !== undefined) next.content = target.content
+      else delete next.content
+      if (target.slides !== undefined) next.slides = target.slides
+      else delete next.slides
+    } else if (TEXT_KINDS.has(a.kind)) {
+      delete next.content
+      delete next.slides
     }
+    return next
   })
 }
 

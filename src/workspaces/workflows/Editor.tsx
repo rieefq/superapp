@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
+import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { Panel } from '@xyflow/react'
 import { ChevronDown, ChevronUp, Copy, FileJson, Files, Layers, Link2, Play, Trash2, Workflow as WorkflowIcon, X } from 'lucide-react'
-import { CanvasTemplate, StageHeader, useShellLayout, type CanvasDrawer } from '@/app/templates'
+import { StageHeader, useShellLayout, type CanvasDrawer } from '@/app/templates'
 import { toggleHold } from '@/app/shell/scope'
 import { attachRun } from '@/app/shell/store'
 import { useIsPinned } from '@/core/context'
@@ -448,6 +448,20 @@ export function EditorStage({ workflowId }: { workflowId: string }) {
             onAddStep={onAddStep}
             minimap={layout.docking.stageWidth >= 720}
           >
+            {wf.nodes.length === 0 && (
+              <Panel position="top-center" className="!mt-24">
+                <EmptyState
+                  icon={WorkflowIcon}
+                  title="No steps yet"
+                  description="Every workflow starts with a trigger: by hand, on a schedule or on an event."
+                  actions={
+                    <Button variant="primary" onClick={() => onAddStep('trigger', null)}>
+                      Add a trigger
+                    </Button>
+                  }
+                />
+              </Panel>
+            )}
             <Panel position="top-left">
               <div className="flex flex-col gap-2">
                 {overlayRun && overlay && <OverlayPanel run={overlayRun} overlay={overlay} onClear={clearOverlay} />}
@@ -525,14 +539,3 @@ export function useRunsDrawer(workflowId: string | null): CanvasDrawer | undefin
     ),
   }
 }
-
-/** A link to a workflow (used by other views). */
-export function WorkflowLink({ wf, className }: { wf: Pick<Workflow, 'id' | 'name'>; className?: string }) {
-  return (
-    <Link to={`/workflows/${encodeURIComponent(wf.id)}`} className={className}>
-      {wf.name}
-    </Link>
-  )
-}
-
-export { CanvasTemplate }

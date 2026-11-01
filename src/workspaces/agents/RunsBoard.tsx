@@ -177,19 +177,30 @@ function RunFilters() {
     { value: 'you', label: 'You', description: 'Runs you did yourself (chat turns)' },
     ...agents.map((a) => ({ value: a.id, label: a.name })),
   ]
+  const kindItems = [{ value: 'all' as const, label: 'All' }, ...RUN_KINDS.map((k) => ({ value: k, label: KIND_CHIP_LABEL[k] }))]
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-2">
+    <div className="@container/filters flex min-w-0 flex-1 items-center gap-2">
       <div className="no-scrollbar -my-1 flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto py-1" role="group" aria-label="Filters">
+        {/* Kind chips when there is room (§6.4); a menu when the row is narrow, so no filter hides off-screen. */}
         <Tabs
           variant="pill"
           size="sm"
           aria-label="Kind"
           value={filters.kind}
           onValueChange={(v) => set({ kind: v as BoardFilters['kind'] })}
-          items={[{ value: 'all', label: 'All' }, ...RUN_KINDS.map((k) => ({ value: k, label: KIND_CHIP_LABEL[k] }))]}
-          className="shrink-0"
+          items={kindItems}
+          className="hidden shrink-0 @min-[1000px]/filters:flex"
         />
-        <span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-line" />
+        <span className="@min-[1000px]/filters:hidden">
+          <FilterMenu<BoardFilters['kind']>
+            label="Kind"
+            value={filters.kind}
+            isDefault={filters.kind === 'all'}
+            options={kindItems.map((k) => ({ value: k.value, label: k.value === 'all' ? 'Any kind' : k.label }))}
+            onChange={(v) => set({ kind: v })}
+          />
+        </span>
+        <span aria-hidden className="mx-1 hidden h-4 w-px shrink-0 bg-line @min-[1000px]/filters:block" />
         <FilterMenu
           label="Owner"
           value={filters.owner ?? 'anyone'}

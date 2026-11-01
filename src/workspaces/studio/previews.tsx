@@ -248,14 +248,15 @@ export const AssetThumb = memo(function AssetThumb({ asset, index = asset.curren
   }
   const text = versionContent(asset, index)
   if (asset.kind === 'presentation') {
-    const slide = text.slides?.[0]
+    // A version whose slides were not recorded still shows its title card in its own palette.
+    const slide = text.slides?.[0] ?? (version ? { id: `${version.id}-title`, layout: 'title' as const, title: asset.title, body: '' } : undefined)
     return slide ? (
-      <SlideView slide={slide} index={0} total={text.slides!.length} palette={spec?.palette ?? FALLBACK_SPEC.palette} thumb className={className} />
+      <SlideView slide={slide} index={0} total={text.slides?.length ?? 1} palette={spec?.palette ?? FALLBACK_SPEC.palette} thumb className={className} />
     ) : (
       <Blank className={className} />
     )
   }
-  if (asset.kind === 'document') return <DocPage content={text.content} className={className} />
+  if (asset.kind === 'document') return <DocPage content={text.content ?? (version ? `# ${asset.title}` : undefined)} className={className} />
   return (
     <div className={cn('@container h-full w-full bg-sunken', className)}>
       <div className="flex h-full w-full flex-col justify-between p-[7cqw]">
@@ -268,7 +269,7 @@ export const AssetThumb = memo(function AssetThumb({ asset, index = asset.curren
           </span>
         )}
         <div className={cn('w-full', tiny ? 'h-full' : 'h-[46%]')}>
-          <Waveform script={text.content} bars={tiny ? 18 : 40} />
+          <Waveform script={text.content ?? asset.prompt} bars={tiny ? 18 : 40} />
         </div>
       </div>
     </div>

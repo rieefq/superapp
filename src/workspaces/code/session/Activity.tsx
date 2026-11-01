@@ -13,7 +13,6 @@ import {
   AgentMark, Button, DiffStat, DiffView, EntityChip, IdCode, Markdown, ProvenanceLine, RunStatusBadge, RunTimeline, SimBadge, Skeleton, StepTape,
   formatClock, useNow, useReducedMotion,
 } from '@/ui'
-import { useSessionDrafts } from '../drafts'
 import { summaryMarkdown } from '../logic'
 import { SessionComposer } from './SessionComposer'
 
@@ -388,9 +387,3 @@ const PullRequestRunItem = memo(function PullRequestRunItem({ runId, highlighted
     </li>
   )
 })
-
-/** Insert text into this session's composer (used by Files and Changes). */
-export function useInsertIntoComposer(sessionId: ID) {
-  const insert = useSessionDrafts((s) => s.insert)
-  return useCallback((text: string) => insert(sessionId, text), [insert, sessionId])
-}

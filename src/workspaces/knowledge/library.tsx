@@ -68,10 +68,10 @@ import {
   type Section,
   type SortKey,
 } from './model'
-import { FILTER_ICON } from './parts'
+import { FILTER_ICON, SectionBoundary } from './parts'
 import { Results } from './results'
 import { rememberLibrary } from './nav'
-import { BrowseButton, KnowledgeScreen, useNewNote, usePhone } from './screen'
+import { BrowseButton, KnowledgeScreen, STAGE_TITLE_FIX, useNewNote, usePhone } from './screen'
 import { dismissUpload, retryUpload, uploadFiles, useUploads } from './uploads'
 
 /**
@@ -258,7 +258,8 @@ export function LibraryView() {
           </div>
         )}
         <UploadRows />
-        <LibraryBody
+        <SectionBoundary what="the library">
+          <LibraryBody
           query={query}
           results={results}
           view={view}
@@ -270,7 +271,8 @@ export function LibraryView() {
           onClearFacets={() => setQuery({ kinds: [], sources: [], project: null })}
           onSearchAll={() => setQuery({ section: { type: 'all' }, kinds: [], sources: [], project: null })}
           collection={collection}
-        />
+          />
+        </SectionBoundary>
       </div>
       <AddLinkDialog open={linkOpen} onOpenChange={setLinkOpen} collectionId={collectionId} />
       <CollectionDialog open={collectionOpen} onOpenChange={setCollectionOpen} onSaved={(id) => navigate(`/knowledge?collection=${encodeURIComponent(id)}`)} />
@@ -417,6 +419,7 @@ function LibraryHeader({
   return (
     <>
       <StageHeader
+        className={STAGE_TITLE_FIX}
         title={collection ? collection.name : title}
         onRename={collection ? (name) => updateCollection(collection.id, { name }) : undefined}
         leading={
@@ -577,6 +580,16 @@ function FacetChips({ query, setQuery }: { query: LibraryQuery; setQuery: (p: Pa
 
 // ------------------------------------------------------------------------------------------------ bulk
 
+/** Run a bulk write; a failure becomes an error toast that says what happened (§8.1). */
+function guard(verb: 'move' | 'add' | 'tag', write: () => void): void {
+  try {
+    write()
+  } catch (err) {
+    const what = verb === 'move' ? 'move the items' : verb === 'add' ? 'add the items to the project' : 'tag the items'
+    toast({ tone: 'error', title: `Couldn’t ${what}`, description: err instanceof Error ? err.message : String(err) })
+  }
+}
+
 function BulkBar({ selected, total, onSelectAll, onClear }: { selected: ReadonlySet<ID>; total: number; onSelectAll: () => void; onClear: () => void }) {
   const ids = [...selected]
   const n = ids.length
@@ -591,20 +604,22 @@ function BulkBar({ selected, total, onSelectAll, onClear }: { selected: Readonly
       (c): MenuItem => ({
         id: c.id,
         label: c.name,
-        onSelect: () => {
-          const moved = moveKnowledge(ids, c.id)
-          toast({ tone: 'success', title: `Moved ${plural(moved)} to ${c.name}` })
-        },
+        onSelect: () =>
+          guard('move', () => {
+            const moved = moveKnowledge(ids, c.id)
+            toast({ tone: 'success', title: `Moved ${plural(moved)} to ${c.name}` })
+          }),
       }),
     ),
     { type: 'separator' },
     {
       id: 'none',
       label: 'No collection',
-      onSelect: () => {
-        const moved = moveKnowledge(ids, null)
-        toast({ title: `Removed ${plural(moved)} from their collection` })
-      },
+      onSelect: () =>
+        guard('move', () => {
+          const moved = moveKnowledge(ids, null)
+          toast({ title: `Removed ${plural(moved)} from their collection` })
+        }),
     },
   ]
   const projectItems: MenuItem[] = [
@@ -613,10 +628,11 @@ function BulkBar({ selected, total, onSelectAll, onClear }: { selected: Readonly
       (p): MenuItem => ({
         id: p.id,
         label: p.name,
-        onSelect: () => {
-          const added = addKnowledgeToProject(ids, p.id)
-          toast({ tone: 'success', title: added ? `Added ${plural(added)} to ${p.name}` : `Already in ${p.name}` })
-        },
+        onSelect: () =>
+          guard('add', () => {
+            const added = addKnowledgeToProject(ids, p.id)
+            toast({ tone: 'success', title: added ? `Added ${plural(added)} to ${p.name}` : `Already in ${p.name}` })
+          }),
       }),
     ),
   ]
@@ -652,9 +668,11 @@ function TagPopover({ ids }: { ids: ID[] }) {
   const apply = (raw: string, close: () => void) => {
     const list = parseTagInput(raw)
     if (!list.length) return
-    let changed = 0
-    for (const t of list) changed += tagKnowledge(ids, t)
-    toast({ tone: 'success', title: `Tagged ${list.map((t) => `#${t}`).join(' ')}`, description: `${changed} change${changed === 1 ? '' : 's'} across ${ids.length} item${ids.length === 1 ? '' : 's'}.` })
+    guard('tag', () => {
+      let changed = 0
+      for (const t of list) changed += tagKnowledge(ids, t)
+      toast({ tone: 'success', title: `Tagged ${list.map((t) => `#${t}`).join(' ')}`, description: `${changed} change${changed === 1 ? '' : 's'} across ${ids.length} item${ids.length === 1 ? '' : 's'}.` })
+    })
     setValue('')
     close()
   }

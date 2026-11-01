@@ -179,7 +179,7 @@ function IndexHeader({
         ))}
       </p>
       <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex min-w-[min(100%,300px)] flex-1 flex-col gap-1">
           <h1 className="type-title-1 text-ink">Projects</h1>
           <p className="type-body-sm text-ink-3">Goals, tasks and milestones for you and your agents.</p>
         </div>

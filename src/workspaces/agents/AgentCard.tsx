@@ -6,6 +6,7 @@ import { useRun } from '@/core/runs'
 import { useAgentStats, type AgentLiveStatus, type AgentStats } from '@/core/services'
 import type { Agent, ID, Run } from '@/core/types'
 import { cn } from '@/lib/cn'
+import { timeAgo } from '@/lib/format'
 import { AgentMark, Button, IconButton, Menu, StepTape, formatCost, type MenuItem } from '@/ui'
 import { summarizeAbilities, useAbilityRows } from './abilities'
 import { agentMenuItems } from './agentActions'
@@ -132,7 +133,11 @@ export const RosterCard = memo(function RosterCard({ agent, status }: { agent: A
             </Button>
           )}
           <span className="flex-1" />
-          {activity.active > 1 && <span className="type-meta text-ink-3">{activity.active} in flight</span>}
+          {activity.active > 1 ? (
+            <span className="type-meta text-ink-3">{activity.active} in flight</span>
+          ) : stats.lastRunAt ? (
+            <span className="type-meta text-ink-3">last run {timeAgo(stats.lastRunAt)}</span>
+          ) : null}
         </>
       }
     />

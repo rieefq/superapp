@@ -22,7 +22,9 @@ import { CHANGE_LETTER, CHANGE_WORD, changeStats, checksClause, checksSummary, n
  * and the sticky review bar that always reads as one sentence, with Request changes, Reject all and
  * Approve & open PR (simulated) ▾ (Apply to branch only · Export .patch · Copy diff).
  */
-export function ChangesPane({ session, selectedPath, onSelectPath, active }: { session: CodeSession; selectedPath: string | null; onSelectPath: (path: string | null) => void; active: boolean }) {
+export function ChangesPane({
+  session, selectedPath, onSelectPath, active, onCompose,
+}: { session: CodeSession; selectedPath: string | null; onSelectPath: (path: string | null) => void; active: boolean; onCompose?: () => void }) {
   const changes = session.changes
   const paneRef = useRef<HTMLDivElement>(null)
   const width = useElementWidth(paneRef)
@@ -78,7 +80,11 @@ export function ChangesPane({ session, selectedPath, onSelectPath, active }: { s
     const n = Number(cell?.textContent?.trim())
     if (!cell || !Number.isFinite(n) || n <= 0) return
     insertIntoComposer(session.id, `${selected.path}:${n}`)
-    toast({ title: `Added ${selected.path}:${n} to the instruction`, description: 'Finish the sentence in the composer.' })
+    toast({
+      title: `Added ${selected.path}:${n} to your next instruction`,
+      description: 'Finish it in the composer under Activity.',
+      ...(onCompose ? { action: { label: 'Write it', onClick: onCompose } } : {}),
+    })
   }
 
   return (
@@ -105,7 +111,14 @@ export function ChangesPane({ session, selectedPath, onSelectPath, active }: { s
               actions={readOnly || narrow ? undefined : <DecisionButtons change={selected} onDecide={(r) => decide(selected, r)} />}
             />
             <p className="type-caption mt-2 text-ink-3 pointer-coarse:hidden">
-              {readOnly ? (session.status === 'merged' ? 'Merged — these changes are on the base branch (simulated).' : 'Archived sessions are read-only.') : 'Click a line number to reference it in your next instruction · J/K next or previous file · A accept · R reject · U clear · V layout'}
+              {readOnly
+                ? session.status === 'merged'
+                  ? 'Merged — these changes are on the base branch (simulated).'
+                  : 'Archived sessions are read-only.'
+                : [
+                    'Click a line number to reference it in your next instruction',
+                    ...(singleKeys ? ['J/K next or previous file', 'A accept', 'R reject', 'U clear', ...(width >= 720 ? ['V layout'] : [])] : []),
+                  ].join(' · ')}
             </p>
           </div>
         )}

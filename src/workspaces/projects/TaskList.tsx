@@ -145,7 +145,7 @@ export const TaskListRow = memo(function TaskListRow({
             .join(' ')}
         </span>
       )}
-      <span className="pointer-events-none flex w-4 shrink-0 justify-center">{task.priority !== 'none' && <PriorityGlyph priority={task.priority} />}</span>
+      <span className="pointer-events-none hidden w-4 shrink-0 justify-center @min-[400px]:flex">{task.priority !== 'none' && <PriorityGlyph priority={task.priority} />}</span>
       <span className="pointer-events-none hidden w-10 shrink-0 text-right @min-[520px]:block">
         {task.subtasks.length > 0 && (
           <span className="type-meta text-ink-3 tabular" aria-label={`${done} of ${task.subtasks.length} subtasks done`}>

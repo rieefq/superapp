@@ -232,7 +232,7 @@ function RepoPanel({ entity }: LensProps) {
         {repo.stars !== undefined && <Fact label="Stars">{repo.stars.toLocaleString('en-US')}</Fact>}
         <Fact label="Synced">{repo.lastSyncedAt ? timeAgo(repo.lastSyncedAt) : 'never'}</Fact>
       </Facts>
-      <div className="-ml-2 flex flex-wrap gap-1">
+      <div className="flex flex-wrap gap-1">
         <Button size="xs" variant="secondary" leadingIcon={Plus} onClick={() => navigate(`/code/new?repo=${encodeURIComponent(repo.id)}`)}>
           New session
         </Button>

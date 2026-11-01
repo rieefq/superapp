@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { getIntegration, INTEGRATIONS } from '@/core/integrations/catalog'
 import type { IntegrationListItem, IntegrationStatus } from '@/core/services/integrations'
 import type { IntegrationConnection } from '@/core/types'
@@ -129,6 +129,8 @@ describe('words', () => {
     expect(whatsReal(getIntegration('slack')!)).toMatch(/^Simulated\. Atrium emulates Slack locally/)
     expect(whatsRealBody(getIntegration('sandbox')!)).toMatch(/^Terminal output/)
     expect(whatsRealBody(getIntegration('github')!)).toBe(getIntegration('github')!.supportNote)
+    expect(whatsReal(getIntegration('openai-compatible')!)).toMatch(/^Live\. Calls your base URL\/chat\/completions/)
+    expect(whatsReal(getIntegration('openai-compatible')!, 'http://localhost:11434/v1/')).toMatch(/Calls http:\/\/localhost:11434\/v1\/chat\/completions/)
     expect(submitLabel(getIntegration('anthropic')!, false)).toBe('Save key and connect')
     expect(submitLabel(getIntegration('anthropic')!, true)).toBe('Replace key')
     expect(editLabel(getIntegration('github')!, false)).toBe('Add a token')
@@ -139,5 +141,27 @@ describe('words', () => {
       title: 'Slack connected (simulated)',
       description: 'Simulated — nothing leaves your browser.',
     })
+  })
+})
+
+describe('manifest commands (⌘K)', () => {
+  it('offers every catalog entry with its live status, plus model and filter shortcuts', async () => {
+    const { db, emptyTables } = await import('@/core/db')
+    const { manifest } = await import('./manifest')
+    db.replaceAll(emptyTables())
+    db.insert('connections', { id: 'jira', status: 'error', mode: 'simulated', scopes: [], config: {}, usageCount: 0, error: 'Token expired' })
+    db.insert('connections', { id: 'slack', status: 'connected', mode: 'simulated', scopes: [], config: {}, usageCount: 0 })
+    const navigate = vi.fn()
+    const close = vi.fn()
+    const commands = manifest.commands!({ navigate, close, scopeProjectId: null, pathname: '/' })
+    const byId = Object.fromEntries(commands.map((c) => [c.id, c]))
+    expect(commands.filter((c) => c.id.startsWith('integrations.open.'))).toHaveLength(INTEGRATIONS.length)
+    expect(byId['integrations.open.slack'].subtitle).toBe('Integration · Connected · simulated')
+    expect(byId['integrations.open.jira'].subtitle).toBe('Integration · Error: Token expired')
+    expect(byId['integrations.open.github'].subtitle).toBe('Integration · Available · live')
+    expect(byId['integrations.open.slack'].keywords).toContain('send messages')
+    await byId['integrations.connect-anthropic'].run({ navigate, close, scopeProjectId: null, pathname: '/' })
+    expect(close).toHaveBeenCalled()
+    expect(navigate).toHaveBeenCalledWith('/integrations/anthropic')
   })
 })

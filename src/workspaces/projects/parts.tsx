@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, type ReactNode } from 'react'
+import { Component, memo, useCallback, useMemo, type ErrorInfo, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router'
 import { useShallow } from 'zustand/react/shallow'
 import { useShellStore } from '@/app/shell/store'
@@ -8,7 +8,7 @@ import { taskRunIdsIn } from '@/core/services'
 import { useSettings } from '@/core/settings'
 import { isRunActive, type ActorRef, type Hue, type ID, type Project, type Task } from '@/core/types'
 import { cn } from '@/lib/cn'
-import { AgentMark, Avatar, HUE_FILL, MonogramMark, runCurrentLine, StepTape, TaskGlyph } from '@/ui'
+import { AgentMark, Avatar, ErrorState, HUE_FILL, MonogramMark, runCurrentLine, StepTape, TaskGlyph } from '@/ui'
 import { dueInfo } from './logic'
 
 /*
@@ -245,4 +245,36 @@ export function useOpenTask(): (taskId: ID, opts?: { replace?: boolean }) => voi
 export function useSelectedTaskId(): ID | null {
   const [params] = useSearchParams()
   return params.get(TASK_PARAM)
+}
+
+// ------------------------------------------------------------------------------------------------ errors
+
+/**
+ * An error boundary for one section or view: it shows "Couldn’t load {name}" with the details and
+ * Retry, and the rest of the page keeps working.
+ */
+export class SectionBoundary extends Component<{ name: string; children: ReactNode; className?: string }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null }
+  static getDerivedStateFromError(error: Error) {
+    return { error }
+  }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.warn(`[projects] ${this.props.name} failed`, error, info.componentStack)
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <ErrorState
+          compact
+          title={`Couldn’t load ${this.props.name}`}
+          message="Something in this part failed to draw. Your data is safe, and the rest of the page still works."
+          details={this.state.error.stack ?? this.state.error.message}
+          onRetry={() => this.setState({ error: null })}
+          retryLabel="Retry"
+          className={this.props.className}
+        />
+      )
+    }
+    return this.props.children
+  }
 }

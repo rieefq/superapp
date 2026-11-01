@@ -29,7 +29,7 @@ import { cn } from '@/lib/cn'
 import { shortCode } from '@/lib/id'
 import { Button, confirm, EmptyState, Menu, Skeleton, toast, type MenuItem } from '@/ui'
 import { PROJECT_STATUS_WORD, readFilters } from './logic'
-import { HueBand, ProjectMark } from './parts'
+import { HueBand, ProjectMark, SectionBoundary } from './parts'
 import { NewProjectDialog, ProjectDetailsDialog } from './ProjectForm'
 import { archiveWithUndo, restoreProject } from './ProjectsIndex'
 import { ProjectsListPane } from './ProjectsListPane'
@@ -227,8 +227,10 @@ function ProjectStage({ project, tab }: { project: Project; tab: ProjectTab }) {
                 aria-pressed={inScope}
                 onClick={toggleScope}
                 title={inScope ? 'This project is your scope. Click to show all work.' : 'Set this project as your scope: lists filter to it and new work is filed in it.'}
+                aria-label={inScope ? 'In scope' : 'Work in this project'}
+                className="max-sm:px-2"
               >
-                {inScope ? 'In scope' : 'Work in this project'}
+                <span className="max-sm:sr-only">{inScope ? 'In scope' : 'Work in this project'}</span>
               </Button>
             )}
             <Button size="sm" variant="ghost" leadingIcon={Plus} kbd="n" onClick={newTask} className="max-sm:hidden">
@@ -261,7 +263,9 @@ function ProjectStage({ project, tab }: { project: Project; tab: ProjectTab }) {
         bodyClassName={cn(tab === 'overview' && 'md:pt-7')}
       >
         {archived && <ArchivedNote project={project} />}
-        <Suspense fallback={<TabSkeleton />}>{view[tab]}</Suspense>
+        <SectionBoundary key={tab} name={TABS.find((t) => t.value === tab)?.label ?? 'this view'} className={board ? 'm-6' : undefined}>
+          <Suspense fallback={<TabSkeleton />}>{view[tab]}</Suspense>
+        </SectionBoundary>
       </Stage>
       <ProjectDetailsDialog project={project} open={editing} onOpenChange={setEditing} />
     </>

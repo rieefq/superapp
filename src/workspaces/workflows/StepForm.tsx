@@ -172,6 +172,15 @@ export function StepForm({ wf, node, issues, runSteps = [] }: StepFormProps) {
 
 // ------------------------------------------------------------------------------------------------ connections
 
+function ConnectionRow({ text, onRemove }: { text: string; onRemove: () => void }) {
+  return (
+    <li className="flex min-h-8 items-center gap-2 rounded-sm px-1 hover:bg-hover">
+      <span className="type-body-sm min-w-0 flex-1 truncate text-ink-2">{text}</span>
+      <IconButton icon={X} label={`Remove the connection: ${text}`} size="xs" onClick={onRemove} />
+    </li>
+  )
+}
+
 /**
  * Connections without dragging (the keyboard way to edit the graph): where this step goes next — for
  * a condition, its Yes and No — and where it is reached from.
@@ -189,12 +198,6 @@ function ConnectionsSection({ wf, node }: { wf: Workflow; node: WorkflowNode }) 
     const problem = connectSteps(wf.id, node.id, target, handle ?? null)
     if (problem) toast.error('Couldn’t connect these steps', { description: problem })
   }
-  const Row = ({ edgeId, text }: { edgeId: string; text: string }) => (
-    <li className="flex min-h-8 items-center gap-2 rounded-sm px-1 hover:bg-hover">
-      <span className="type-body-sm min-w-0 flex-1 truncate text-ink-2">{text}</span>
-      <IconButton icon={X} label={`Remove the connection to ${text}`} size="xs" onClick={() => disconnect(wf.id, edgeId)} />
-    </li>
-  )
   return (
     <Section title="Connections">
       {node.type === 'condition' ? (
@@ -221,7 +224,7 @@ function ConnectionsSection({ wf, node }: { wf: Workflow; node: WorkflowNode }) 
           {outgoing.length ? (
             <ul className="flex flex-col">
               {outgoing.map((e) => (
-                <Row key={e.id} edgeId={e.id} text={label(e.target)} />
+                <ConnectionRow key={e.id} onRemove={() => disconnect(wf.id, e.id)} text={label(e.target)} />
               ))}
             </ul>
           ) : (
@@ -245,7 +248,7 @@ function ConnectionsSection({ wf, node }: { wf: Workflow; node: WorkflowNode }) 
           {incoming.length ? (
             <ul className="flex flex-col">
               {incoming.map((e) => (
-                <Row key={e.id} edgeId={e.id} text={`${label(e.source)}${e.sourceHandle ? ` (${e.sourceHandle === 'false' ? 'No' : 'Yes'})` : ''}`} />
+                <ConnectionRow key={e.id} onRemove={() => disconnect(wf.id, e.id)} text={`${label(e.source)}${e.sourceHandle ? ` (${e.sourceHandle === 'false' ? 'No' : 'Yes'})` : ''}`} />
               ))}
             </ul>
           ) : (

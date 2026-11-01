@@ -1,4 +1,4 @@
-import { FolderPlus, Layers, Library, Link2, NotebookPen, ScanSearch, Upload } from 'lucide-react'
+import { FolderPlus, Layers, Library, Link2, ScanSearch, Upload } from 'lucide-react'
 import type { Command, WorkspaceManifest } from '@/app/types'
 import { newNoteHref, pickFiles } from './nav'
 
@@ -10,22 +10,16 @@ export const manifest: WorkspaceManifest = {
   group: 'organize',
   path: '/knowledge',
   chord: ['g', 'k'],
-  newAction: { label: 'New note', run: (ctx) => ctx.navigate(newNoteHref()) },
-  defaultInspectorTab: 'item',
-  commands: (): Command[] => [
-    {
-      id: 'knowledge.new-note',
-      title: 'New note',
-      subtitle: 'A Markdown note in Knowledge — it saves as you type',
-      icon: NotebookPen,
-      group: 'Knowledge',
-      keywords: ['knowledge', 'write', 'create', 'markdown', 'memo'],
-      priority: 40,
-      run: (ctx) => {
-        ctx.close()
-        ctx.navigate(newNoteHref())
-      },
+  newAction: {
+    label: 'New note',
+    run: (ctx) => {
+      ctx.close()
+      ctx.navigate(newNoteHref())
     },
+  },
+  defaultInspectorTab: 'item',
+  // `newAction` already gives ⌘K its "New note" (N); these are the other ways in.
+  commands: (): Command[] => [
     {
       id: 'knowledge.upload',
       title: 'Upload files to Knowledge',

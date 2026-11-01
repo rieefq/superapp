@@ -53,6 +53,14 @@ export default function RosterView() {
 
 type FleetFilter = AgentLiveStatus | 'all' | 'archived'
 
+const EMPTY_TITLE: Record<AgentLiveStatus, string> = {
+  working: 'No agent is working right now',
+  waiting: 'No agent needs you',
+  attention: 'No agent needs attention',
+  idle: 'No agent is idle',
+  paused: 'No agent is paused',
+}
+
 function Fleet() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
@@ -105,7 +113,7 @@ function Fleet() {
         {shown.length === 0 ? (
           <EmptyState
             compact
-            title={filter === 'archived' ? 'No archived agents' : `No agents are ${filter === 'all' ? 'here' : AGENT_STATUS_META[filter].word.toLowerCase()}`}
+            title={filter === 'archived' ? 'No archived agents' : filter === 'all' ? 'No agents here' : EMPTY_TITLE[filter]}
             description={scope && filter === 'all' ? 'No agent has worked in this project yet. Agents that run here, hold its tasks or read its knowledge show up.' : 'Choose another status to see the rest of the fleet.'}
             actions={
               filter !== 'all' ? (

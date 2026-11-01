@@ -497,7 +497,9 @@ export function scheduledInstruction(agent: Pick<Agent, 'schedule'>): string {
   return `Scheduled run (${label})\nWork through your standing instructions and report what changed since the last run.`
 }
 
-let schedulerTimer: ReturnType<typeof setInterval> | undefined
+// Kept on globalThis so a hot-reloaded module never starts a second timer.
+const SCHEDULER_KEY = '__atriumAgentScheduler'
+type SchedulerHost = typeof globalThis & { [SCHEDULER_KEY]?: ReturnType<typeof setInterval> }
 
 /**
  * Fire agent schedules while Atrium is open (§8.4 “Runs only while Atrium is open”): a minute-level
@@ -505,13 +507,14 @@ let schedulerTimer: ReturnType<typeof setInterval> | undefined
  * Idempotent; returns a stop function.
  */
 export function startAgentScheduler(intervalMs = 20_000): () => void {
+  const host = globalThis as SchedulerHost
   const stop = () => {
-    if (schedulerTimer) clearInterval(schedulerTimer)
-    schedulerTimer = undefined
+    if (host[SCHEDULER_KEY]) clearInterval(host[SCHEDULER_KEY])
+    host[SCHEDULER_KEY] = undefined
   }
-  if (schedulerTimer || typeof setInterval === 'undefined') return stop
+  if (host[SCHEDULER_KEY] || typeof setInterval === 'undefined') return stop
   let last = Date.now()
-  schedulerTimer = setInterval(() => {
+  host[SCHEDULER_KEY] = setInterval(() => {
     const now = Date.now()
     for (const agent of db.all('agents')) {
       const schedule = agent.schedule

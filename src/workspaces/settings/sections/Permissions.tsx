@@ -21,7 +21,7 @@ import {
   toggleAlwaysAsk,
   type PolicyRow,
 } from '../logic'
-import { BlockRow, Group, InlineLink, Row, SectionBody, SettingRow, useMarkSaved, useSaveSetting } from '../parts'
+import { BlockRow, Group, InlineLink, Row, SectionBody, SettingRow, useSaveSetting } from '../parts'
 import { getSection } from '../sections'
 
 /**
@@ -260,7 +260,6 @@ function AlwaysAllowList() {
 
 const AgentGrantsRow = memo(function AgentGrantsRow({ agent, grants }: { agent: Agent; grants: CapabilityGrant[] }) {
   const navigate = useNavigate()
-  const mark = useMarkSaved()
   const alwaysAsk = useSettings((s) => s.safety.alwaysAsk)
   const agentPath = entityRoute({ kind: 'agent', id: agent.id })
 
@@ -269,7 +268,6 @@ const AgentGrantsRow = memo(function AgentGrantsRow({ agent, grants }: { agent: 
     const previous = agent.capabilities
     try {
       updateAgent(agent.id, { capabilities: grantsWithoutAlways(agent, grant.capability, grant.integrationId) })
-      mark('always-allow', 'Always allowed')
       toast.success(`${agent.name} will ask before it can ${label}`, {
         description: 'Revoked “Always allow”.',
         duration: 8000,
@@ -295,7 +293,10 @@ const AgentGrantsRow = memo(function AgentGrantsRow({ agent, grants }: { agent: 
           >
             {agent.name}
           </button>
-          <span className="truncate text-xs text-ink-3">{agent.role}</span>
+          <span className="truncate text-xs text-ink-3">
+            {agent.role}
+            {agent.status !== 'active' && ` · ${agent.status === 'paused' ? 'Paused' : 'Archived'}`}
+          </span>
         </div>
         <span className="type-meta shrink-0 text-ink-3">{AUTONOMY_LABEL[agent.autonomy]}</span>
       </div>

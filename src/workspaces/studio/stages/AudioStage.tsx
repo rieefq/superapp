@@ -6,7 +6,7 @@ import type { Asset } from '@/core/types'
 import { Button, Markdown, SimBadge, Tooltip } from '@/ui'
 import { formatClock } from '../logic'
 import { Waveform } from '../previews'
-import { FailedCard, GeneratingCard } from './common'
+import { FailedCard, GeneratingCard, UnrecordedCard, isUnrecorded } from './common'
 import { TextCompare } from './DocStage'
 
 /*
@@ -139,7 +139,15 @@ export function AudioStage({ asset, index, compareIndex }: { asset: Asset; index
   if (!content?.trim()) {
     return (
       <div className="sim-hatch grid min-h-[240px] w-full max-w-[760px] place-items-center rounded-md border border-dashed border-line-input">
-        {asset.status === 'generating' ? <GeneratingCard asset={asset} /> : asset.status === 'failed' ? <FailedCard asset={asset} /> : <p className="type-body-sm text-ink-3">No script yet.</p>}
+        {asset.status === 'generating' ? (
+          <GeneratingCard asset={asset} />
+        ) : asset.status === 'failed' ? (
+          <FailedCard asset={asset} />
+        ) : isUnrecorded(asset, index) ? (
+          <UnrecordedCard asset={asset} index={index} />
+        ) : (
+          <p className="type-body-sm text-ink-3">No script yet.</p>
+        )}
       </div>
     )
   }

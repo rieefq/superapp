@@ -20,6 +20,10 @@ export interface CitedBy {
   at: number
 }
 
+/**
+ * Work made *from* the item (tasks, research, copies…) is not listed here: the reader shows it in
+ * "Made from this" with the shared DerivedList (live while it runs, a LandedCard when it ends).
+ */
 export interface KnowledgeConnections {
   cameFrom: EntityRef[]
   /** Runs whose steps read the item, newest first. */
@@ -27,10 +31,8 @@ export interface KnowledgeConnections {
   citedBy: CitedBy[]
   /** Investigations that used it as a source. */
   sourced: ID[]
-  /** Tasks made from it or pointing at it. */
+  /** Tasks that point at it (made-from tasks are in "Made from this"). */
   tasks: ID[]
-  /** Other things made from it (copies, sessions, assets…). */
-  ledTo: EntityRef[]
   /** Knowledge it references or is related to. */
   related: EntityRef[]
 }
@@ -53,7 +55,7 @@ export function connectionsIn(s: Tables, id: ID): KnowledgeConnections {
   const cameFrom: EntityRef[] = []
   const citedBy: CitedBy[] = []
   const tasks = new Set<ID>()
-  const ledTo: EntityRef[] = []
+  const madeFrom = new Set<ID>()
   const related: EntityRef[] = []
   if (item?.source.ref) cameFrom.push(item.source.ref)
   for (const inv of Object.values(s.investigations)) if (inv.knowledgeId === id) cameFrom.push({ kind: 'investigation', id: inv.id })
@@ -67,12 +69,10 @@ export function connectionsIn(s: Tables, id: ID): KnowledgeConnections {
     switch (l.rel) {
       case 'derived_from':
         if (out) cameFrom.push(other)
-        else if (other.kind === 'task') tasks.add(other.id)
-        else ledTo.push(other)
+        else if (other.kind === 'task') madeFrom.add(other.id)
         break
       case 'produced':
         if (inc) cameFrom.push(other)
-        else ledTo.push(other)
         break
       case 'cites':
         if (inc) citedBy.push({ ref: other, at: l.createdAt })
@@ -87,7 +87,8 @@ export function connectionsIn(s: Tables, id: ID): KnowledgeConnections {
         else related.push(other)
     }
   }
-  for (const t of Object.values(s.tasks)) if (t.origin && isKnowledge(t.origin, id)) tasks.add(t.id)
+  for (const t of Object.values(s.tasks)) if (t.origin && isKnowledge(t.origin, id)) madeFrom.add(t.id)
+  for (const t of madeFrom) tasks.delete(t)
 
   const sourced = new Set<ID>()
   for (const src of Object.values(s.sources)) {
@@ -108,7 +109,6 @@ export function connectionsIn(s: Tables, id: ID): KnowledgeConnections {
     citedBy: citedBy.sort((a, b) => b.at - a.at),
     sourced: [...sourced].sort((a, b) => (s.investigations[b]?.updatedAt ?? 0) - (s.investigations[a]?.updatedAt ?? 0)),
     tasks: [...tasks].filter((t) => s.tasks[t]).sort((a, b) => (s.tasks[b]?.updatedAt ?? 0) - (s.tasks[a]?.updatedAt ?? 0)),
-    ledTo: uniq(ledTo),
     related: uniq(related),
   }
 }
@@ -130,7 +130,7 @@ export function useKnowledgeConnections(id: ID): KnowledgeConnections {
 }
 
 export function connectionCount(c: KnowledgeConnections): number {
-  return c.cameFrom.length + c.usedBy.length + c.citedBy.length + c.sourced.length + c.tasks.length + c.ledTo.length + c.related.length
+  return c.cameFrom.length + c.usedBy.length + c.citedBy.length + c.sourced.length + c.tasks.length + c.related.length
 }
 
 // ------------------------------------------------------------------------------------------------ view
@@ -237,7 +237,7 @@ function Chips({ refs }: { refs: EntityRef[] }) {
 
 const USED_VISIBLE = 6
 
-/** The Connections section of the reader: Came from · Used by · Cited by · Research · Tasks · Led to · Related. */
+/** The Connections section of the reader: Came from · Used by · Cited by · Research · Tasks · Related. */
 export function ConnectionsSection({ id }: { id: ID }) {
   const c = useKnowledgeConnections(id)
   const total = connectionCount(c)
@@ -285,11 +285,6 @@ export function ConnectionsSection({ id }: { id: ID }) {
               {c.tasks.map((taskId) => (
                 <TaskConnection key={taskId} id={taskId} />
               ))}
-            </Group>
-          )}
-          {c.ledTo.length > 0 && (
-            <Group label="Led to" count={c.ledTo.length}>
-              <Chips refs={c.ledTo} />
             </Group>
           )}
           {c.related.length > 0 && (

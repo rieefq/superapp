@@ -45,16 +45,16 @@ export function keyWarning(def: IntegrationDef, baseUrl?: string): string | unde
 }
 
 /** The honest note at the top of a detail page (`supportNote`, or the simulated default). */
-export function whatsReal(def: IntegrationDef): string {
-  if (def.supportNote) return def.supportNote
+export function whatsReal(def: IntegrationDef, baseUrl?: string): string {
+  if (def.supportNote) return def.supportNote.replace('{baseUrl}', baseUrl?.replace(/\/+$/, '') || 'your base URL')
   return def.support === 'simulated'
     ? `Simulated. Atrium emulates ${def.name} locally so agents and workflows can use it in this build. Connecting creates a fictional account on an .example domain; everything it sends or reads is generated here and labeled simulated.`
     : `Live. Atrium makes real requests to ${def.name} from your browser.`
 }
 
 /** The note's body when the SIMULATED line or badge is already shown next to it (no "Simulated." twice). */
-export function whatsRealBody(def: IntegrationDef): string {
-  const note = whatsReal(def)
+export function whatsRealBody(def: IntegrationDef, baseUrl?: string): string {
+  const note = whatsReal(def, baseUrl)
   return def.support === 'simulated' ? note.replace(/^Simulated\.\s*/, '') : note
 }
 

@@ -7,6 +7,12 @@ import { test, expect, open } from './fixtures'
  * which validates locally and never calls the network in tests.
  */
 
+/**
+ * Client-side navigations can commit late while simulated runs stream (router updates are React
+ * transitions); assertions that follow a navigation get extra room.
+ */
+const afterNav = expect.configure({ timeout: 15_000 })
+
 const header = (page: Page) => page.locator('[data-region="stage"] > header').first()
 const statusChip = (page: Page) => header(page).locator('[data-status]')
 
@@ -58,8 +64,8 @@ test.describe('Integrations', () => {
     // The list pane filters by category.
     await page.getByRole('list', { name: 'Integration filters' }).getByRole('link', { name: /^Communication/ }).click()
     await expect(page).toHaveURL(/\/integrations\?category=communication$/)
-    await expect(page.getByRole('heading', { level: 1, name: 'Communication' })).toBeVisible()
-    await expect(page.locator('[data-card]')).toHaveCount(3)
+    await afterNav(page.getByRole('heading', { level: 1, name: 'Communication' })).toBeVisible()
+    await afterNav(page.locator('[data-card]')).toHaveCount(3)
   })
 
   test('connect Slack (simulated), set Send messages to deny, disconnect with confirm', async ({ page }) => {
@@ -163,10 +169,11 @@ test.describe('Integrations', () => {
     await page.keyboard.press(' ')
     await expect(page).toHaveURL(/inspect=integration%3Aanthropic/)
     const inspector = page.getByRole('complementary', { name: 'Inspector' })
-    await expect(inspector.getByRole('heading', { name: 'Anthropic' })).toBeVisible()
+    await afterNav(inspector.getByRole('heading', { name: 'Anthropic' })).toBeVisible()
     await expect(inspector.getByText('Not connected').first()).toBeVisible()
     await inspector.getByRole('button', { name: 'Manage' }).click()
     await expect(page).toHaveURL(/\/integrations\/anthropic/)
+    await afterNav(page.getByRole('heading', { level: 1, name: 'Anthropic' })).toBeVisible()
   })
 
   test('Jira’s expired token shows the error, the fix, and reconnects', async ({ page }) => {

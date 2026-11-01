@@ -171,6 +171,7 @@ function TaskForm({ agent, disabled }: { agent: Agent; disabled: boolean }) {
   }, [tasksTable, scope, query])
 
   const pickedTask = picked ? tasksTable[picked] : undefined
+  const ready = tab === 'pick' ? !!pickedTask : !!title.trim()
   const readBack = useAgentReadBack(agent, tab === 'pick' ? (pickedTask?.projectId ?? scope) : projectId, tab === 'pick' ? pickedTask?.title : title || undefined)
 
   useEffect(() => setError(null), [tab, picked, title])
@@ -251,6 +252,7 @@ function TaskForm({ agent, disabled }: { agent: Agent; disabled: boolean }) {
                     key={t.id}
                     className={cn(
                       'flex min-h-11 cursor-pointer items-center gap-3 rounded-sm px-2.5 py-1.5 transition-colors duration-(--dur-1)',
+                      'has-[input:focus-visible]:outline-2 has-[input:focus-visible]:-outline-offset-2 has-[input:focus-visible]:outline-(--focus-ring)',
                       checked ? 'bg-accent-tint' : 'hover:bg-hover',
                     )}
                   >
@@ -308,10 +310,10 @@ function TaskForm({ agent, disabled }: { agent: Agent; disabled: boolean }) {
         <Button variant="ghost" onClick={closeGiveWork}>
           Cancel
         </Button>
-        <Button variant="secondary" disabled={disabled || busy} onClick={() => submit(true)}>
+        <Button variant="secondary" disabled={disabled || busy || !ready} onClick={() => submit(true)}>
           Assign in background
         </Button>
-        <Button variant="primary" loading={busy} disabled={disabled || (tab === 'pick' ? !picked : !title.trim())} onClick={() => submit(false)}>
+        <Button variant="primary" loading={busy} disabled={disabled || !ready} onClick={() => submit(false)}>
           Assign
         </Button>
       </div>

@@ -13,6 +13,13 @@ export function useNewNote(): () => void {
   return useCallback(() => navigate(newNoteHref(location.search, location.pathname)), [navigate, location.search, location.pathname])
 }
 
+/**
+ * Local correction for StageHeader's renamable title: its button is `-mx-1.5 px-1.5 max-w-full`, so
+ * its max width resolves against an h1 that excludes the 12px of padding and every title truncates
+ * early ("Prod…"). Allowing the 12px back fixes it without touching the shared template.
+ */
+export const STAGE_TITLE_FIX = '[&_h1>button]:max-w-[calc(100%+0.75rem)]'
+
 export function usePhone(): boolean {
   return useShellLayout().formFactor === 'phone'
 }

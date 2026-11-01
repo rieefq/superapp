@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 import { useNavigate, type NavigateOptions, type To } from 'react-router'
-import { useShallow } from 'zustand/react/shallow'
 import { useDB, type Tables } from '@/core/db'
 import { GithubRequestError, getLastRateLimit, getRateLimit, peekFile, subscribeRateLimit, type GithubErrorKind, type GithubRateLimit } from '@/core/github'
 import { getRepoFile, type RepoFileContent } from '@/core/services'
-import type { ID, Run } from '@/core/types'
+import type { ID } from '@/core/types'
 
 /** The GitHub REST quota last observed (null before any GitHub request in this tab). */
 export function useRateLimit(): GithubRateLimit | null {
@@ -81,20 +80,6 @@ export function useElementWidth(ref: RefObject<HTMLElement | null>): number {
     return () => ro.disconnect()
   }, [ref])
   return width
-}
-
-/** The latest run of each session turn, selected narrowly (status, steps and usage only change those rows). */
-export function useTurnRuns(runIds: readonly (ID | undefined)[]): (Run | undefined)[] {
-  return useDB(useShallow((s: Tables) => runIds.map((id) => (id ? s.runs[id] : undefined))))
-}
-
-/** Remember the previous value (for "just changed" effects). */
-export function usePrevious<T>(value: T): T | undefined {
-  const ref = useRef<T | undefined>(undefined)
-  useEffect(() => {
-    ref.current = value
-  })
-  return ref.current
 }
 
 /**

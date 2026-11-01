@@ -4,17 +4,17 @@ import { ArrowUpRight, Ellipsis, FolderGit2, Plus, RefreshCw, SquareTerminal, Un
 import { Stage, StageHeader } from '@/app/templates'
 import { useScope } from '@/core/context'
 import { useDB, type Tables } from '@/core/db'
+import { connectDemoRepo } from '@/core/services'
 import type { ID } from '@/core/types'
 import { cn } from '@/lib/cn'
 import { timeAgo } from '@/lib/format'
-import { AgentMark, Button, DiffStat, EmptyState, IconButton, Menu, StepTape } from '@/ui'
+import { AgentMark, Button, DiffStat, EmptyState, IconButton, Menu, SimBadge, StepTape, runCurrentLine } from '@/ui'
 import { disconnectWithConfirm, refreshWithToast } from './actions'
 import { openConnectDialog } from './ConnectRepo'
-import { useFetchRateLimit, useRateLimit } from './hooks'
+import { useFetchRateLimit, useGo, useRateLimit } from './hooks'
 import { changeStats, fileCount, homeGroups, rateLimitText } from './logic'
 import { BranchLine, ChecksBrief, QuietLine, RepoMark, RepoModeBadge, SectionTitle, SessionGlyph } from './parts'
 import { StartComposer } from './StartComposer'
-import { useGo } from './hooks'
 
 /**
  * Code home (`/code`, §6.3 + brief): start a session, then the sessions that need you or are moving,
@@ -51,38 +51,43 @@ export function CodeHome() {
         />
       }
     >
-          {!anyRepo ? (
-            <NoRepositories />
-          ) : (
-            <>
-              <StartComposer className="max-w-[760px]" />
-              <div className="mt-10 grid gap-x-8 gap-y-10 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-                <SessionsColumn />
-                <section aria-labelledby="code-home-repos" className="min-w-0">
-                  <SectionTitle
-                    id="code-home-repos"
-                    title="Repositories"
-                    count={repoIds.length}
-                    action={
-                      <Button size="xs" variant="ghost" leadingIcon={Plus} onClick={openConnectDialog}>
-                        Connect
-                      </Button>
-                    }
-                  />
-                  {repoIds.length === 0 ? (
-                    <QuietLine>No repositories in this project. Connect one, or show all work.</QuietLine>
-                  ) : (
-                    <ul className="flex flex-col gap-2">
-                      {repoIds.map((id) => (
-                        <RepoCard key={id} id={id} />
-                      ))}
-                    </ul>
-                  )}
-                  <RateLimitLine />
-                </section>
-              </div>
-            </>
-          )}
+      {!anyRepo ? (
+        <>
+          <NoRepositories />
+          <div className="mt-12">
+            <SessionsColumn />
+          </div>
+        </>
+      ) : (
+        <>
+          <StartComposer className="max-w-[760px]" />
+          <div className="mt-10 grid gap-x-8 gap-y-10 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+            <SessionsColumn />
+            <section aria-labelledby="code-home-repos" className="min-w-0">
+              <SectionTitle
+                id="code-home-repos"
+                title="Repositories"
+                count={repoIds.length}
+                action={
+                  <Button size="xs" variant="ghost" leadingIcon={Plus} onClick={openConnectDialog}>
+                    Connect
+                  </Button>
+                }
+              />
+              {repoIds.length === 0 ? (
+                <QuietLine>No repositories in this project. Connect one, or show all work.</QuietLine>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {repoIds.map((id) => (
+                    <RepoCard key={id} id={id} />
+                  ))}
+                </ul>
+              )}
+              <RateLimitLine />
+            </section>
+          </div>
+        </>
+      )}
     </Stage>
   )
 }
@@ -95,15 +100,27 @@ function RateLimitLine() {
 }
 
 function NoRepositories() {
+  const navigate = useGo()
+  const scope = useScope()
+  const startWithDemo = () => {
+    const repo = connectDemoRepo({ projectId: scope })
+    navigate(`/code/repos/${encodeURIComponent(repo.id)}`)
+  }
   return (
     <EmptyState
       icon={FolderGit2}
       title="Connect a repository to start"
-      description="Coding agents work in a repository: a GitHub one read live, or the bundled demo repository."
+      description="Coding agents work in a repository: a GitHub one, read live, or the bundled demo repository, simulated end to end."
       actions={
-        <Button variant="primary" leadingIcon={Plus} onClick={openConnectDialog}>
-          Connect a repository
-        </Button>
+        <>
+          <Button variant="primary" leadingIcon={Plus} onClick={openConnectDialog}>
+            Connect a GitHub repository
+          </Button>
+          <Button variant="secondary" onClick={startWithDemo}>
+            Use the demo repository
+            <SimBadge className="ml-1" />
+          </Button>
+        </>
       }
       className="mt-10"
     />
@@ -195,6 +212,11 @@ export const SessionOverviewRow = memo(function SessionOverviewRow({ id }: { id:
               </span>
             )}
           </span>
+          {working && run && (
+            <span className={cn('type-caption truncate', run.status === 'waiting' ? 'text-attn-ink' : 'text-ink-3')}>
+              {run.status === 'waiting' ? `Needs you · ${runCurrentLine(run)}` : runCurrentLine(run)}
+            </span>
+          )}
         </span>
         <span className="flex shrink-0 flex-col items-end gap-1">
           <span className="flex items-center gap-3">

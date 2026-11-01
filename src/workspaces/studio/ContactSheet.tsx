@@ -14,7 +14,7 @@ import { AssetTile } from './AssetTile'
 import { KINDS } from './kinds'
 import { filterAssets, gridMove, inPlace, inScope, isAssetKind, matchesQuery, type Place } from './logic'
 import { PromptBar, type PromptBarHandle } from './PromptBar'
-import { useStudioView } from './view'
+import { useStudioView, withParam } from './view'
 
 /**
  * The board stage (§6.8): the sticky generation bar over the contact sheet on --surface-sunken —
@@ -183,6 +183,7 @@ export function ContactSheet({ composeRef }: { composeRef: (h: PromptBarHandle |
           onRename={board ? (name) => renameBoard(board.id, name) : undefined}
           status={filters}
           menu={menu}
+          backTo={withParam(view.href(), 'places', '1')}
         />
       }
       padded={false}

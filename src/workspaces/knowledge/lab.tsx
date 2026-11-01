@@ -16,7 +16,7 @@ import type { ID, KnowledgeItem } from '@/core/types'
 import { Button, EmptyState, HUE_FILL, Input, Kbd, Menu, TickMeter, Tooltip, toast, type MenuItem } from '@/ui'
 import { cn } from '@/lib/cn'
 import { Highlight, KnowledgeTile } from './parts'
-import { KnowledgeScreen, usePhone } from './screen'
+import { KnowledgeScreen, STAGE_TITLE_FIX, usePhone } from './screen'
 
 /**
  * Retrieval lab: "What would the AI retrieve?" Runs the same local retrieval a chat turn uses (BM25 over
@@ -257,7 +257,7 @@ export function RetrievalLab() {
     }
   }
 
-  const header = <StageHeader title="Retrieval lab" leading={<ScanSearch aria-hidden className="size-4 text-ink-3" strokeWidth={1.75} />} hideInspectorToggle={phone} />
+  const header = <StageHeader className={STAGE_TITLE_FIX} title="Retrieval lab" leading={<ScanSearch aria-hidden className="size-4 text-ink-3" strokeWidth={1.75} />} hideInspectorToggle={phone} />
 
   return (
     <KnowledgeScreen header={header} measure={880}>

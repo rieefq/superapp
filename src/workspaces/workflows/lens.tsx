@@ -11,7 +11,7 @@ import { cn } from '@/lib/cn'
 import { formatDateTime, timeAgo } from '@/lib/format'
 import { Button, OutcomeTape, RUN_STATUS_META, RunStatusGlyph, SimBadge, Switch, Textarea } from '@/ui'
 import { workflowCapabilities } from './capabilities'
-import { toggleEnabled } from './dialogs'
+import { EnableDialog, toggleEnabled } from './dialogs'
 import { selectStep, useSelectedNodeId } from './editorStore'
 import { useIssues, useOverlayRun, useWorkflowSummaries } from './hooks'
 import { NODE_TYPES } from './nodeMeta'
@@ -48,6 +48,8 @@ function WorkflowPanel({ entity }: LensProps) {
 
 function WorkflowOverview({ wf, inEditor, issues }: { wf: Workflow; inEditor: boolean; issues: ReturnType<typeof useIssues>['issues'] }) {
   const navigate = useNavigate()
+  // Outside Workflows (which hosts its own), the "Turn on" read-back needs a host here.
+  const hostsDialog = !useLocation().pathname.startsWith('/workflows')
   const runs = useWorkflowRuns(wf.id)
   const capabilities = useMemo(() => workflowCapabilities(wf), [wf])
   const outline = useMemo(() => buildOutline(wf.nodes, wf.edges), [wf.nodes, wf.edges])
@@ -55,6 +57,7 @@ function WorkflowOverview({ wf, inEditor, issues }: { wf: Workflow; inEditor: bo
   const recent = runs.slice(0, 5)
   return (
     <div className="flex flex-col" data-testid="workflow-overview">
+      {hostsDialog && <EnableDialog />}
       <Section>
         {inEditor ? (
           <Textarea

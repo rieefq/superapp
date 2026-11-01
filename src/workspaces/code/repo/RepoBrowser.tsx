@@ -7,7 +7,7 @@ import { cn } from '@/lib/cn'
 import { formatBytes } from '@/lib/format'
 import { Button, CodeBlock, EmptyState, ErrorState, FileIcon, SearchField, Skeleton, Tree, languageLabel, type TreeNode } from '@/ui'
 import { useElementWidth, useRepoFile } from '../hooks'
-import { buildFileTree, CHANGE_LETTER, defaultExpanded, fileCount, splitPath, type FileTreeNode } from '../logic'
+import { buildFileTree, CHANGE_LETTER, CHANGE_WORD, defaultExpanded, fileCount, splitPath, type FileTreeNode } from '../logic'
 import { RepoModeBadge } from '../parts'
 
 export interface RepoBrowserProps {
@@ -30,7 +30,16 @@ function toTreeNodes(nodes: readonly FileTreeNode[], changed?: ReadonlyMap<strin
       id: n.id,
       label: n.label,
       ...(n.children ? { children: toTreeNodes(n.children, changed) } : {}),
-      ...(letter ? { meta: <span title={`Changed in this session (${letter})`}>{CHANGE_LETTER[letter]}</span> } : {}),
+      ...(letter
+        ? {
+            meta: (
+              <span title={`${CHANGE_WORD[letter]} in this session`}>
+                <span aria-hidden>{CHANGE_LETTER[letter]}</span>
+                <span className="sr-only">, {CHANGE_WORD[letter].toLowerCase()} in this session</span>
+              </span>
+            ),
+          }
+        : {}),
     }
   })
 }

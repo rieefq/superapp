@@ -31,7 +31,7 @@ export const useEditorStore = create<EditorState>()((set) => ({
   edgeId: null,
   overlayRunId: null,
   drawerOpen: false,
-  issuesOpen: true,
+  issuesOpen: false,
   setDrawerOpen: (drawerOpen) => set({ drawerOpen }),
   setIssuesOpen: (issuesOpen) => set({ issuesOpen }),
   select: (workflowId, nodeId) => set((s) => (s.workflowId === workflowId && s.nodeId === nodeId && !s.edgeId ? s : { workflowId, nodeId, edgeId: null })),

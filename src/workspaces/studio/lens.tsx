@@ -137,16 +137,16 @@ function BoardPanel({ entity }: LensProps) {
   const board = useRow('boards', entity.id)
   const assets = useBoardAssets(entity.id)
   const counts = useMemo(() => {
-    const out = new Map<string, number>()
-    for (const a of assets) out.set(KINDS[a.kind].plural, (out.get(KINDS[a.kind].plural) ?? 0) + 1)
-    return [...out.entries()]
+    const out = new Map<Asset['kind'], number>()
+    for (const a of assets) out.set(a.kind, (out.get(a.kind) ?? 0) + 1)
+    return [...out.entries()].map(([kind, n]) => `${n} ${(n === 1 ? KINDS[kind].label : KINDS[kind].plural).toLowerCase()}`)
   }, [assets])
   if (!board) return null
   return (
     <div className="flex flex-col gap-4 px-4 py-3.5">
       {board.description && <p className="type-body-sm text-ink-2">{board.description}</p>}
       <dl className="flex flex-col gap-2">
-        <Row label="Assets">{assets.length ? counts.map(([k, n]) => `${n} ${k.toLowerCase()}`).join(' · ') : 'Empty'}</Row>
+        <Row label="Assets">{assets.length ? counts.join(' · ') : 'Empty'}</Row>
         <Row label="Project">{board.projectId ? <EntityChip entity={{ kind: 'project', id: board.projectId }} size="sm" /> : 'None'}</Row>
       </dl>
       {assets.length > 0 && (

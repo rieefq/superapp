@@ -121,7 +121,7 @@ function ConnectForm({ onDone }: { onDone: () => void }) {
     }
   }
 
-  const useDemo = () => {
+  const startWithDemo = () => {
     const existed = !!demo
     const repo = connectDemoRepo({ projectId: scope })
     finish(repo, !existed)
@@ -166,7 +166,7 @@ function ConnectForm({ onDone }: { onDone: () => void }) {
         <span className="h-px flex-1 bg-line" />
       </div>
 
-      <section aria-label="Demo repository" className="sim-hatch flex flex-col gap-3 rounded-md border border-dashed border-line-input p-3 sm:flex-row sm:items-center">
+      <section aria-label="Demo repository" className="flex flex-col gap-3 rounded-md border border-dashed border-line-input p-3 sm:flex-row sm:items-center">
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex min-w-0 items-center gap-2">
             <span className="type-mono-sm truncate text-ink">
@@ -178,7 +178,7 @@ function ConnectForm({ onDone }: { onDone: () => void }) {
             {DEMO_REPO.language} · {DEMO_REPO.files.length} files · bundled with Atrium. Sessions on it are simulated end to end.
           </p>
         </div>
-        <Button variant="secondary" onClick={useDemo} disabled={busy} className="shrink-0 bg-raised">
+        <Button variant="secondary" onClick={startWithDemo} disabled={busy} className="shrink-0">
           {demo ? 'Open the demo repository' : 'Use the demo repository'}
         </Button>
       </section>

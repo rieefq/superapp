@@ -22,10 +22,12 @@ export const Frontier = memo(function Frontier({ inv, runId, sources, className 
 })
 
 function FrontierStrip({ inv, run, sources, className }: { inv: Investigation; run: Run; sources: readonly Source[]; className?: string }) {
+  // Count this run's own web sources (a follow-up reads new pages, not the earlier ones).
+  const since = run.createdAt
   const web = useMemo(() => {
-    const w = sources.filter((s) => sourceOrigin(s) === 'web')
+    const w = sources.filter((s) => sourceOrigin(s) === 'web' && s.addedAt >= since)
     return { found: w.length, read: w.filter((s) => s.status === 'read' || s.status === 'cited' || (s.status === 'discarded' && !!s.content)).length }
-  }, [sources])
+  }, [sources, since])
   const phases = researchPhases({ inv, run, web })
   const elapsed = useRunElapsed(run)
   const approvals = useApprovalsForRun(run.id)
@@ -42,7 +44,7 @@ function FrontierStrip({ inv, run, sources, className }: { inv: Investigation; r
       className={cn('flex flex-col gap-2.5 rounded-md border border-line bg-raised px-3.5 py-3', run.status === 'waiting' && 'border-attn/50', className)}
     >
       <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="flex min-w-0 flex-1 items-center gap-2">
+        <span className="flex min-w-0 grow basis-[240px] items-center gap-2">
           <RunStatusGlyph status={run.status} size={12} />
           <span aria-live="off" className={cn('type-body-sm min-w-0 truncate font-medium', run.status === 'running' ? 'text-live-ink' : run.status === 'waiting' ? 'text-attn-ink' : 'text-ink-2')}>
             {followUp && <span className="text-ink-3">Follow-up · </span>}

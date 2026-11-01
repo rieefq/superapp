@@ -70,7 +70,7 @@ export function CodeListPane() {
       count={total}
       onNew={() => navigate('/code/new')}
       newLabel="New"
-      search={{ value: query, onChange: setQuery, placeholder: 'Search sessions and repositories' }}
+      search={{ value: query, onChange: setQuery, placeholder: 'Search sessions and repos' }}
       footer={
         archived.length > 0 ? (
           <button

@@ -6,7 +6,7 @@ import { cn } from '@/lib/cn'
 import { Button, IconButton, Input, SegmentedControl, Textarea, toast } from '@/ui'
 import { addSlideAfter, duplicateSlide, moveSlide, removeSlide } from '../logic'
 import { SlideView, previewSpec } from '../previews'
-import { FailedCard, GeneratingCard, SideLabel } from './common'
+import { FailedCard, GeneratingCard, SideLabel, UnrecordedCard, isUnrecorded } from './common'
 import { useVersionDraft } from './useVersionDraft'
 
 /*
@@ -40,7 +40,15 @@ export function DeckStage({ asset, index, compareIndex, onPresent, selected, onS
   if (!slides?.length) {
     return (
       <div className="sim-hatch grid aspect-video w-full max-w-[860px] place-items-center rounded-md border border-dashed border-line-input">
-        {asset.status === 'generating' ? <GeneratingCard asset={asset} /> : asset.status === 'failed' ? <FailedCard asset={asset} /> : <p className="type-body-sm text-ink-3">This deck has no slides yet.</p>}
+        {asset.status === 'generating' ? (
+          <GeneratingCard asset={asset} />
+        ) : asset.status === 'failed' ? (
+          <FailedCard asset={asset} />
+        ) : isUnrecorded(asset, index) ? (
+          <UnrecordedCard asset={asset} index={index} />
+        ) : (
+          <p className="type-body-sm text-ink-3">This deck has no slides yet.</p>
+        )}
       </div>
     )
   }
@@ -73,7 +81,7 @@ function DeckEditor({
   onPresent: (i: number) => void
 }) {
   const generating = asset.status === 'generating'
-  const [slides, setSlides, flush] = useVersionDraft<Slide[]>(initial, (value) => updateAssetContent(asset.id, { slides: value }, { versionId }))
+  const [slides, setSlides] = useVersionDraft<Slide[]>(initial, (value) => updateAssetContent(asset.id, { slides: value }, { versionId }))
   const sel = Math.max(0, Math.min(slides.length - 1, selected))
   const slide = slides[sel]
   const spec = previewSpec(asset.versions.find((v) => v.id === versionId)?.preview)
@@ -102,7 +110,6 @@ function DeckEditor({
         onClick: () => {
           setSlides(before)
           onSelect(sel)
-          flush()
         },
       },
     })

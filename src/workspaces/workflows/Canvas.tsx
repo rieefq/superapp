@@ -88,6 +88,7 @@ const StepNode = memo(function StepNode({ data }: NodeProps<StepFlowNode>) {
       data-type={node.type}
       data-sim={sim ? 'true' : undefined}
       data-selected={data.selected ? 'true' : undefined}
+      data-issue={errors.length ? 'error' : issues.length ? 'warning' : undefined}
       data-testid={`wf-node-${node.id}`}
       data-node-label={node.label}
     >

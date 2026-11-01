@@ -1,7 +1,7 @@
-import { memo, type ReactNode } from 'react'
+import { Component, memo, type ErrorInfo, type ReactNode } from 'react'
 import type { Finding, Investigation, ResearchDepth, Run, Source } from '@/core/types'
 import { cn } from '@/lib/cn'
-import { KindTile, LiveBadge, RunStatusGlyph, SimBadge, StepStatusGlyph, TaskGlyph, Tooltip } from '@/ui'
+import { ErrorState, KindTile, LiveBadge, RunStatusGlyph, SimBadge, StepStatusGlyph, TaskGlyph, Tooltip } from '@/ui'
 import { CONFIDENCE_CELLS, DEPTH_LABEL, DEPTH_LETTER, SOURCE_STATUS_WORD, STATUS_WORD, meterCells, sourceOrigin } from './logic'
 
 /*
@@ -225,4 +225,40 @@ export function TextButton({ children, onClick, className, ...rest }: { children
       {children}
     </button>
   )
+}
+
+// ------------------------------------------------------------------------------------------------ errors
+
+/**
+ * A view that fails to draw shows an ErrorState with Retry; the rest of the workspace keeps working.
+ * It resets when `resetKey` changes (another tab or investigation).
+ */
+export class ViewBoundary extends Component<{ name: string; resetKey: string; children: ReactNode }, { error: Error | null; key: string }> {
+  state: { error: Error | null; key: string } = { error: null, key: this.props.resetKey }
+
+  static getDerivedStateFromError(error: Error) {
+    return { error }
+  }
+
+  static getDerivedStateFromProps(props: { resetKey: string }, state: { error: Error | null; key: string }) {
+    return props.resetKey !== state.key ? { error: null, key: props.resetKey } : null
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.warn(`[research] the ${this.props.name} failed to draw`, error, info.componentStack)
+  }
+
+  render() {
+    if (!this.state.error) return this.props.children
+    return (
+      <ErrorState
+        compact
+        title={`Couldn’t show the ${this.props.name}`}
+        message="Something in this view failed to draw. The investigation itself is safe; the other views still work."
+        details={this.state.error.stack ?? this.state.error.message}
+        onRetry={() => this.setState({ error: null })}
+        retryLabel="Retry"
+      />
+    )
+  }
 }

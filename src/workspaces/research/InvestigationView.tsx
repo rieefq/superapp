@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
 import {
-  ArrowLeft, BookPlus, Check, Copy, CornerUpRight, Download, Layers, Link2, ListChecks, MessagesSquare, Orbit, Presentation, RotateCcw, RotateCw,
-  SquareTerminal, Telescope, Trash2, Workflow,
+  ArrowLeft, BookPlus, Check, Copy, CornerUpRight, Download, Layers, Link2, ListChecks, MessagesSquare, Orbit, PenLine, Presentation, RotateCcw,
+  RotateCw, SquareTerminal, Telescope, Trash2, Workflow,
 } from 'lucide-react'
 import { Composer, ReadBackLine, useReadBack, type ComposerSubmitMeta } from '@/app/components'
 import { useRegisterCommands } from '@/app/commands/registry'
@@ -18,7 +18,7 @@ import {
 } from '@/core/services'
 import { STEP_PROFILE } from '@/core/sim/research'
 import { useSettings } from '@/core/settings'
-import { isRunActive, type EntityRef, type Investigation } from '@/core/types'
+import { isRunActive, type EntityRef, type ID, type Investigation, type Source } from '@/core/types'
 import { cn } from '@/lib/cn'
 import { shortCode } from '@/lib/id'
 import { timeAgo } from '@/lib/format'
@@ -34,9 +34,9 @@ import { useBoardColumns, useReadingIds, useSelectSource, useSelectedSourceId, S
 import { DEPTH_LABEL, openQuestions, sourceStats } from './logic'
 import { MakeTasksDialog } from './MakeTasksDialog'
 import { NewBrief } from './NewBrief'
-import { InvestigationStatusChip } from './parts'
+import { InvestigationStatusChip, SectionLabel, TextButton, ViewBoundary } from './parts'
 import { ReportView, SaveReportButton } from './ReportView'
-import { SourcesView } from './SourcesView'
+import { SourceList, SourcesView } from './SourcesView'
 
 type Tab = 'board' | 'report' | 'findings' | 'sources' | 'activity'
 const SUB_TABS: readonly Tab[] = ['findings', 'sources', 'activity']
@@ -72,6 +72,7 @@ function InvestigationScreen({ inv, tabParam }: { inv: Investigation; tabParam?:
   const bodyRef = useRef<HTMLDivElement>(null)
   const [tasksOpen, setTasksOpen] = useState(false)
   const [turnOpen, setTurnOpen] = useState(false)
+  const [renaming, setRenaming] = useState(false)
   const singleKeys = useSettings((s) => s.appearance.singleKeyShortcuts)
   const held = useIsPinned({ kind: 'investigation', id: inv.id })
   const ref: EntityRef = useMemo(() => ({ kind: 'investigation', id: inv.id }), [inv.id])
@@ -178,12 +179,13 @@ function InvestigationScreen({ inv, tabParam }: { inv: Investigation; tabParam?:
   const menu: MenuItem[] = [
     ...(hasReport ? [{ id: 'follow', label: 'Ask a follow-up', icon: CornerUpRight, shortcut: '/', onSelect: focusFollowUp }] : []),
     { id: 'hold', label: held ? 'Release the report' : 'Hold the report', icon: Layers, shortcut: 'h', description: held ? undefined : 'It rides along in every new AI action', onSelect: toggleHold },
-    ...(phone && inv.status === 'failed' && !active ? [{ id: 'retry', label: 'Retry the research', icon: RotateCw, onSelect: retry }] : []),
-    ...(phone && hasReport ? [{ id: 'save', label: inv.knowledgeId ? 'Open in Knowledge' : 'Save to Knowledge', icon: BookPlus, shortcut: 's', onSelect: saveOrOpen }] : []),
+    ...(inv.status === 'failed' && !active && (phone || layout.docking.stageWidth < 900) ? [{ id: 'retry', label: 'Retry the research', icon: RotateCw, onSelect: retry }] : []),
+    ...((phone || layout.docking.stageWidth < 1240) && hasReport ? [{ id: 'save', label: inv.knowledgeId ? 'Open in Knowledge' : 'Save to Knowledge', icon: BookPlus, shortcut: 's', onSelect: saveOrOpen }] : []),
     { id: 'export', label: 'Export Markdown', icon: Download, disabled: !hasReport, onSelect: exportMd },
     ...(inv.status === 'review' ? [{ id: 'complete', label: 'Mark complete', icon: Check, onSelect: markComplete }] : []),
     ...(inv.status === 'complete' ? [{ id: 'reopen', label: 'Reopen for review', icon: RotateCcw, onSelect: () => reopenInvestigation(inv.id) }] : []),
     { type: 'separator' },
+    { id: 'rename', label: 'Rename', icon: PenLine, onSelect: () => setRenaming(true) },
     { id: 'link', label: 'Copy link', icon: Link2, onSelect: () => copy(`${window.location.origin}/research/${inv.id}`, 'Link') },
     { id: 'handle', label: 'Copy handle', icon: Copy, onSelect: () => copy(shortCode(inv.id), 'Handle') },
     { type: 'separator' },
@@ -232,7 +234,7 @@ function InvestigationScreen({ inv, tabParam }: { inv: Investigation; tabParam?:
       ),
     })
   if (hasReport) actions.push({ key: 'save', node: <SaveReportButton key="save" inv={inv} /> })
-  const slots = phone ? 0 : stageWidth < 1240 ? 1 : 2
+  const slots = phone || stageWidth < 900 ? 0 : stageWidth < 1240 ? 1 : 2
   const visibleActions = [...actions.slice(0, slots), ...(turnStyle === 'menu' ? [] : [{ key: 'turn', node: <span key="turn">{turnMenu}</span> }])]
   const turnHidden = turnStyle === 'menu'
 
@@ -259,7 +261,9 @@ function InvestigationScreen({ inv, tabParam }: { inv: Investigation; tabParam?:
   useRegisterCommands(`research.investigation.${inv.id}`, commands)
 
   const isBoard = tab === 'board' && columns
-  const column = isBoard ? 'max-w-[1280px]' : 'max-w-[720px]'
+  // Wide stages split the report: the document, and its sources beside it (§3.12).
+  const split = tab === 'report' && hasReport && !phone && layout.docking.stageWidth >= 1480
+  const column = isBoard ? 'max-w-[1280px]' : split ? 'max-w-[1148px]' : 'max-w-[720px]'
 
   return (
     <div ref={scopeRef} className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
@@ -269,8 +273,19 @@ function InvestigationScreen({ inv, tabParam }: { inv: Investigation; tabParam?:
         measure="full"
         header={
           <StageHeader<Tab>
-            title={inv.title}
-            onRename={(t) => updateInvestigation(inv.id, { title: t })}
+            title={
+              renaming ? (
+                <TitleEditor
+                  value={inv.title}
+                  onDone={(t) => {
+                    setRenaming(false)
+                    if (t && t !== inv.title) updateInvestigation(inv.id, { title: t })
+                  }}
+                />
+              ) : (
+                inv.title
+              )
+            }
             status={<InvestigationStatusChip inv={inv} run={runLite} />}
             tabs={{
               'aria-label': 'Investigation views',
@@ -289,43 +304,54 @@ function InvestigationScreen({ inv, tabParam }: { inv: Investigation; tabParam?:
           />
         }
         composer={
-          <div className="mx-auto w-full max-w-[720px]">
-            <FollowUpComposer inv={inv} active={active} />
+          <div className={cn('mx-auto w-full', split ? 'max-w-[1148px]' : 'max-w-[720px]')}>
+            <div className="max-w-[720px]">
+              <FollowUpComposer inv={inv} active={active} />
+            </div>
           </div>
         }
       >
         <div className={cn('mx-auto flex w-full flex-col', column)}>
           <Masthead inv={inv} agentId={runAgentId} working={runStatus === 'running'} compact={tab === 'findings' || tab === 'sources' || tab === 'activity'} phone={phone} />
           {active && runId && <Frontier inv={inv} runId={runId} sources={sources} className="mb-6" />}
-          {tab === 'board' && (
-            <Board inv={inv} runId={runId} sources={sources} selectedId={selectedId} readingIds={readingIds} onSelectSource={selectSource} columns={columns} />
-          )}
-          {tab === 'report' &&
-            (hasReport ? (
-              <ReportView inv={inv} sources={sources} runId={runId} busy={active} onSelectSource={selectSource} hotkeyScope={scopeRef} />
-            ) : inv.status === 'failed' ? (
-              <ErrorState
-                title="Couldn’t finish this investigation"
-                message={runError ? `The run stopped: ${runError}` : 'The research run stopped before the report was drafted.'}
-                onRetry={retry}
-                retryLabel="Retry"
-                className="py-10"
-              />
-            ) : (
-              <EmptyState
-                icon={Telescope}
-                title="No report yet"
-                description={stats.active ? 'The sources are here, but no report was drafted. Run the research again to draft it.' : 'No sources matched. Widen the sources or rephrase.'}
-                actions={
-                  <Button variant="primary" leadingIcon={RotateCw} onClick={retry}>
-                    Run the research again
-                  </Button>
-                }
-              />
-            ))}
-          {tab === 'findings' && <FindingsView inv={inv} sources={sources} onSelectSource={selectSource} running={active} />}
-          {tab === 'sources' && <SourcesView inv={inv} sources={sources} selectedId={selectedId} readingIds={readingIds} onSelect={selectSource} />}
-          {tab === 'activity' && <ActivityView inv={inv} />}
+          <ViewBoundary name={tab === 'board' ? 'board' : tab} resetKey={`${inv.id}:${tab}`}>
+            {tab === 'board' && (
+              <Board inv={inv} runId={runId} sources={sources} selectedId={selectedId} readingIds={readingIds} onSelectSource={selectSource} columns={columns} />
+            )}
+            {tab === 'report' &&
+              (hasReport ? (
+                split ? (
+                  <div className="grid grid-cols-[720px_380px] items-start gap-12">
+                    <ReportView inv={inv} sources={sources} runId={runId} busy={active} onSelectSource={selectSource} hotkeyScope={scopeRef} />
+                    <SourcesRail inv={inv} sources={sources} selectedId={selectedId} readingIds={readingIds} onSelect={selectSource} onAll={() => goTab('sources')} />
+                  </div>
+                ) : (
+                  <ReportView inv={inv} sources={sources} runId={runId} busy={active} onSelectSource={selectSource} hotkeyScope={scopeRef} />
+                )
+              ) : inv.status === 'failed' ? (
+                <ErrorState
+                  title="Couldn’t finish this investigation"
+                  message={runError ? `The run stopped: ${runError}` : 'The research run stopped before the report was drafted.'}
+                  onRetry={retry}
+                  retryLabel="Retry"
+                  className="py-10"
+                />
+              ) : (
+                <EmptyState
+                  icon={Telescope}
+                  title="No report yet"
+                  description={stats.active ? 'The sources are here, but no report was drafted. Run the research again to draft it.' : 'No sources matched. Widen the sources or rephrase.'}
+                  actions={
+                    <Button variant="primary" leadingIcon={RotateCw} onClick={retry}>
+                      Run the research again
+                    </Button>
+                  }
+                />
+              ))}
+            {tab === 'findings' && <FindingsView inv={inv} sources={sources} onSelectSource={selectSource} running={active} />}
+            {tab === 'sources' && <SourcesView inv={inv} sources={sources} selectedId={selectedId} readingIds={readingIds} onSelect={selectSource} />}
+            {tab === 'activity' && <ActivityView inv={inv} />}
+          </ViewBoundary>
         </div>
       </Stage>
       <MakeTasksDialog open={tasksOpen} onOpenChange={setTasksOpen} inv={inv} candidates={questions} />
@@ -383,7 +409,7 @@ function Masthead({ inv, agentId, working, compact, phone }: { inv: Investigatio
       {compact ? (
         <h2 className="type-body-sm line-clamp-2 max-w-[760px] text-pretty text-ink-2">{inv.question}</h2>
       ) : (
-        <h2 className="type-doc-h2 max-w-[760px] text-pretty text-ink">{inv.question}</h2>
+        <h2 className={cn('max-w-[760px] text-pretty text-ink', phone ? 'type-doc-h3' : 'type-doc-h2')}>{inv.question}</h2>
       )}
       {inv.origin && !compact && (
         <div className="type-caption flex min-w-0 items-center gap-1.5 text-ink-3">
@@ -436,7 +462,7 @@ function FollowUpComposer({ inv, active }: { inv: Investigation; active: boolean
   ) : undefined
   return (
     <Composer
-      placeholder={inv.report ? 'Ask a follow-up — Scout searches again and adds a section' : 'Ask a follow-up — it starts when this run ends'}
+      placeholder={phone ? 'Ask a follow-up' : inv.report ? 'Ask a follow-up — Scout searches again and adds a section' : 'Ask a follow-up — it starts when this run ends'}
       aria-label="Ask a follow-up"
       submitLabel={active ? 'Queue' : 'Ask'}
       size={phone ? 'compact' : 'default'}
@@ -449,21 +475,92 @@ function FollowUpComposer({ inv, active }: { inv: Investigation; active: boolean
   )
 }
 
+// ------------------------------------------------------------------------------------------------ wide report: sources rail
+
+/** Beside the report on wide stages: its sources in report order, the selected one highlighted. */
+function SourcesRail({ inv, sources, selectedId, readingIds, onSelect, onAll }: {
+  inv: Investigation
+  sources: readonly Source[]
+  selectedId: ID | null
+  readingIds: ReadonlySet<ID>
+  onSelect: (id: ID) => void
+  onAll: () => void
+}) {
+  const numberOf = useMemo(() => new Map(inv.sourceIds.map((id, i) => [id, i + 1])), [inv.sourceIds])
+  const shown = useMemo(() => sources.filter((s) => s.status !== 'discarded'), [sources])
+  return (
+    <aside aria-labelledby="rail-sources" className="sticky top-0 flex max-h-[calc(100dvh-280px)] min-h-0 flex-col">
+      <SectionLabel id="rail-sources" count={shown.length} action={<TextButton onClick={onAll}>All sources</TextButton>}>
+        Sources
+      </SectionLabel>
+      <div className="-mx-1.5 min-h-0 overflow-y-auto overscroll-contain">
+        <SourceList sources={shown} numberOf={numberOf} selectedId={selectedId} readingIds={readingIds} onSelect={onSelect} compact />
+      </div>
+    </aside>
+  )
+}
+
+/** Inline rename in the stage header (⋯ › Rename): ⏎ saves, Esc cancels, leaving the field saves. */
+function TitleEditor({ value, onDone }: { value: string; onDone: (title: string | null) => void }) {
+  const [draft, setDraft] = useState(value)
+  const done = useRef(false)
+  const finish = (title: string | null) => {
+    if (done.current) return
+    done.current = true
+    onDone(title)
+  }
+  return (
+    <input
+      value={draft}
+      autoFocus
+      onFocus={(e) => e.currentTarget.select()}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => finish(draft.replace(/\s+/g, ' ').trim() || null)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          finish(draft.replace(/\s+/g, ' ').trim() || null)
+        } else if (e.key === 'Escape') {
+          e.preventDefault()
+          e.stopPropagation()
+          finish(null)
+        }
+      }}
+      aria-label="Investigation title"
+      className="type-title-3 h-8 w-full min-w-0 rounded-sm border border-line-input bg-raised px-1.5 text-ink outline-none focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-(--focus-ring)"
+    />
+  )
+}
+
 // ------------------------------------------------------------------------------------------------ draft and gone
 
 function DraftStage({ inv }: { inv: Investigation }) {
   const navigate = useNavigate()
   const stageRef = useRef<HTMLDivElement>(null)
+  const [renaming, setRenaming] = useState(false)
   return (
     <Stage
       primary={{ kind: 'investigation', id: inv.id }}
       measure={760}
       header={
         <StageHeader
-          title={inv.title}
-          onRename={(t) => updateInvestigation(inv.id, { title: t })}
+          title={
+            renaming ? (
+              <TitleEditor
+                value={inv.title}
+                onDone={(t) => {
+                  setRenaming(false)
+                  if (t && t !== inv.title) updateInvestigation(inv.id, { title: t })
+                }}
+              />
+            ) : (
+              inv.title
+            )
+          }
           status={<InvestigationStatusChip inv={inv} />}
           menu={[
+            { id: 'rename', label: 'Rename', icon: PenLine, onSelect: () => setRenaming(true) },
+            { type: 'separator' },
             { id: 'delete', label: 'Delete draft…', icon: Trash2, danger: true, onSelect: () => void confirmDelete(inv).then((ok) => ok && navigate('/research')) },
           ]}
           backTo="/research"

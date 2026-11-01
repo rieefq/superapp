@@ -18,7 +18,7 @@ import {
   Telescope,
   Trash2,
 } from 'lucide-react'
-import { CollectionPicker, HoldButton, ProjectPicker, TurnIntoMenu } from '@/app/components'
+import { CollectionPicker, DerivedList, HoldButton, ProjectPicker, SelectionActions, TurnIntoMenu, useDerived } from '@/app/components'
 import { attachRun, openStartSheet, useShellStore } from '@/app/shell/store'
 import { StageHeader, useShellLayout } from '@/app/templates'
 import { useRegisterCommands } from '@/app/commands/registry'
@@ -51,9 +51,9 @@ import { ConnectionsSection } from './connections'
 import { EditorBar, EditorBody, useNoteEditor } from './editor'
 import { countWords, isImage, isIndexed } from './model'
 import { lastLibraryHref } from './nav'
-import { AVAILABILITY_EFFECT, AVAILABILITY_OPTIONS, KnowledgeTile, NotIndexedTag, originWords } from './parts'
+import { AVAILABILITY_EFFECT, AVAILABILITY_OPTIONS, KnowledgeTile, NotIndexedTag, originWords, SectionBoundary } from './parts'
 import { AvailabilityControl, CollectionControl, ProjectsControl, TagsControl } from './properties'
-import { KnowledgeScreen } from './screen'
+import { KnowledgeScreen, STAGE_TITLE_FIX } from './screen'
 
 const kref = (id: ID): EntityRef => ({ kind: 'knowledge', id })
 
@@ -196,7 +196,7 @@ function ItemHeader({ item, isNew, editing, onEdit, onRenamed }: { item?: Knowle
   const back = phone ? <IconButton icon={ChevronLeft} label="Back to Knowledge" size="sm" onClick={() => navigate(lastLibraryHref())} className="-ml-1.5" /> : null
 
   if (!item) {
-    return <StageHeader title="New note" leading={back ?? <KnowledgeTile item={{ kind: 'note', simulated: false }} size={20} />} hideInspectorToggle={phone} />
+    return <StageHeader className={STAGE_TITLE_FIX} title="New note" leading={back ?? <KnowledgeTile item={{ kind: 'note', simulated: false }} size={20} />} hideInspectorToggle={phone} />
   }
   const ref = kref(item.id)
   const never = item.aiAvailability === 'never'
@@ -276,6 +276,7 @@ function ItemHeader({ item, isNew, editing, onEdit, onRenamed }: { item?: Knowle
   return (
     <>
       <StageHeader
+        className={STAGE_TITLE_FIX}
         title={item.title}
         onRename={(title) => {
           updateKnowledge(item.id, { title })
@@ -369,7 +370,7 @@ function MemoryDialog({ open, onOpenChange, item }: { open: boolean; onOpenChang
 function MissingItem() {
   const navigate = useNavigate()
   return (
-    <KnowledgeScreen header={<StageHeader title="Not found" />}>
+    <KnowledgeScreen header={<StageHeader className={STAGE_TITLE_FIX} title="Not found" />}>
       <EmptyState
         icon={FileText}
         title="This item isn’t in Knowledge"
@@ -427,6 +428,7 @@ function Reader({ item, onEdit }: { item: KnowledgeItem; onEdit: () => void }) {
   const usage = useKnowledgeUsage(item.id)
   const producedBy = useProducedBy(item.id)
   const run = useRow('runs', producedBy)
+  const docRef = useRef<HTMLDivElement>(null)
 
   return (
     <article className="flex flex-col gap-6" aria-label={item.title}>
@@ -473,7 +475,7 @@ function Reader({ item, onEdit }: { item: KnowledgeItem; onEdit: () => void }) {
         </figure>
       )}
 
-      <div className={cn('relative min-w-0', item.simulated && 'pl-5')}>
+      <div ref={docRef} className={cn('relative min-w-0', item.simulated && 'pl-5')}>
         {item.simulated && <span aria-hidden className="sim-band absolute inset-y-0 left-0 rounded-[1px]" />}
         {item.content.trim() ? (
           <Markdown prose="doc">{item.content}</Markdown>
@@ -501,11 +503,35 @@ function Reader({ item, onEdit }: { item: KnowledgeItem; onEdit: () => void }) {
         )}
       </div>
 
+      <SelectionActions containerRef={docRef} source={kref(item.id)} aria-label="Selected text" />
+      <SectionBoundary what="what was made from this">
+        <MadeFromThis id={item.id} />
+      </SectionBoundary>
       <hr className="border-line" />
-      <AboutSection item={item} />
+      <SectionBoundary what="this item’s details">
+        <AboutSection item={item} />
+      </SectionBoundary>
       <hr className="border-line" />
-      <ConnectionsSection id={item.id} />
+      <SectionBoundary what="this item’s connections">
+        <ConnectionsSection id={item.id} />
+      </SectionBoundary>
     </article>
+  )
+}
+
+/** Work started from this item (Turn into…, Research from this, Make a task): live rows while it runs, cards when it lands (§7.1). */
+function MadeFromThis({ id }: { id: ID }) {
+  const source = useMemo(() => kref(id), [id])
+  const count = useDerived(source).length
+  if (!count) return null
+  return (
+    <section aria-labelledby="kn-made" className="flex flex-col gap-2">
+      <h3 id="kn-made" className="type-label flex items-center gap-2 text-ink-3">
+        Made from this
+        <span className="type-meta font-normal tracking-normal normal-case tabular">{count}</span>
+      </h3>
+      <DerivedList source={source} />
+    </section>
   )
 }
 

@@ -79,46 +79,58 @@ function Ruler({
   // Labels near the edges would overflow; the today label hides when it would collide with a tick label.
   const ticks = axis.ticks.filter((t) => t.x > 0.04 && t.x < 0.96 && Math.abs(t.x - axis.today) > 0.05)
   return (
-    <div role="group" aria-label="Milestone ruler" className="relative mx-1.5 h-[60px] select-none">
-      {/* today */}
-      <div aria-hidden className="absolute top-0 bottom-3 w-px bg-ink" style={{ left: pct(axis.today) }}>
-        <span className="type-meta-caps absolute -top-0.5 left-1.5 text-[10px] whitespace-nowrap text-ink">Today</span>
+    <div className="@container mx-1.5">
+      <div role="group" aria-label="Milestone ruler" className="relative h-[60px] select-none">
+        {/* today */}
+        <div aria-hidden className="absolute top-0 bottom-3 w-px bg-ink" style={{ left: pct(axis.today) }}>
+          <span className="type-meta-caps absolute -top-0.5 left-1.5 text-[10px] whitespace-nowrap text-ink">Today</span>
+        </div>
+        {/* baseline and ticks */}
+        <div aria-hidden className="absolute inset-x-0 top-[30px] h-px bg-line-strong" />
+        {axis.ticks.map((t) => (
+          <div key={t.at} aria-hidden className="absolute top-[27px] h-[7px] w-px bg-line-strong" style={{ left: pct(t.x) }} />
+        ))}
+        {ticks.map((t, i) => (
+          <span
+            key={`l${t.at}`}
+            aria-hidden
+            className={cn('type-meta absolute top-[40px] -translate-x-1/2 whitespace-nowrap text-ink-3', i % 2 === 1 && '@max-[620px]:hidden')}
+            style={{ left: pct(t.x) }}
+          >
+            {t.label}
+          </span>
+        ))}
+        {/* markers */}
+        {marks.map(({ milestone: m, x }) => {
+          const p = progress.get(m.id)
+          const isNext = m.id === next?.id
+          const due = m.dueAt
+            ? new Date(m.dueAt).toLocaleDateString(undefined, {
+                month: 'short',
+                day: 'numeric',
+              })
+            : 'no date'
+          const label = `${m.title}, due ${due}${m.status === 'done' ? ', reached' : isNext ? ', next' : ''}${p ? `, ${p.done} of ${p.total} tasks done` : ''}. Show its tasks`
+          return (
+            <Tooltip key={m.id} content={`${m.title} · ${due}${p ? ` · ${p.done}/${p.total} tasks` : ''}`}>
+              <button
+                type="button"
+                aria-label={label}
+                onClick={() => onPick(m)}
+                className="group/mark absolute top-[30px] grid size-6 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-xs focus-visible:outline-2 focus-visible:outline-(--focus-ring)"
+                style={{ left: pct(x) }}
+              >
+                <span
+                  className={cn(
+                    'block rounded-[2px] bg-canvas transition-transform duration-(--dur-1) group-hover/mark:scale-125',
+                    m.status === 'done' ? 'size-2.5 bg-done' : isNext ? 'size-3 border-2 border-ink' : 'size-2.5 border-[1.5px] border-ink-2',
+                  )}
+                />
+              </button>
+            </Tooltip>
+          )
+        })}
       </div>
-      {/* baseline and ticks */}
-      <div aria-hidden className="absolute inset-x-0 top-[30px] h-px bg-line-strong" />
-      {axis.ticks.map((t) => (
-        <div key={t.at} aria-hidden className="absolute top-[27px] h-[7px] w-px bg-line-strong" style={{ left: pct(t.x) }} />
-      ))}
-      {ticks.map((t) => (
-        <span key={`l${t.at}`} aria-hidden className="type-meta absolute top-[40px] -translate-x-1/2 whitespace-nowrap text-ink-3" style={{ left: pct(t.x) }}>
-          {t.label}
-        </span>
-      ))}
-      {/* markers */}
-      {marks.map(({ milestone: m, x }) => {
-        const p = progress.get(m.id)
-        const isNext = m.id === next?.id
-        const due = m.dueAt ? new Date(m.dueAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'no date'
-        const label = `${m.title}, due ${due}${m.status === 'done' ? ', reached' : isNext ? ', next' : ''}${p ? `, ${p.done} of ${p.total} tasks done` : ''}. Show its tasks`
-        return (
-          <Tooltip key={m.id} content={`${m.title} · ${due}${p ? ` · ${p.done}/${p.total} tasks` : ''}`}>
-            <button
-              type="button"
-              aria-label={label}
-              onClick={() => onPick(m)}
-              className="group/mark absolute top-[30px] grid size-6 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-xs focus-visible:outline-2 focus-visible:outline-(--focus-ring)"
-              style={{ left: pct(x) }}
-            >
-              <span
-                className={cn(
-                  'block rounded-[2px] bg-canvas transition-transform duration-(--dur-1) group-hover/mark:scale-125',
-                  m.status === 'done' ? 'size-2.5 bg-done' : isNext ? 'size-3 border-2 border-ink' : 'size-2.5 border-[1.5px] border-ink-2',
-                )}
-              />
-            </button>
-          </Tooltip>
-        )
-      })}
     </div>
   )
 }
@@ -164,7 +176,14 @@ const MilestoneRow = memo(function MilestoneRow({
       </span>
       {progress && progress.total > 0 && (
         <span className="pointer-events-none hidden shrink-0 items-center gap-2 sm:flex">
-          <TickMeter value={progress.done} max={progress.total} width={64} label={`${m.title} tasks`} valueText={`${progress.done} of ${progress.total} tasks done`} thresholds={{ attn: 2, fail: 3 }} />
+          <TickMeter
+            value={progress.done}
+            max={progress.total}
+            width={64}
+            label={`${m.title} tasks`}
+            valueText={`${progress.done} of ${progress.total} tasks done`}
+            thresholds={{ attn: 2, fail: 3 }}
+          />
           <span className="type-meta w-9 text-ink-3 tabular">
             {progress.done}/{progress.total}
           </span>
@@ -180,10 +199,26 @@ const MilestoneRow = memo(function MilestoneRow({
           placement="bottom-end"
           items={[
             done
-              ? { id: 'reopen', label: 'Reopen', icon: RotateCcw, onSelect: () => updateMilestone(project.id, m.id, { status: 'active' }) }
-              : { id: 'done', label: 'Mark reached', icon: Check, onSelect: () => updateMilestone(project.id, m.id, { status: 'done' }) },
+              ? {
+                  id: 'reopen',
+                  label: 'Reopen',
+                  icon: RotateCcw,
+                  onSelect: () => updateMilestone(project.id, m.id, { status: 'active' }),
+                }
+              : {
+                  id: 'done',
+                  label: 'Mark reached',
+                  icon: Check,
+                  onSelect: () => updateMilestone(project.id, m.id, { status: 'done' }),
+                },
             { type: 'separator' },
-            { id: 'remove', label: 'Remove…', icon: Trash2, danger: true, onSelect: () => void remove() },
+            {
+              id: 'remove',
+              label: 'Remove…',
+              icon: Trash2,
+              danger: true,
+              onSelect: () => void remove(),
+            },
           ]}
           trigger={<IconButton icon={Ellipsis} size="sm" label={`More actions for ${m.title}`} className={reveal} />}
         />
@@ -214,7 +249,12 @@ function MilestoneEditor({ project, milestone, trigger }: { project: Project; mi
       setError('Give the milestone a title.')
       return
     }
-    const input = { title: title.trim(), dueAt: dueFromDateInput(due), status, description: description.trim() || undefined }
+    const input = {
+      title: title.trim(),
+      dueAt: dueFromDateInput(due),
+      status,
+      description: description.trim() || undefined,
+    }
     if (milestone) updateMilestone(project.id, milestone.id, input)
     else addMilestone(project.id, input)
     close()

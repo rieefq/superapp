@@ -1,10 +1,10 @@
-import { memo, type ReactNode } from 'react'
+import { Component, memo, type ErrorInfo, type ReactNode } from 'react'
 import { BookMarked, Clock, Layers, MessagesSquare, Orbit, SquareDashed, Telescope, Upload, type LucideIcon } from 'lucide-react'
 import { useDB, type Tables } from '@/core/db'
 import { AI_AVAILABILITY_LABEL, KNOWLEDGE_KIND_META, KIND_META, useKnowledgeUsage } from '@/core/services'
 import { getIntegration } from '@/core/integrations/catalog'
 import type { KnowledgeItem } from '@/core/types'
-import { DynamicIcon, KindTile, Tooltip } from '@/ui'
+import { DynamicIcon, ErrorState, KindTile, Tooltip } from '@/ui'
 import { cn } from '@/lib/cn'
 import { isImage, type SmartFilter } from './model'
 
@@ -175,4 +175,31 @@ export const FILTER_ICON: Record<SmartFilter, LucideIcon> = {
   chat: MessagesSquare,
   agents: Orbit,
   simulated: SquareDashed,
+}
+
+/**
+ * A failing section shows an ErrorState with Retry while the rest of the view keeps working
+ * ("Couldn't {verb} {thing}", §5.4.14).
+ */
+export class SectionBoundary extends Component<{ what: string; children: ReactNode }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null }
+  static getDerivedStateFromError(error: Error) {
+    return { error }
+  }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.warn(`[knowledge] ${this.props.what} failed`, error, info.componentStack)
+  }
+  render() {
+    if (!this.state.error) return this.props.children
+    return (
+      <ErrorState
+        compact
+        title={`Couldn’t show ${this.props.what}`}
+        message="Something in this part failed to draw. Your knowledge is safe, and the rest of the page still works."
+        details={this.state.error.stack ?? this.state.error.message}
+        onRetry={() => this.setState({ error: null })}
+        retryLabel="Retry"
+      />
+    )
+  }
 }

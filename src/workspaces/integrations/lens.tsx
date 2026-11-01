@@ -55,7 +55,7 @@ function IntegrationPanel({ entity }: LensProps) {
           <span className="type-caption text-ink-3">{categoryLabel(def.category)}</span>
         </div>
         <StatusLine status={status} word={statusWord(def, status)} detail={detail} />
-        <p className="type-caption line-clamp-3 text-pretty text-ink-2">{def.support === 'simulated' ? `${SIMULATED_LINE} ${whatsRealBody(def)}` : whatsReal(def)}</p>
+        <p className="type-caption line-clamp-3 text-pretty text-ink-2">{def.support === 'simulated' ? `${SIMULATED_LINE} ${whatsRealBody(def)}` : whatsReal(def, connection?.config.baseUrl)}</p>
       </div>
 
       {scopes.length > 0 && (

@@ -144,7 +144,7 @@ export function ConnectForm({ def, connection, status, onFocusRequest, onSaved, 
               value={values[f.key] ?? ''}
               onValueChange={(v) => onChange(f.key, v)}
               onBlur={() => attempted && validate(values)}
-              placeholder={stored ? 'Paste a new key to replace it' : f.placeholder}
+              placeholder={stored ? `Paste a new ${lowerFirst(f.label)} to replace it` : f.placeholder}
               autoComplete="off"
               spellCheck={false}
               autoCapitalize="off"
@@ -169,7 +169,7 @@ export function ConnectForm({ def, connection, status, onFocusRequest, onSaved, 
       )}
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="submit" variant="primary" loading={busy || status === 'connecting'} disabled={connected && !dirty && status !== 'error'}>
+        <Button type="submit" variant="primary" loading={busy || status === 'connecting'} disabled={connected && !dirty}>
           {submitLabel(def, connected)}
         </Button>
         {onCancel && (

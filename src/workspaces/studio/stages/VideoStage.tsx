@@ -7,7 +7,7 @@ import { cn } from '@/lib/cn'
 import { IconButton, ProceduralArt, SimBadge, useReducedMotion, type ProceduralSpec } from '@/ui'
 import { aspectRatio, formatClock, parseShots, shotAt, storyboardDuration, type Shot } from '../logic'
 import { previewSpec, shotSpec } from '../previews'
-import { FailedCard, GeneratingCard, SideLabel } from './common'
+import { FailedCard, GeneratingCard, SideLabel, UnrecordedCard, isUnrecorded } from './common'
 
 /*
  * Video in this build is a storyboard: one procedural frame per shot. The player cycles through the
@@ -128,7 +128,15 @@ export function StoryboardPlayer({ asset, index, compact, overlay = true }: { as
   if (!spec || !shots.length) {
     return (
       <div className="sim-hatch relative grid w-full max-w-[960px] place-items-center rounded-md border border-dashed border-line-input" style={{ aspectRatio: String(ratio) }}>
-        {asset.status === 'generating' ? <GeneratingCard asset={asset} /> : asset.status === 'failed' ? <FailedCard asset={asset} /> : <p className="type-body-sm text-ink-3">This storyboard has no shots yet.</p>}
+        {asset.status === 'generating' ? (
+          <GeneratingCard asset={asset} />
+        ) : asset.status === 'failed' ? (
+          <FailedCard asset={asset} />
+        ) : isUnrecorded(asset, index) ? (
+          <UnrecordedCard asset={asset} index={index} />
+        ) : (
+          <p className="type-body-sm text-ink-3">This storyboard has no shots yet.</p>
+        )}
       </div>
     )
   }

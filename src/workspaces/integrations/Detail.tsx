@@ -156,13 +156,13 @@ function IntegrationDetail({ def }: { def: IntegrationDef }) {
       out.push({ id: `integrations.test.${def.id}`, title: `Test the ${def.name} connection`, icon: Activity, group: 'Integrations', run: (c) => (c.close(), void diagnoseConnection(def.id)) })
       out.push({ id: `integrations.disconnect.${def.id}`, title: `Disconnect ${def.name}…`, icon: Unplug, group: 'Integrations', run: (c) => (c.close(), setDisconnectOpen(true)) })
     }
-    if (!connectedLike || status === 'error') {
+    if (!connectedLike || (status === 'error' && !isModel)) {
       out.push({ id: `integrations.connect.${def.id}`, title: `${status === 'error' ? 'Reconnect' : 'Connect'} ${def.name}`, icon: Plug, group: 'Integrations', run: (c) => (c.close(), void connectNow()) })
     }
     return out
     // connectNow is stable enough for a command (it reads current state when it runs).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [def.id, def.name, connectedLike, status])
+  }, [def.id, def.name, connectedLike, status, isModel])
   useRegisterCommands(`integrations.detail.${def.id}`, commands)
 
   const menu: MenuItem[] = [
@@ -174,12 +174,11 @@ function IntegrationDetail({ def }: { def: IntegrationDef }) {
     ...(connectedLike ? [{ type: 'separator' as const }, { id: 'disconnect', label: `Disconnect ${def.name}…`, icon: Unplug, danger: true, onSelect: () => setDisconnectOpen(true) }] : []),
   ]
 
+  // While connecting, the live status chip says so; there is nothing to press. A failing model provider
+  // isn't "reconnected" (that would only re-save the same key): its form is open and Test connection retests it.
+  const reconnectable = status === 'error' && !isModel
   const primary =
-    status === 'connecting' ? (
-      <Button size="sm" variant="secondary" loading>
-        Connecting
-      </Button>
-    ) : status === 'error' ? (
+    status === 'connecting' ? null : reconnectable ? (
       <Button size="sm" variant="primary" leadingIcon={RotateCw} loading={connecting} onClick={() => void connectNow()}>
         Reconnect
       </Button>
@@ -247,7 +246,7 @@ function IntegrationDetail({ def }: { def: IntegrationDef }) {
                 <p className="type-body-sm text-pretty text-ink-2">{connection?.error ?? 'The last check failed.'}</p>
               </div>
               {/* Desktop: Reconnect is the header's primary action; phones keep it here. */}
-              {phone && (
+              {phone && reconnectable && (
                 <Button size="sm" variant="secondary" leadingIcon={RotateCw} loading={connecting} onClick={() => void connectNow()}>
                   Reconnect
                 </Button>
@@ -256,7 +255,7 @@ function IntegrationDetail({ def }: { def: IntegrationDef }) {
           )}
           <WhatsReal simulated={def.support === 'simulated'}>
             {def.support === 'simulated' && <p className="type-body-sm font-medium text-ink">{SIMULATED_LINE}</p>}
-            <p className="type-body-sm text-pretty text-ink-2">{whatsRealBody(def)}</p>
+            <p className="type-body-sm text-pretty text-ink-2">{whatsRealBody(def, connection?.config.baseUrl)}</p>
           </WhatsReal>
         </div>
 
@@ -389,6 +388,7 @@ function IntegrationDetail({ def }: { def: IntegrationDef }) {
 
 function SimulatorDetail() {
   const scope = useScope()
+  const phone = useShellLayout().formFactor === 'phone'
   const [showAll, setShowAll] = useState(false)
   const speed = useSettings((s) => s.simulation.speed)
   const setWhatsRealOpen = useShellStore((s) => s.setWhatsRealOpen)
@@ -399,7 +399,12 @@ function SimulatorDetail() {
         <StageHeader
           leading={<SimulatorMark size={24} />}
           title="Simulator"
-          status={<StatusChip status="always" />}
+          status={
+            <span className="flex items-center gap-1.5">
+              <StatusChip status="always" />
+              {!phone && <ModeBadge support="simulated" />}
+            </span>
+          }
           menu={[
             { id: 'link', label: 'Copy link', icon: Link2, onSelect: () => copyLink('/integrations/simulator') },
             { id: 'real', label: 'What’s real in this build', icon: ShieldCheck, onSelect: () => setWhatsRealOpen(true) },
@@ -411,7 +416,7 @@ function SimulatorDetail() {
         <div className="flex flex-col gap-5">
           <Intro
             kicker="AI models"
-            badge={<ModeBadge support="simulated" />}
+            badge={phone ? <ModeBadge support="simulated" /> : null}
             description="Atrium’s local template engine. It answers chat turns and runs delegated work in this build, entirely in your browser."
             facts={['Always on', `${speed}× speed`, 'Free']}
           />

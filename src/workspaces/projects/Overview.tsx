@@ -30,7 +30,7 @@ import { AssignDialog } from './AssignDialog'
 import { dueBucket } from './logic'
 import { useMemoryBreakdown } from './memory'
 import { MilestonesBlock } from './Milestones'
-import { ActorMark, DueText, QuietLine, SectionAction, SectionLabel, TaskStatusGlyph, useActorName, useIdList, useOpenTask } from './parts'
+import { ActorMark, DueText, QuietLine, SectionAction, SectionBoundary, SectionLabel, TaskStatusGlyph, useActorName, useIdList, useOpenTask } from './parts'
 
 /**
  * Overview (§6.9): the goal, progress, the milestone ruler, then Needs you · In flight · Next up on
@@ -44,18 +44,34 @@ export default function Overview({ project }: { project: Project }) {
         <Goal project={project} />
         <Progress project={project} />
       </div>
-      <MilestonesBlock project={project} />
+      <SectionBoundary name="Milestones">
+        <MilestonesBlock project={project} />
+      </SectionBoundary>
       <div className="grid gap-x-8 gap-y-10 @min-[880px]:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-10">
-          <NeedsYou project={project} />
-          <InFlight project={project} />
-          <NextUp project={project} />
+          <SectionBoundary name="Needs you">
+            <NeedsYou project={project} />
+          </SectionBoundary>
+          <SectionBoundary name="In flight">
+            <InFlight project={project} />
+          </SectionBoundary>
+          <SectionBoundary name="Next up">
+            <NextUp project={project} />
+          </SectionBoundary>
         </div>
         <div className="flex min-w-0 flex-col gap-10">
-          <Members project={project} onAssignAgent={(taskId, agentId) => setAssign({ taskId, agentId, open: true })} />
-          <Numbers project={project} />
-          <MemoryBlock project={project} />
-          <RecentActivity project={project} />
+          <SectionBoundary name="Members">
+            <Members project={project} onAssignAgent={(taskId, agentId) => setAssign({ taskId, agentId, open: true })} />
+          </SectionBoundary>
+          <SectionBoundary name="Numbers">
+            <Numbers project={project} />
+          </SectionBoundary>
+          <SectionBoundary name="Memory">
+            <MemoryBlock project={project} />
+          </SectionBoundary>
+          <SectionBoundary name="Recent activity">
+            <RecentActivity project={project} />
+          </SectionBoundary>
         </div>
       </div>
       <AssignDialog taskId={assign.taskId} agentId={assign.agentId} open={assign.open} onOpenChange={(open) => setAssign((a) => ({ ...a, open }))} />
@@ -91,6 +107,7 @@ function Progress({ project }: { project: Project }) {
   const stats = useProjectStats(project.id)
   const { total, done, inProgress, review, overdue } = stats.tasks
   const parts = [inProgress ? `${inProgress} in progress` : null, review ? `${review} in review` : null, overdue ? `${overdue} overdue` : null].filter(Boolean)
+  if (total === 0) return <p className="type-body-sm text-ink-3">No tasks yet.</p>
   return (
     <section aria-label="Progress" className="flex flex-wrap items-center gap-x-4 gap-y-2">
       <span className="type-body-sm text-ink-2">

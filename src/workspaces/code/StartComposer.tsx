@@ -36,8 +36,9 @@ export function StartComposer({ repoId: initialRepo, autoFocus, className }: Sta
   const [agentId, setAgentId] = useState<ID | null>(defaultAgent)
   const repo = useDB((s: Tables) => (repoId ? s.repos[repoId] : undefined))
   const taskProject = useDB((s: Tables) => (task ? (s.tasks[task.id]?.projectId ?? null) : undefined))
-  // The project the run uses: the linked task's, else the scope (the composer's project chip shows it).
-  const projectId = taskProject !== undefined ? taskProject : scope
+  // The project the session files into (the composer's project chip shows it): the linked task's, else
+  // the scope, else the repository's own project.
+  const projectId = taskProject !== undefined ? taskProject : (scope ?? repo?.projectId ?? null)
   const ctx = useComposerContext({ projectId, label: 'Code · New session', initialAttached: [] })
   const readBack = useReadBack({ kind: 'session', agentId, repoId, projectId })
 

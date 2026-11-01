@@ -8,7 +8,7 @@ import { formatBytes, formatDateTime, formatNumber } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import { runErase } from '../actions'
 import { applyImport, checkImport, storageReport, TABLE_LABEL, type ImportPayload, type ImportSummary, type StorageReport } from '../data'
-import { Group, Row, SectionBody, useMarkSaved } from '../parts'
+import { Group, Row, SectionBody } from '../parts'
 import { getSection } from '../sections'
 
 /** Data (§6.12): storage by table, Export JSON, Import JSON, Reset demo world, Erase everything. */
@@ -178,7 +178,6 @@ type ImportState =
   | { status: 'review'; payload: ImportPayload; summary: ImportSummary }
 
 function ExportImport() {
-  const mark = useMarkSaved()
   const fileRef = useRef<HTMLInputElement>(null)
   const [state, setState] = useState<ImportState>({ status: 'idle' })
 
@@ -202,7 +201,6 @@ function ExportImport() {
     try {
       const result = applyImport(payload, { withSettings })
       setState({ status: 'idle' })
-      mark('import', 'Import')
       if (result.unsaved.length) {
         toast.error('Imported, but not all of it was saved', {
           description: `This browser had no room for ${result.unsaved.map((t) => TABLE_LABEL[t]).join(', ')}. It is here until you reload.`,

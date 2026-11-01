@@ -5,7 +5,7 @@ import { updateAssetContent, versionContent } from '@/core/services/studio'
 import type { Asset } from '@/core/types'
 import { cn } from '@/lib/cn'
 import { Button, DiffView, Markdown, SegmentedControl, Textarea, toast, useBreakpointUp } from '@/ui'
-import { FailedCard, GeneratingCard, SideLabel } from './common'
+import { FailedCard, GeneratingCard, SideLabel, UnrecordedCard, isUnrecorded } from './common'
 import { useVersionDraft } from './useVersionDraft'
 
 /*
@@ -21,7 +21,15 @@ export function DocStage({ asset, index, compareIndex }: { asset: Asset; index: 
   if (!text.content?.trim()) {
     return (
       <div className="sim-hatch grid min-h-[320px] w-full max-w-[720px] place-items-center rounded-md border border-dashed border-line-input">
-        {asset.status === 'generating' ? <GeneratingCard asset={asset} /> : asset.status === 'failed' ? <FailedCard asset={asset} /> : <p className="type-body-sm text-ink-3">No text yet.</p>}
+        {asset.status === 'generating' ? (
+          <GeneratingCard asset={asset} />
+        ) : asset.status === 'failed' ? (
+          <FailedCard asset={asset} />
+        ) : isUnrecorded(asset, index) ? (
+          <UnrecordedCard asset={asset} index={index} />
+        ) : (
+          <p className="type-body-sm text-ink-3">No text yet.</p>
+        )}
       </div>
     )
   }

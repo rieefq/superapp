@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { ArrowUpRight, RotateCcw, Square } from 'lucide-react'
 import { attachRun } from '@/app/shell/store'
 import { useRun } from '@/core/runs'
-import { retryGeneration, stopGeneration } from '@/core/services/studio'
+import { retryGeneration, setCurrentVersion, stopGeneration, versionContent } from '@/core/services/studio'
 import type { Asset } from '@/core/types'
 import { cn } from '@/lib/cn'
 import { Button, RunStatusGlyph, StepTape, runCurrentLine } from '@/ui'
@@ -63,4 +63,34 @@ export function SideLabel({ side, index, current }: { side: 'A' | 'B'; index: nu
       {current && <span>· current</span>}
     </span>
   )
+}
+
+/**
+ * A version whose text was never recorded (seeded data from before per-version text): say so, and
+ * offer the newest version that has its text, instead of showing another version's words.
+ */
+export function UnrecordedCard({ asset, index, className }: { asset: Asset; index: number; className?: string }) {
+  let latest = -1
+  for (let i = asset.versions.length - 1; i >= 0; i--) {
+    if (i !== index && versionContent(asset, i).known) {
+      latest = i
+      break
+    }
+  }
+  return (
+    <div role="status" className={cn('flex max-w-[min(420px,90%)] flex-col items-center gap-2 rounded-md border border-line bg-overlay px-4 py-3 text-center shadow-e1', className)}>
+      <span className="type-body-sm font-medium text-ink">v{index + 1}’s text wasn’t kept</span>
+      <span className="type-caption text-ink-3">It predates per-version text in this build — only its preview and prompt were recorded.</span>
+      {latest >= 0 && (
+        <Button size="sm" variant="secondary" onClick={() => setCurrentVersion(asset.id, latest)}>
+          Show v{latest + 1}
+        </Button>
+      )}
+    </div>
+  )
+}
+
+/** True when a version exists but its text was not recorded. */
+export function isUnrecorded(asset: Asset, index: number): boolean {
+  return !!asset.versions[index] && !versionContent(asset, index).known && asset.status !== 'generating'
 }

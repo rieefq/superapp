@@ -57,6 +57,12 @@ function digestData(wf: Workflow): { lines: DigestLine[]; pendingApprovals: numb
   return { lines, pendingApprovals: db.filter('approvals', (a) => a.status === 'pending').length, dateLabel: formatDate(now, { weekday: 'long', month: 'short', day: 'numeric' }) }
 }
 
+/** Why a step can't reach its integration, with the fix. */
+function notConnectedMessage(name: string, conn: { status: string; error?: string } | undefined): string {
+  if (conn?.status === 'error') return `${name}’s connection has an error${conn.error ? ` (${conn.error.replace(/\.$/, '')})` : ''}. Reconnect it in Integrations and run again.`
+  return `${name} is not connected. Connect it in Integrations and run again.`
+}
+
 /** Where an action goes, for previews: "#product", "support@…", a folder, a team. */
 function destinationOf(node: WorkflowNode): string | undefined {
   return configString(node.config, 'channel', 'to', 'recipient', 'path', 'destination', 'folder', 'team', 'project', 'repo')
@@ -391,7 +397,7 @@ export function planWorkflow(params: Record<string, unknown>, rng: Rng): RunPlan
           input: preview.content,
           output: actionResult(acting, flow, def?.name),
           ...(notConnected
-            ? { failChance: 1, failMessage: `${def?.name ?? node.integrationId} is not connected. Connect it in Integrations and run again.` }
+            ? { failChance: 1, failMessage: notConnectedMessage(def?.name ?? node.integrationId ?? 'This integration', conn) }
             : approvedAt || !capability
               ? {}
               : { approval: { title: node.label, description: `${def?.name ?? 'This step'} will ${CAPABILITIES[capability].label.toLowerCase()}${def?.support === 'simulated' ? ' (simulated)' : ''}.`, risk, preview } }),
@@ -414,7 +420,7 @@ export function planWorkflow(params: Record<string, unknown>, rng: Rng): RunPlan
         const def = getIntegration(node.integrationId)
         const conn = node.integrationId ? db.get('connections', node.integrationId) : undefined
         if (def && conn?.status !== 'connected') {
-          steps.push({ ...base, kind: 'read', title: node.label, tool: def.name, integrationId: node.integrationId, durationMs: 700, failChance: 1, failMessage: `${def.name} is not connected. Connect it in Integrations and run again.` })
+          steps.push({ ...base, kind: 'read', title: node.label, tool: def.name, integrationId: node.integrationId, durationMs: 700, failChance: 1, failMessage: notConnectedMessage(def.name, conn) })
           break
         }
         const configured = configString(node.config, 'operation', 'template', 'expression', 'format', 'lookup')

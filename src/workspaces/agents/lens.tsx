@@ -10,7 +10,7 @@ import { useDB, useRow, type Tables } from '@/core/db'
 import { CAPABILITIES } from '@/core/permissions'
 import { useRun } from '@/core/runs'
 import { agentExecutorModel, entityRoute, useAgentLiveStatus, useAgentStats, useApprovalsForRun } from '@/core/services'
-import type { ID, Run } from '@/core/types'
+import type { Run } from '@/core/types'
 import { cn } from '@/lib/cn'
 import { timeAgo, truncate } from '@/lib/format'
 import { ApprovalCardConnected, Button, EntityChip, RISK_LABEL, RunMeta, StepTape, formatCost, runCurrentLine } from '@/ui'
@@ -194,15 +194,9 @@ function RunCard({ entity }: LensProps) {
 // ------------------------------------------------------------------------------------------------ approval
 
 function ApprovalPanel({ entity }: LensProps) {
-  const runId = useDB((s: Tables) => s.approvals[entity.id]?.runId as ID | undefined)
   return (
     <div className="flex flex-col gap-3 px-4 py-3.5">
       <ApprovalCardConnected approvalId={entity.id} variant="full" />
-      {runId && (
-        <p className="type-caption flex items-center gap-1.5 text-ink-3">
-          Asked by the run <EntityChip entity={{ kind: 'run', id: runId }} size="sm" />
-        </p>
-      )}
     </div>
   )
 }

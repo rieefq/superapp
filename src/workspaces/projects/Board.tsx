@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
-import { ArrowDown, ArrowUp, ArrowUpRight, Ellipsis, Orbit, Plus, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpRight, Ellipsis, Layers, Orbit, Plus, Trash2 } from 'lucide-react'
 import { announce } from '@/app/shell/Announcer'
+import { toggleHold } from '@/app/shell/scope'
 import { useDB } from '@/core/db'
 import { createTask, TASK_STATUS_LABEL } from '@/core/services'
 import type { ActorRef, ID, Task, TaskStatus } from '@/core/types'
@@ -452,7 +453,8 @@ const Column = memo(function Column({
       aria-labelledby={headId}
       className={cn(
         'flex max-h-full min-h-0 shrink-0 flex-col rounded-md bg-sunken transition-[background-color,box-shadow] duration-(--dur-1)',
-        fullWidth ? 'w-full' : 'w-[280px]',
+        // 280 per the spec; on wide stages columns may grow to 360 so titles and labels breathe.
+        fullWidth ? 'w-full' : 'w-[280px] min-w-[280px] grow-0 3xl:w-auto 3xl:max-w-[360px] 3xl:grow',
         dropTarget && 'shadow-[inset_0_0_0_1px_var(--line-strong)]',
       )}
     >
@@ -585,6 +587,7 @@ const BoardCard = memo(function BoardCard({ task, selected, lifted, onOpen, onKe
       { id: 'down', label: 'Move down', icon: ArrowDown, onSelect: () => nudge(task, 1) },
       { type: 'separator' },
       { id: 'assign', label: 'Assign to agent…', icon: Orbit, onSelect: () => onAssignAgent(task.id) },
+      { id: 'hold', label: 'Hold or release', description: 'Held items ride along in every new AI action', icon: Layers, onSelect: () => toggleHold({ kind: 'task', id: task.id }) },
       { id: 'delete', label: 'Delete…', icon: Trash2, danger: true, onSelect: () => void deleteWithConfirm(task) },
     ],
     [task, onOpen, onAssignAgent],

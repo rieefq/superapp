@@ -9,7 +9,7 @@ import { useDB, type Tables } from '@/core/db'
 import { KIND_META, useEntity, useProjectItems } from '@/core/services'
 import { refKey, type EntityKind, type EntityRef, type Project } from '@/core/types'
 import { timeAgo } from '@/lib/format'
-import { EntityChip, EntityMark, SimBadge } from '@/ui'
+import { EntityChip, EntityMark, entityStatusWord, SimBadge } from '@/ui'
 import { deliverablesIn } from './logic'
 import { QuietLine, SectionAction, SectionLabel } from './parts'
 
@@ -200,7 +200,6 @@ const WorkRow = memo(function WorkRow({ entity, projectName }: { entity: EntityR
 
 function statusWord(kind: EntityKind, status?: string): ReactNode {
   if (!status) return null
-  if (kind === 'session') return status === 'needs_review' ? 'Needs review' : status.replace(/_/g, ' ')
   if (kind === 'workflow') return status === 'enabled' ? 'On' : 'Off'
-  return status.replace(/_/g, ' ')
+  return entityStatusWord(kind, status)
 }

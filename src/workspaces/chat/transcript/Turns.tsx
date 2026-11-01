@@ -135,7 +135,7 @@ function AnswerTurn({ message, highlighted, threadId, isLastAnswer, busy }: Turn
         />
         {message.derived?.length ? <DerivedList source={{ kind: 'message', id: message.id }} /> : null}
         {/* The action row sits in the turn's bottom padding, so revealing it on hover never moves anything. */}
-        {!streaming && (
+        {!streaming && !(failed && !message.content) && (
           <div className={cn('absolute bottom-2 left-0', simulated && '@max-[599px]:left-3.5')}>
             <AnswerActions message={message} isLast={isLastAnswer} busy={busy} scope={ref} />
           </div>
